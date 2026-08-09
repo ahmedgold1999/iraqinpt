@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "inpt": "inptiq",
+    "default": "inptiq"
+  },
+  "targets": {},
+  "etags": {}
+}

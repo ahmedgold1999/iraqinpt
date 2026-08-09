@@ -1,0 +1,80 @@
+plugins {
+    id 'com.android.application'
+    // START: FlutterFire Configuration
+    id 'com.google.gms.google-services'
+    // END: FlutterFire Configuration
+    id 'kotlin-android'
+    id 'dev.flutter.flutter-gradle-plugin'
+}
+
+import java.util.Properties
+
+// قراءة ملف key.properties
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+} else {
+    println("WARNING: key.properties file not found! Make sure it's in android/app/")
+}
+
+android {
+    namespace 'com.inpt.ahmeed.iraqinpt'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.inpt.ahmeed.iraqinpt"
+        minSdk flutter.minSdkVersion
+        targetSdk 36
+        versionCode flutter.versionCode
+        versionName flutter.versionName
+    }
+
+    ndkVersion "28.2.13676358"
+
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    // ✅ أضف هذا القسم
+    buildFeatures {
+        buildConfig = true
+    }
+
+    // إعدادات التوقيع Release
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            signingConfig signingConfigs.release // لتجربة debug بنفس المفتاح إذا أردت
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+    implementation 'com.google.android.gms:play-services-auth:21.2.0'
+}
