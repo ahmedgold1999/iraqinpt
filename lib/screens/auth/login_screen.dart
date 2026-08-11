@@ -522,13 +522,27 @@ ahmeedgold1000@gmail.com
       final userModel = await _auth.signInWithGoogle();
       if (userModel != null) {
         await NotificationService.enableNotifications();
-        _navigateBasedOnRole(userModel.role);
+        if (mounted) {
+          _navigateBasedOnRole(userModel.role);
+        }
       } else {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        _showError(_getFirebaseErrorMessage(e));
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      _showError('فشل تسجيل الدخول عبر جوجل: ${e.toString()}');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        final errStr = e.toString();
+        if (!errStr.contains('canceled') && !errStr.contains('cancelled') && !errStr.contains('sign_in_canceled')) {
+          _showError('فشل تسجيل الدخول عبر جوجل: ${e.toString()}');
+        }
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -1384,28 +1398,6 @@ ahmeedgold1000@gmail.com
                           ),
                         ),
                       ),
-                      if (_isLogin) ...[
-                        const SizedBox(height: 16),
-                        TextButton.icon(
-                          onPressed: () {
-                            _showError('خاصية استعادة كلمة المرور قريباً');
-                          },
-                          icon: const Icon(
-                            Icons.lock_reset_rounded,
-                            color: _kIosTextMuted,
-                            size: 18,
-                          ),
-                          label: const Text(
-                            'نسيت كلمة المرور؟',
-                            style: TextStyle(
-                              color: _kIosTextMuted,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'Tajawal',
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),

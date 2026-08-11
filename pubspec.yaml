@@ -2,7 +2,7 @@ name: inpt
 description: تطبيق الاختبارات الوطني الموحد. تطبيق تعليمي متكامل للاختبارات مع نظام اشتراكات متقدم.
 publish_to: 'none'
 
-version: 1.1.7+23
+version: 1.1.8+24
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -58,6 +58,7 @@ flutter:
     - assets/icons/mohesr.pdf
     - assets/fonts/
     - assets/icons/exam_schedule.png
+    - assets/icons/graduation_hat.json
 
   # الخطوط المخصصة
   fonts:

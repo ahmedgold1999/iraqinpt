@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_radius.dart';
 import '../theme/app_text_styles.dart';
 
 class AppBottomNavItem {
@@ -30,36 +29,46 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double bottomInset = MediaQuery.of(context).padding.bottom;
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      margin: EdgeInsets.zero,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0F0F172A),
-            blurRadius: 24,
-            offset: Offset(0, 8),
+            blurRadius: 20,
+            offset: Offset(0, -4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
-            height: 68,
+            padding: EdgeInsets.only(
+              bottom: bottomInset > 0 ? bottomInset : 4,
+              top: 4,
+              left: 4,
+              right: 4,
+            ),
             decoration: BoxDecoration(
-              color: AppColors.surface.withOpacity(0.88),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.7),
-                width: 1.5,
+              color: AppColors.surface.withOpacity(0.90),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withOpacity(0.7),
+                  width: 1.5,
+                ),
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(items.length, (index) {
+            child: SizedBox(
+              height: 64,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(items.length, (index) {
                 final item = items[index];
                 final bool isSelected = currentIndex == index;
                 final Color activeColor = item.color ?? AppColors.primary;
@@ -72,6 +81,7 @@ class AppBottomNav extends StatelessWidget {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeInOut,
+                      padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -85,25 +95,25 @@ class AppBottomNav extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           AnimatedScale(
-                            scale: isSelected ? 1.12 : 1.0,
+                            scale: isSelected ? 1.1 : 1.0,
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeOutBack,
                             child: Icon(
                               item.icon,
                               color: isSelected ? activeColor : AppColors.textSecondary,
-                              size: 23,
+                              size: 22,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 2),
                           Text(
                             item.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontFamily: AppTextStyles.fontFamily,
-                              fontSize: 11,
+                              fontSize: 10.5,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                               color: isSelected ? activeColor : AppColors.textSecondary,
                             ),
@@ -118,6 +128,7 @@ class AppBottomNav extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

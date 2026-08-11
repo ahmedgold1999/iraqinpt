@@ -9,7 +9,10 @@ import '../models/app_models.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  static const String _webClientId = '527094263196-em54nrkgk7bbll25anr1drkegv7f36h6.apps.googleusercontent.com';
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: _webClientId,
+  );
   final String _usersCollection = 'users';
   
   // ذاكرة مؤقتة للمستخدم لتوفير قراءات Firestore
@@ -91,6 +94,13 @@ class AuthService {
         
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
+        // تنظيف أي جلسة سابقة معلقة لضمان عرض نافذة اختيار الحساب
+        try {
+          await _googleSignIn.signOut();
+        } catch (e) {
+          print('⚠️ تنبيه أثناء الخروج المسبق من GoogleSignIn: $e');
+        }
+
         final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
         if (googleUser == null) return null;
 
@@ -107,9 +117,14 @@ class AuthService {
 
       UserModel? userModel = await _getUserFromFirestore(user.uid);
       if (userModel == null) {
+        String displayName = user.displayName ?? '';
+        if (displayName.trim().isEmpty) {
+          displayName = (user.email ?? user.uid).split('@').first;
+        }
+
         userModel = UserModel(
           uid: user.uid,
-          name: user.displayName ?? 'مستخدم جوجل',
+          name: displayName,
           email: user.email ?? '',
           role: UserRole.student,
           isPremium: false,
@@ -117,7 +132,11 @@ class AuthService {
           expiryDate: null,
         );
         final userData = userModel.toMap();
-        userData['username'] = (user.email ?? user.uid).split('@').first;
+        String rawUsername = (user.email ?? user.uid).split('@').first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
+        if (rawUsername.isEmpty) {
+          rawUsername = 'user_${user.uid.substring(0, 6)}';
+        }
+        userData['username'] = rawUsername;
         userData['createdAt'] = FieldValue.serverTimestamp();
         userData['authMethod'] = 'google';
         await _firestore.collection(_usersCollection).doc(user.uid).set(userData);

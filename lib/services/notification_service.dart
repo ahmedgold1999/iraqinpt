@@ -100,28 +100,32 @@ class NotificationService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
-        // ✅ الاشتراك التلقائي في المواضيع العامة لضمان وصول الإشعارات لجميع الأجهزة
-        try {
-          await _fcm.subscribeToTopic('all');
-          await _fcm.subscribeToTopic('global');
-          await _fcm.subscribeToTopic('students');
-          print('✅ Subscribed to FCM topics: all, global, students');
-        } catch (e) {
-          print('⚠️ Topic subscription error: $e');
+        // ✅ الاشتراك التلقائي في المواضيع العامة فقط على الأجهزة (غير الويب)
+        if (!kIsWeb) {
+          try {
+            await _fcm.subscribeToTopic('all');
+            await _fcm.subscribeToTopic('global');
+            await _fcm.subscribeToTopic('students');
+            debugPrint('✅ Subscribed to FCM topics: all, global, students');
+          } catch (e) {
+            debugPrint('⚠️ Topic subscription error: $e');
+          }
         }
 
         String? token = await _fcm.getToken();
-        print('📱 FCM Token: $token');
+        debugPrint('📱 FCM Token: $token');
 
         await _saveTokenToFirestore(token);
 
         _fcm.onTokenRefresh.listen((newToken) async {
           await _saveTokenToFirestore(newToken);
-          try {
-            await _fcm.subscribeToTopic('all');
-            await _fcm.subscribeToTopic('global');
-            await _fcm.subscribeToTopic('students');
-          } catch (_) {}
+          if (!kIsWeb) {
+            try {
+              await _fcm.subscribeToTopic('all');
+              await _fcm.subscribeToTopic('global');
+              await _fcm.subscribeToTopic('students');
+            } catch (_) {}
+          }
         });
 
         setupListeners();

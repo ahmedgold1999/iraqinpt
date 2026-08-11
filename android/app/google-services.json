@@ -58,6 +58,14 @@
           }
         },
         {
+          "client_id": "527094263196-5u7oivitnib0skr6kl86dcm6b5ppej20.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.inpt.ahmeed.iraqinpt",
+            "certificate_hash": "f835934d22b27e8fdf5c5f2b218f13aea1025a09"
+          }
+        },
+        {
           "client_id": "527094263196-em54nrkgk7bbll25anr1drkegv7f36h6.apps.googleusercontent.com",
           "client_type": 3
         }

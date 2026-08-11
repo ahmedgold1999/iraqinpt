@@ -23,6 +23,7 @@
     }
   },
   "hosting": {
+    "site": "inptiq",
     "public": "build/web",
     "ignore": [
       "firebase.json",
