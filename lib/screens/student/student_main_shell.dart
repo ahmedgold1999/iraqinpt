@@ -10,6 +10,8 @@ import '../../widgets/luxury_bottom_nav.dart';
 import '../../models/app_models.dart';
 import '../../services/subscription_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/app_update_service.dart';
+import '../../services/daily_reminder_service.dart';
 
 class StudentMainShell extends StatefulWidget {
   const StudentMainShell({super.key});
@@ -27,6 +29,10 @@ class _StudentMainShellState extends State<StudentMainShell> {
   void initState() {
     super.initState();
     _loadUserData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppUpdateService.checkUpdateOnStartup(context);
+      DailyReminderService.checkAndDispatchTodayNotification();
+    });
   }
 
   Future<void> _loadUserData() async {

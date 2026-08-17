@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // ✅ ثيم أبل الفاخر (iOS System Luxury Theme + الخط الكوفي Noto Kufi Arabic)
+  // ✅ ثيم أبل الفاخر الفاتح (iOS System Luxury Light Theme)
   static final luxuryTheme = ThemeData(
     useMaterial3: true,
+    brightness: Brightness.light,
     primaryColor: const Color(0xFF2563EB), // أزرق ملكي زاهي
     scaffoldBackgroundColor: const Color(0xFFF8FAFC), // خلفية أبل البيضاء الصافية
     fontFamily: GoogleFonts.notoKufiArabic().fontFamily,
     textTheme: GoogleFonts.notoKufiArabicTextTheme(),
     colorScheme: ColorScheme.fromSeed(
       seedColor: const Color(0xFF2563EB),
+      brightness: Brightness.light,
       primary: const Color(0xFF2563EB),
       secondary: const Color(0xFF00C853), // أخضر زمردي
       tertiary: const Color(0xFFF59E0B), // ذهبي فاخر
@@ -46,6 +48,56 @@ class AppTheme {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
         side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+      ),
+    ),
+  );
+
+  // ✅ ثيم أبل الفاخر المظلم (OLED Dark Mode)
+  static final luxuryDarkTheme = ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    primaryColor: const Color(0xFF38BDF8), // أزرق سماوي مضيء
+    scaffoldBackgroundColor: const Color(0xFF0A0F1D), // سواد OLED فخم
+    fontFamily: GoogleFonts.notoKufiArabic().fontFamily,
+    textTheme: GoogleFonts.notoKufiArabicTextTheme(ThemeData.dark().textTheme),
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: const Color(0xFF38BDF8),
+      brightness: Brightness.dark,
+      primary: const Color(0xFF38BDF8),
+      secondary: const Color(0xFF10B981),
+      tertiary: const Color(0xFFFACC15),
+      surface: const Color(0xFF131C31),
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: true,
+      iconTheme: const IconThemeData(color: Colors.white),
+      titleTextStyle: GoogleFonts.notoKufiArabic(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF2563EB),
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+        elevation: 0,
+        textStyle: GoogleFonts.notoKufiArabic(
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+        ),
+      ),
+    ),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: const Color(0xFF131C31),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: Colors.white.withOpacity(0.08), width: 1),
       ),
     ),
   );

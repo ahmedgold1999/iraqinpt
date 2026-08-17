@@ -6,11 +6,22 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/config_service.dart';
+import '../../services/question_service.dart';
+import 'smart_vault_screen.dart';
+import 'notifications_screen.dart';
+import 'about_national_exam_screen.dart';
+import 'qualification_score_screen.dart';
+import 'exam_centers_screen.dart';
+import 'certificate_verification_screen.dart';
+import 'exam_instructions_screen.dart';
+import '../../widgets/luxury_exam_countdown_card.dart';
 import '../../routes.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_radius.dart';
 import '../../theme/app_text_styles.dart';
@@ -26,6 +37,8 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
   // ===== Bottom Nav =====
   int _currentIndex = 2; // جدول الامتحانات
   bool _showImage = false; // التحكم في إظهار الصورة
+  bool _isSyncingQuestions = false;
+  DateTime? _lastSyncDate;
   static const String _admissionsRegulationsUrl =
       'https://drive.google.com/file/d/1x5aQwSpyEZP_AS0VbfDoR0ZsEPEDOnou/preview';
   static const String _competitiveExamsUrl =
@@ -48,10 +61,65 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
     'english':
     'https://raw.githubusercontent.com/ahmedgold1999/questionsinpt/refs/heads/main/english',
   };
+
   @override
   void initState() {
     super.initState();
     _loadAllQuestionsCounts();
+    _loadLastSyncDate();
+  }
+
+  Future<void> _loadLastSyncDate() async {
+    final date = await QuestionService.getLastSyncDate();
+    if (mounted) {
+      setState(() => _lastSyncDate = date);
+    }
+  }
+
+  Future<void> _syncQuestionsNow() async {
+    setState(() => _isSyncingQuestions = true);
+    try {
+      final results = await QuestionService.syncAllQuestions();
+      int total = results.values.fold(0, (a, b) => a + b);
+      await _loadAllQuestionsCounts();
+      await _loadLastSyncDate();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF00C853),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'تم تحديث وحفظ $total سؤال بنجاح للاستخدام بدون إنترنت!',
+                    style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            content: Text('تعذر مزامنة الأسئلة: $e', style: const TextStyle(fontFamily: 'Tajawal')),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncingQuestions = false);
+      }
+    }
   }
 
   void _showAdmissionsWebView() {
@@ -2043,7 +2111,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
             children: [
               // هيدر أبل آيفون الفاخر لشاشة الأدوات
               Container(
-                margin: const EdgeInsets.only(bottom: 24),
+                margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
@@ -2099,7 +2167,336 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                 ),
               ),
 
-              // شبكة الأدوات بنمط أبل التفاعلي (Apple Control Grid 2x2)
+              // بنر لوحة المتصدرين الفاخر
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFFACC15).withOpacity(0.35), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFACC15).withOpacity(0.1),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.leaderboard),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFACC15), Color(0xFFD97706)],
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFFACC15).withOpacity(0.4),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.emoji_events_rounded, color: Color(0xFF0F172A), size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'لوحة الشرف والمتصدرين',
+                                      style: GoogleFonts.notoKufiArabic(
+                                        color: Colors.white,
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFACC15).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        'جديد',
+                                        style: TextStyle(
+                                          color: Color(0xFFFACC15),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Tajawal',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'شاهد تصنيف وترتيب الطلاب الأوائل على العراق',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11.5,
+                                    fontFamily: 'Tajawal',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFFACC15), size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // بطاقة خزنة المذاكرة والبطاقات الذكية الفخمة (Featured Smart Vault)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4F46E5), Color(0xFF6366F1), Color(0xFF0F172A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withOpacity(0.3),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SmartVaultScreen(),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.style_rounded, color: Colors.white, size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'خزنة المذاكرة والبطاقات الذكية',
+                                      style: GoogleFonts.notoKufiArabic(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        'جديد 🔥',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Tajawal',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'بطاقات فلاشية تفاعلية 3D • الأسئلة المفضلة • معالجة الأخطاء',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                    fontFamily: 'Tajawal',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ⚡ بطاقة تحدي صح أم خطأ السريع الفاخرة
+              Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0D9488), Color(0xFF059669)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0D9488).withOpacity(0.35),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.trueFalseQuiz);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.flash_on_rounded, color: Color(0xFFFDE68A), size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'اختبار صح أم خطأ السريع',
+                                      style: GoogleFonts.notoKufiArabic(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF59E0B),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        '⚡ برق',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Tajawal',
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'تحدي 10 ثوانٍ • تثبيت المفاهيم والقواعد الوزارية بلمسة واحدة',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                    fontFamily: 'Tajawal',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // شبكة الأدوات بنمط أبل التفاعلي (Apple Control Grid)
+              Row(
+                children: [
+                  _buildIosToolCard(
+                    icon: Icons.psychology_alt_rounded,
+                    title: 'بنك أخطائي',
+                    subtitle: 'مراجعة أخطائي السابقة',
+                    color: const Color(0xFFEF4444),
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.mistakes),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildIosToolCard(
+                    icon: Icons.search_rounded,
+                    title: 'البحث في الأسئلة',
+                    subtitle: 'محرك بحث فوري',
+                    color: const Color(0xFF2563EB),
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.questionSearch),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _buildIosToolCard(
+                    icon: Icons.bolt_rounded,
+                    title: 'تحدي الـ 60 ثانية',
+                    subtitle: 'اختبار السرعة الحماسي',
+                    color: const Color(0xFFF59E0B),
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.speedQuiz),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildIosToolCard(
+                    icon: Icons.alarm_rounded,
+                    title: 'المنبه وسؤال اليوم',
+                    subtitle: 'تحدي مسائي 8:00 م',
+                    color: const Color(0xFF8B5CF6),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   _buildIosToolCard(
@@ -2107,7 +2504,10 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                     title: 'فحص الشهادة',
                     subtitle: 'مسح QR المباشر',
                     color: const Color(0xFF00C853),
-                    onTap: _openCertificateCheckDialog,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const CertificateVerificationScreen()),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   _buildIosToolCard(
@@ -2127,7 +2527,10 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                     title: 'درجة التأهيل',
                     subtitle: 'حسب تخصصك الدراسي',
                     color: const Color(0xFF2563EB),
-                    onTap: _openQualificationWebView,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const QualificationScoreScreen()),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   _buildIosToolCard(
@@ -2135,7 +2538,10 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                     title: 'المراكز الامتحانية',
                     subtitle: 'دليل المراكز بالمحافظات',
                     color: const Color(0xFF8B5CF6),
-                    onTap: _openExamCentersWebView,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ExamCentersScreen()),
+                    ),
                   ),
                 ],
               ),
@@ -2155,7 +2561,10 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                     title: 'تعليمات الامتحان',
                     subtitle: 'إرشادات هامة للطالب',
                     color: const Color(0xFFEF4444),
-                    onTap: _openExamInstructions,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ExamInstructionsScreen()),
+                    ),
                   ),
                 ],
               ),
@@ -2167,7 +2576,10 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                     title: 'عن الامتحان',
                     subtitle: 'تفاصيل الاختبار الوطني',
                     color: const Color(0xFF0284C7),
-                    onTap: _openCompetitiveExamsWebView,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AboutNationalExamScreen()),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   _buildIosToolCard(
@@ -2260,6 +2672,66 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                       Icons.language_rounded,
                       'القواعد والمفردات الإنجليزية',
                     ),
+                    const SizedBox(height: 16),
+                    // زر التحديث والمزامنة للأوفلاين
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: _isSyncingQuestions ? null : _syncQuestionsNow,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (_isSyncingQuestions)
+                                  const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFFFACC15),
+                                    ),
+                                  )
+                                else
+                                  const Icon(Icons.sync_rounded, color: Color(0xFFFACC15), size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isSyncingQuestions ? 'جاري تحديث الأسئلة...' : 'تحديث بنك الأسئلة (أوفلاين)',
+                                  style: const TextStyle(
+                                    fontFamily: 'Tajawal',
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_lastSyncDate != null) ...[
+                      const SizedBox(height: 6),
+                      Center(
+                        child: Text(
+                          'آخر تحديث: ${_lastSyncDate!.year}/${_lastSyncDate!.month}/${_lastSyncDate!.day}',
+                          style: const TextStyle(
+                            fontFamily: 'Tajawal',
+                            color: Color(0xFF94A3B8),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2306,7 +2778,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
               ),
 
               const SizedBox(height: 24),
-              _buildCountdownTimer(),
+              const LuxuryExamCountdownCard(),
               const SizedBox(height: 100),
             ],
           ),
@@ -2322,16 +2794,17 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
     required Color color,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Container(
         height: 110,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF131C31) : Colors.white,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -2360,7 +2833,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                         ),
                         child: Icon(icon, color: color, size: 22),
                       ),
-                      Icon(Icons.arrow_forward_ios_rounded, color: Colors.grey.shade400, size: 14),
+                      Icon(Icons.arrow_forward_ios_rounded, color: isDark ? Colors.white38 : Colors.grey.shade400, size: 14),
                     ],
                   ),
                   Column(
@@ -2371,7 +2844,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                         style: GoogleFonts.notoKufiArabic(
                           fontSize: 13.5,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF0F172A),
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -2380,7 +2853,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                         subtitle,
                         style: GoogleFonts.notoKufiArabic(
                           fontSize: 10.5,
-                          color: const Color(0xFF64748B),
+                          color: isDark ? Colors.white60 : const Color(0xFF64748B),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

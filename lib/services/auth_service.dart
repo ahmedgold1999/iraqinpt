@@ -11,6 +11,7 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const String _webClientId = '527094263196-em54nrkgk7bbll25anr1drkegv7f36h6.apps.googleusercontent.com';
   final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: _webClientId,
     serverClientId: _webClientId,
   );
   final String _usersCollection = 'users';
@@ -346,13 +347,18 @@ class AuthService {
   /// تسجيل الخروج
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
       await _auth.signOut();
       _cachedUser = null; // تنظيف الذاكرة المؤقتة
       print('👋 تم تسجيل الخروج بنجاح');
     } catch (e) {
       print('❌ خطأ في تسجيل الخروج: $e');
-      rethrow;
+      try {
+        await _auth.signOut();
+      } catch (_) {}
+      _cachedUser = null;
     }
   }
 

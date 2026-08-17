@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/social_service.dart';
@@ -123,211 +124,125 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   // ===== Logout Dialog =====
   void _showLogoutDialog(BuildContext context, AuthService authService) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => TweenAnimationBuilder(
-        tween: Tween<double>(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 400),
-        builder: (context, value, child) {
-          return Transform.scale(
-            scale: value,
-            child: Container(
-              margin: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(30),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 50,
-                          spreadRadius: -5,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.red.shade400,
-                                Colors.red.shade700,
-                              ],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.red.shade300.withOpacity(0.5),
-                                blurRadius: 20,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.logout_rounded,
-                            color: Colors.white,
-                            size: 40,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text(
-                          'تسجيل الخروج',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'Cairo',
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Color(0xFF6B7280),
-                            fontFamily: 'Cairo',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 40),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: const Color(0xFFE5E7EB),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  style: TextButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'إلغاء',
-                                    style: TextStyle(
-                                      color: Color(0xFF6B7280),
-                                      fontWeight: FontWeight.w700,
-                                      fontFamily: 'Cairo',
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Container(
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Color(0xFFEF4444),
-                                      Color(0xFFDC2626),
-                                    ],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.red.shade400.withOpacity(0.4),
-                                      blurRadius: 15,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    Navigator.pop(context);
-                                    await authService.signOut();
-                                    Navigator.pushNamedAndRemoveUntil(
-                                        context, '/login', (route) => false);
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'تأكيد',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontFamily: 'Cairo',
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+      barrierDismissible: true,
+      builder: (dialogCtx) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF131C31) : Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.12),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 30,
-                          spreadRadius: -5,
+                  child: const Icon(
+                    Icons.logout_rounded,
+                    color: Color(0xFFEF4444),
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'تسجيل الخروج',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Tajawal',
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'هل أنت متأكد من رغبتك في تسجيل الخروج من التطبيق؟',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                    fontFamily: 'Tajawal',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0)),
                         ),
-                      ],
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        child: const Text(
-                          'إغلاق',
+                        child: Text(
+                          'إلغاء',
                           style: TextStyle(
-                            color: Color(0xFF9CA3AF),
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Cairo',
-                            fontSize: 15,
+                            fontFamily: 'Tajawal',
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white70 : const Color(0xFF64748B),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(dialogCtx);
+                          try {
+                            await authService.signOut();
+                            await FirebaseAuth.instance.signOut();
+                          } catch (e) {
+                            print('Logout error: $e');
+                          }
+                          if (context.mounted) {
+                            Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+                              AppRoutes.login,
+                              (route) => false,
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          elevation: 0,
+                        ),
+                        child: const Text(
+                          'تأكيد الخروج',
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -485,19 +400,79 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildFontSettingsCard() {
+  Widget _buildThemeSettingsCard() {
     return Consumer<SettingsProvider>(
       builder: (context, settings, _) {
+        final isDark = settings.isDarkMode;
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF131C31) : Colors.white,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFE5E5EA), width: 1),
+            border: Border.all(
+              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE5E5EA),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                    color: isDark ? const Color(0xFFFACC15) : const Color(0xFF0F172A),
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'الوضع الليلي (Dark Mode)',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                    ),
+                  ),
+                ],
+              ),
+              Switch.adaptive(
+                value: isDark,
+                activeColor: const Color(0xFF2563EB),
+                onChanged: (_) => settings.toggleTheme(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFontSettingsCard() {
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, _) {
+        final isDark = settings.isDarkMode;
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF131C31) : Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE5E5EA),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                 blurRadius: 15,
                 offset: const Offset(0, 4),
               ),
@@ -506,21 +481,21 @@ class _ProfileScreenState extends State<ProfileScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.text_fields_rounded, color: Color(0xFF0F172A), size: 20),
-                  SizedBox(width: 8),
-                  Text('حجم النص في التطبيق', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1C1C1E))),
+                  Icon(Icons.text_fields_rounded, color: isDark ? Colors.white : const Color(0xFF0F172A), size: 20),
+                  const SizedBox(width: 8),
+                  Text('حجم النص في التطبيق', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF1C1C1E))),
                 ],
               ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildFontOption(context, settings, 'صغير', 0.85),
-                  _buildFontOption(context, settings, 'افتراضي', 1.0),
-                  _buildFontOption(context, settings, 'كبير', 1.15),
-                  _buildFontOption(context, settings, 'ضخم', 1.3),
+                  _buildFontOption(context, settings, 'صغير', 0.85, isDark),
+                  _buildFontOption(context, settings, 'افتراضي', 1.0, isDark),
+                  _buildFontOption(context, settings, 'كبير', 1.15, isDark),
+                  _buildFontOption(context, settings, 'ضخم', 1.3, isDark),
                 ],
               ),
             ],
@@ -530,7 +505,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildFontOption(BuildContext context, SettingsProvider settings, String label, double scale) {
+  Widget _buildFontOption(BuildContext context, SettingsProvider settings, String label, double scale, bool isDark) {
     final isSelected = settings.fontScale == scale;
     return GestureDetector(
       onTap: () => settings.setFontScale(scale),
@@ -540,14 +515,39 @@ class _ProfileScreenState extends State<ProfileScreen>
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFF2F2F7),
+              color: isSelected
+                  ? const Color(0xFF2563EB)
+                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF2F2F7)),
               shape: BoxShape.circle,
-              border: Border.all(color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE5E5EA)),
+              border: Border.all(
+                color: isSelected
+                    ? const Color(0xFF2563EB)
+                    : (isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE5E5EA)),
+              ),
             ),
-            child: Text('ع', style: TextStyle(fontSize: 14 * scale, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? Colors.white : const Color(0xFF8E8E93))),
+            child: Text(
+              'ع',
+              style: TextStyle(
+                fontSize: 14 * scale,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.white70 : const Color(0xFF8E8E93)),
+              ),
+            ),
           ),
           const SizedBox(height: 6),
-          Text(label, style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF8E8E93))),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected
+                  ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0F172A))
+                  : (isDark ? Colors.white54 : const Color(0xFF8E8E93)),
+            ),
+          ),
         ],
       ),
     );
@@ -557,8 +557,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     switch (role) {
       case UserRole.admin:
         return 'مدير النظام';
-      case UserRole.teacher:
-        return 'معلم';
       default:
         return 'طالب';
     }
@@ -850,12 +848,31 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _buildSectionHeader('مستواك في المواد'),
                       _buildSmartStatsCard(user.uid),
 
+                      if (user.role == UserRole.admin) ...[
+                        const SizedBox(height: 16),
+                        _buildSectionHeader('إدارة النظام'),
+                        _buildInfoCard(
+                          icon: Icons.admin_panel_settings_rounded,
+                          title: 'لوحة تحكم المدير الفاخرة',
+                          value: 'فتح لوحة التحكم والمؤشرات 👑',
+                          color: const Color(0xFF2563EB),
+                          onTap: () => Navigator.pushNamed(context, AppRoutes.adminDashboard),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       _buildSectionHeader('إعدادات التطبيق'),
+                      _buildThemeSettingsCard(),
                       _buildFontSettingsCard(),
                       
                       const SizedBox(height: 16),
                       _buildSectionHeader('الحساب'),
+                      _buildInfoCard(
+                        icon: Icons.logout_rounded,
+                        title: 'تسجيل الخروج',
+                        value: 'الخروج من الحساب الحالي',
+                        color: Colors.orange,
+                        onTap: () => _showLogoutDialog(context, authService),
+                      ),
                       _buildInfoCard(
                         icon: Icons.delete_forever_rounded,
                         title: 'إدارة البيانات',
@@ -866,150 +883,58 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ]),
                   ),
 
-                  // Premium Logout Button
-                  if (daysLeft > 0 && daysLeft <= 7)
-                    SliverToBoxAdapter(
-                      child: Transform.translate(
-                        offset: Offset(0, _slideAnimation.value),
-                        child: Opacity(
-                          opacity: _fadeAnimation.value,
-                          child: Container(
-                            margin: const EdgeInsets.all(20),
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFFFFF3E0),
-                                  Color(0xFFFFE0B2),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: const Color(0xFFFFB74D),
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFFFB74D)
-                                      .withOpacity(0.2),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Color(0xFFF59E0B),
-                                        Color(0xFFD97706),
-                                      ],
-                                    ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.warning_amber_rounded,
-                                    color: Colors.white,
-                                    size: 26,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Text(
-                                    'متبقي $daysLeft أيام على انتهاء الاشتراك',
-                                    style: const TextStyle(
-                                      fontFamily: 'Cairo',
-                                      color: Color(0xFF92400E),
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    color: Color(0xFFF59E0B),
-                                    size: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  // Premium Logout Button
+                  // Bottom Logout Button
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20,
-                        vertical: 30,
+                        vertical: 24,
                       ),
-                      child: Transform.translate(
-                        offset: Offset(0, _slideAnimation.value),
-                        child: Opacity(
-                          opacity: _fadeAnimation.value,
-                          child: Container(
-                            height: 60,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFFEF4444),
-                                  Color(0xFFDC2626),
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.red.shade400.withOpacity(0.4),
-                                  blurRadius: 25,
-                                  offset: const Offset(0, 8),
+                      child: Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFEF4444),
+                              Color(0xFFDC2626),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.shade400.withOpacity(0.35),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(18),
+                          child: InkWell(
+                            onTap: () => _showLogoutDialog(context, authService),
+                            borderRadius: BorderRadius.circular(18),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.logout_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  'تسجيل الخروج من التطبيق',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Tajawal',
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ],
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                              child: InkWell(
-                                onTap: () =>
-                                    _showLogoutDialog(context, authService),
-                                borderRadius: BorderRadius.circular(20),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.logout_rounded,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Text(
-                                      'تسجيل الخروج',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontFamily: 'Cairo',
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 17,
-                                        letterSpacing: -0.3,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ),
                           ),
                         ),

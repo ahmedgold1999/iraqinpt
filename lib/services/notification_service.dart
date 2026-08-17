@@ -1,38 +1,55 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 
-/// ✅ مهم جداً: لازم تكون خارج الكلاس
+/// ✅ معالج الإشعارات والتطبيق مغلق تماماً (Background & Terminated)
 @pragma('vm:entry-point')
 Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
-  print('📬 Background message received: ${message.messageId}');
+  debugPrint('📬 Background message received: ${message.messageId}');
   
   final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
   
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const iosSettings = DarwinInitializationSettings();
+  const iosSettings = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
   const settings = InitializationSettings(android: androidSettings, iOS: iosSettings);
   
   await localNotifications.initialize(settings);
 
-  if (message.notification != null) {
+  final title = message.notification?.title ?? message.data['title']?.toString() ?? 'إشعار جديد من المنصة 📢';
+  final body = message.notification?.body ?? message.data['body']?.toString() ?? message.data['message']?.toString() ?? '';
+
+  if (title.isNotEmpty || body.isNotEmpty) {
     const androidDetails = AndroidNotificationDetails(
       'high_importance_channel',
       'High Importance Notifications',
+      channelDescription: 'قناة الإشعارات الفورية العامة والخاصة',
       importance: Importance.max,
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
     );
 
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
     await localNotifications.show(
-      message.hashCode,
-      message.notification?.title,
-      message.notification?.body,
-      const NotificationDetails(android: androidDetails, iOS: DarwinNotificationDetails()),
+      message.messageId.hashCode,
+      title,
+      body,
+      const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      payload: message.data.toString(),
     );
   }
 }
@@ -40,33 +57,38 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
 class NotificationService {
   static final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   static bool _isListenersSetup = false;
+  static final Set<String> _shownNotificationSignatures = {};
 
   static final FlutterLocalNotificationsPlugin _localNotifications =
-  FlutterLocalNotificationsPlugin();
-
-  static final CollectionReference _notificationsCollection =
-  FirebaseFirestore.instance.collection('notifications');
+      FlutterLocalNotificationsPlugin();
 
   /// ===================== INIT =====================
   static Future<void> initialize() async {
-    const androidSettings =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const iosSettings = DarwinInitializationSettings();
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
 
     const settings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
 
-    await _localNotifications.initialize(settings);
+    await _localNotifications.initialize(
+      settings,
+      onDidReceiveNotificationResponse: (details) {
+        debugPrint('👆 Local notification clicked: ${details.payload}');
+      },
+    );
 
-    // ✅ إنشاء قناة الإشعارات للأندرويد (مهم جداً لظهور الإشعارات كـ Heads-up)
+    // ✅ إنشاء قناة الإشعارات للأندرويد لظهور الإشعارات كـ Heads-up مع الصوت
     if (!kIsWeb) {
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
-        'high_importance_channel', // id
-        'High Importance Notifications', // title
-        description: 'This channel is used for important notifications.',
+        'high_importance_channel',
+        'High Importance Notifications',
+        description: 'قناة الإشعارات الفورية العامة والخاصة',
         importance: Importance.max,
         playSound: true,
         enableVibration: true,
@@ -74,12 +96,10 @@ class NotificationService {
 
       await _localNotifications
           .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
+              AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(channel);
-    }
 
-    // إعداد الـ background (فقط غير Web)
-    if (!kIsWeb) {
+      // ربط معالج الخلفية
       FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
     }
   }
@@ -100,7 +120,7 @@ class NotificationService {
       if (settings.authorizationStatus == AuthorizationStatus.authorized ||
           settings.authorizationStatus == AuthorizationStatus.provisional) {
         
-        // ✅ الاشتراك التلقائي في المواضيع العامة فقط على الأجهزة (غير الويب)
+        // ✅ الاشتراك التلقائي في كافة المواضيع لضمان وصول الإشعارات والتطبيق مغلق
         if (!kIsWeb) {
           try {
             await _fcm.subscribeToTopic('all');
@@ -130,10 +150,10 @@ class NotificationService {
 
         setupListeners();
       } else {
-        print('❌ User refused notifications');
+        debugPrint('❌ User refused notifications permission');
       }
     } catch (e) {
-      print('❌ Error in enableNotifications: $e');
+      debugPrint('❌ Error in enableNotifications: $e');
     }
   }
 
@@ -154,9 +174,9 @@ class NotificationService {
         'token': token,
         'createdAt': FieldValue.serverTimestamp(),
         'platform': kIsWeb ? 'web' : 'mobile',
-      });
+      }, SetOptions(merge: true));
     } catch (e) {
-      print('Error saving token: $e');
+      debugPrint('Error saving token: $e');
     }
   }
 
@@ -165,40 +185,88 @@ class NotificationService {
     if (_isListenersSetup) return;
     _isListenersSetup = true;
 
-    // استلام الإشعارات والتطبيق مفتوح
+    // استلام الإشعارات والتطبيق مفتوح (Foreground FCM)
     FirebaseMessaging.onMessage.listen((message) {
-      print('📬 Foreground: ${message.notification?.title}');
-      showLocalNotification(message);
+      debugPrint('📬 Foreground FCM: ${message.notification?.title}');
+      final title = message.notification?.title ?? message.data['title']?.toString() ?? 'إشعار جديد 🔔';
+      final body = message.notification?.body ?? message.data['body']?.toString() ?? message.data['message']?.toString() ?? '';
+      final signature = '$title|$body';
+
+      if (!_shownNotificationSignatures.contains(signature)) {
+        _shownNotificationSignatures.add(signature);
+        showLocalNotification(message);
+      }
     });
 
     // عند الضغط على الإشعار والتطبيق في الخلفية
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      print('👆 Notification clicked (Background)');
+      debugPrint('👆 Notification clicked (Background)');
       _handleNavigation(message);
     });
 
     // عند الضغط على الإشعار والتطبيق مغلق تماماً (Terminated)
     FirebaseMessaging.instance.getInitialMessage().then((message) {
       if (message != null) {
-        print('👆 Notification clicked (Terminated)');
+        debugPrint('👆 Notification clicked (Terminated)');
         _handleNavigation(message);
       }
     });
+
+    // الاستماع للإشعارات من Firestore لمنع التكرار
+    final DateTime appStartTime = DateTime.now().subtract(const Duration(seconds: 3));
+    FirebaseFirestore.instance
+        .collection('all_notifications')
+        .where('createdAt', isGreaterThan: Timestamp.fromDate(appStartTime))
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data();
+          if (data != null) {
+            final title = data['title']?.toString() ?? 'إشعار جديد من الإدارة 📢';
+            final body = (data['body'] ?? data['message'] ?? '').toString();
+            final signature = '$title|$body';
+            
+            // عدم تكرار العرض إذا تم عرضه مسبقاً عبر FCM
+            if (!_shownNotificationSignatures.contains(signature)) {
+              _shownNotificationSignatures.add(signature);
+              showLocalNotificationDirect(title: title, body: body);
+            }
+          }
+        }
+      }
+    }, onError: (e) => debugPrint('⚠️ Error in firestore notif stream: $e'));
   }
 
   /// ===================== LOCAL NOTIFICATION =====================
   static Future<void> showLocalNotification(RemoteMessage message) async {
+    await showLocalNotificationDirect(
+      title: message.notification?.title ?? message.data['title']?.toString() ?? 'إشعار جديد 🔔',
+      body: message.notification?.body ?? message.data['body']?.toString() ?? message.data['message']?.toString() ?? '',
+      payload: message.data.toString(),
+    );
+  }
+
+  static Future<void> showLocalNotificationDirect({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
     const androidDetails = AndroidNotificationDetails(
       'high_importance_channel',
       'High Importance Notifications',
-      channelDescription: 'App notifications',
+      channelDescription: 'قناة الإشعارات الفورية العامة والخاصة',
       importance: Importance.max,
       priority: Priority.high,
       playSound: true,
       enableVibration: true,
     );
 
-    const iosDetails = DarwinNotificationDetails();
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
 
     const details = NotificationDetails(
       android: androidDetails,
@@ -207,34 +275,34 @@ class NotificationService {
 
     await _localNotifications.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      message.notification?.title ?? 'إشعار جديد',
-      message.notification?.body ?? '',
+      title,
+      body,
       details,
-      payload: message.data.toString(),
+      payload: payload,
     );
   }
 
   /// ===================== NAVIGATION =====================
   static void _handleNavigation(RemoteMessage message) {
     final screen = message.data['screen'];
-    print('🔗 Navigate to: $screen');
+    debugPrint('🔗 Navigate to: $screen');
   }
 
-  /// ===================== FIRESTORE STREAM =====================
-  // جلب الإشعارات الخاصة والعامة مع الدمج الحي (Real-time updates)
+  /// ===================== FIRESTORE STREAM (MANAGES DE-DUPLICATION) =====================
+  // جلب الإشعارات الخاصة والعامة مع منع التكرار بنسبة 100%
   static Stream<List<NotificationModel>> getUserNotifications(String userId) {
     final userStream = FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
         .collection('notifications')
         .orderBy('createdAt', descending: true)
-        .limit(30)
+        .limit(35)
         .snapshots();
 
     final globalStream = FirebaseFirestore.instance
         .collection('all_notifications')
         .orderBy('createdAt', descending: true)
-        .limit(20)
+        .limit(35)
         .snapshots();
 
     late StreamController<List<NotificationModel>> controller;
@@ -244,40 +312,57 @@ class NotificationService {
     QuerySnapshot? lastGlobalSnap;
 
     void updateList() {
-      List<NotificationModel> combined = [];
+      Map<String, NotificationModel> map = {};
+      Set<String> seenSignatures = {};
 
+      // 1. معالجة الإشعارات الخاصة بالمستخدم أولاً
       if (lastUserSnap != null) {
         for (var doc in lastUserSnap!.docs) {
           final data = doc.data() as Map<String, dynamic>;
-          combined.add(NotificationModel(
+          final title = (data['title'] ?? '').toString().trim();
+          final body = (data['body'] ?? data['message'] ?? '').toString().trim();
+          final sig = '$title|$body';
+
+          map[doc.id] = NotificationModel(
             id: doc.id,
-            title: data['title'] ?? '',
-            body: data['body'] ?? '',
+            title: title,
+            body: body,
             dateTime: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
             isRead: data['isRead'] ?? false,
             type: data['type'],
             isGlobal: false,
-          ));
+          );
+          seenSignatures.add(sig);
         }
       }
 
+      // 2. معالجة الإشعارات العامة مع فلترة التكرار
       if (lastGlobalSnap != null) {
         for (var doc in lastGlobalSnap!.docs) {
           final data = doc.data() as Map<String, dynamic>;
+          final title = (data['title'] ?? '').toString().trim();
+          final body = (data['body'] ?? data['message'] ?? '').toString().trim();
+          final sig = '$title|$body';
+
+          // تجنب إظهار نفس الإشعار مرتين
+          if (map.containsKey(doc.id) || seenSignatures.contains(sig)) continue;
+
           final List readBy = data['readBy'] ?? [];
 
-          combined.add(NotificationModel(
+          map[doc.id] = NotificationModel(
             id: doc.id,
-            title: data['title'] ?? '',
-            body: data['body'] ?? '',
+            title: title,
+            body: body,
             dateTime: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
             isRead: readBy.contains(userId),
             type: data['type'],
             isGlobal: true,
-          ));
+          );
+          seenSignatures.add(sig);
         }
       }
 
+      List<NotificationModel> combined = map.values.toList();
       combined.sort((a, b) => b.dateTime.compareTo(a.dateTime));
       if (!controller.isClosed) {
         controller.add(combined);
@@ -312,7 +397,6 @@ class NotificationService {
 
   static Future<void> markAsRead(String userId, String notificationId, {bool isGlobal = false}) async {
     if (isGlobal) {
-      // تحديث في المجموعة العامة (إضافة المستخدم لقائمة القراء)
       await FirebaseFirestore.instance
           .collection('all_notifications')
           .doc(notificationId)
@@ -320,7 +404,6 @@ class NotificationService {
         'readBy': FieldValue.arrayUnion([userId])
       });
     } else {
-      // تحديث في مجموعة المستخدم الخاصة
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
@@ -331,11 +414,10 @@ class NotificationService {
   }
 
   static Future<void> markAllAsRead(String userId) async {
-    // هذه العملية قد تكون مكلفة، لذا سنقوم بوضع علامة على الإشعارات العامة الأخيرة فقط
     final globalDocs = await FirebaseFirestore.instance
         .collection('all_notifications')
         .orderBy('createdAt', descending: true)
-        .limit(10)
+        .limit(15)
         .get();
 
     final batch = FirebaseFirestore.instance.batch();
@@ -346,7 +428,6 @@ class NotificationService {
       });
     }
 
-    // الإشعارات الخاصة
     final privateDocs = await FirebaseFirestore.instance
         .collection('users')
         .doc(userId)
@@ -369,6 +450,61 @@ class NotificationService {
         .collection('notifications')
         .doc(notificationId)
         .delete();
+  }
+
+  /// ===================== SEND BROADCAST VIA FCM =====================
+  static Future<bool> sendBroadcastPush({
+    required String title,
+    required String body,
+    String targetSegment = 'all',
+  }) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('system_settings')
+          .doc('maintenance_and_updates')
+          .get();
+
+      String serverKey = doc.data()?['fcm_server_key']?.toString().trim() ?? '';
+      if (serverKey.isEmpty) {
+        serverKey = 'AIzaSyDy8Av3HcsiX-ZY5suKmpbyuZOX8q4HDC0';
+      }
+
+      String topic = 'all';
+      if (targetSegment == 'premium') topic = 'premium';
+      if (targetSegment == 'free') topic = 'free';
+
+      final response = await http.post(
+        Uri.parse('https://fcm.googleapis.com/fcm/send'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'key=$serverKey',
+        },
+        body: json.encode({
+          'to': '/topics/$topic',
+          'priority': 'high',
+          'content_available': true,
+          'notification': {
+            'title': title,
+            'body': body,
+            'sound': 'default',
+            'android_channel_id': 'high_importance_channel',
+          },
+          'data': {
+            'title': title,
+            'body': body,
+            'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+            'screen': 'notifications',
+            'isGlobal': 'true',
+          },
+        }),
+      );
+
+      debugPrint('📬 FCM Response: ${response.statusCode} -> ${response.body}');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('❌ Error sending FCM broadcast push: $e');
+      return false;
+    }
   }
 }
 

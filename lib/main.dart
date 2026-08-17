@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, FlutterError, PlatformDispatcher;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -18,6 +19,7 @@ import 'theme/app_theme.dart';
 import 'services/config_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
+import 'services/daily_reminder_service.dart';
 import 'services/device_service.dart';
 import 'utils/web_helper.dart';
 import 'screens/auth/login_screen.dart';
@@ -36,9 +38,20 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
+    // ✅ تهيئة مراقبة الأعطال (Firebase Crashlytics) بدون أي استهلاك للفايربيس
+    if (!kIsWeb) {
+      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+    }
+
     await NotificationService.initialize();
+    await DailyReminderService.initialize();
     await ConfigService().initialize();
     NotificationService.setupListeners();
+    NotificationService.enableNotifications();
 
     if (kIsWeb) {
       await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
@@ -201,6 +214,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
         if (!_isInitialized) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
+            theme: AppTheme.luxuryTheme,
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
@@ -216,11 +230,13 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
           );
         }
 
-        // ✅ 2. التطبيق الرئيسي (مع دعم RTL الشامل)
+        // ✅ 2. التطبيق الرئيسي (مع دعم RTL الشامل والوضع الليلي)
         return MaterialApp(
           title: 'الاختبار الوطني الموحد',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.luxuryTheme,
+          darkTheme: AppTheme.luxuryDarkTheme,
+          themeMode: settings.themeMode,
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,

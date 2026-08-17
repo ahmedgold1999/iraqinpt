@@ -1,4 +1,3 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +7,7 @@ import 'package:flutter/foundation.dart';
 class DeviceService {
   static final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
+  /// جلب المعرف الفريد للجهاز
   static Future<String> getDeviceId() async {
     if (kIsWeb) return 'web_user';
     
@@ -20,24 +20,18 @@ class DeviceService {
         return iosInfo.identifierForVendor ?? 'ios_unknown';
       }
     } catch (e) {
-      debugPrint('Error getting device id: $e');
+      debugPrint('⚠️ Error getting device id: $e');
     }
     return 'unknown_device';
   }
 
+  /// التحقق من تقييد الحساب على جهاز واحد فقط (1 Device Limit)
   static Future<bool> checkDeviceLimit() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return true;
 
     final deviceId = await getDeviceId();
-    if (deviceId == 'web_user' || deviceId == 'unknown_device') return true;
-
-    // تحسين: التحقق من التخزين المحلي أولاً لتوفير قراءات Firestore
-    final prefs = await SharedPreferences.getInstance();
-    final String cacheKey = 'device_verified_${user.uid}_$deviceId';
-    if (prefs.getBool(cacheKey) ?? false) {
-      return true; // تم التحقق من هذا الجهاز مسبقاً لهذا المستخدم
-    }
+    if (deviceId == 'unknown_device') return true;
 
     final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
     if (!userDoc.exists) return true;
@@ -47,29 +41,45 @@ class DeviceService {
     
     // المدير يتخطى القيد
     if (role == 'admin') {
-      await prefs.setBool(cacheKey, true);
       return true;
     }
 
-    List<String> devices = List<String>.from(data?['deviceIds'] ?? []);
+    // استخراج الأجهزة المسجلة
+    List<String> devices = [];
+    if (data?['deviceIds'] != null) {
+      devices = List<String>.from(data?['deviceIds']);
+    } else if (data?['deviceId'] != null && data!['deviceId'].toString().trim().isNotEmpty && data!['deviceId'] != 'غير مقيد' && data!['deviceId'] != 'تمت إعادة التعيين') {
+      devices = [data['deviceId'].toString().trim()];
+    }
 
-    // إذا كان الجهاز مسجلاً مسبقاً في Firestore
+    // 1. إذا كان هذا الجهاز مسجلاً مسبقاً لهذا الطالب -> يسمح له بالدخول
     if (devices.contains(deviceId)) {
-      await prefs.setBool(cacheKey, true);
       return true;
     }
 
-    // حد الأجهزة المسموح به (مثلاً 2)
-    if (devices.length >= 2) {
+    // 2. إذا كان الحساب مقيداً على جهاز آخر بالفعل -> منع الجهاز الجديد فوراً
+    if (devices.isNotEmpty) {
+      debugPrint('🚫 [Security] Device blocked: Account bound to $devices, attempting access from $deviceId');
       return false;
     }
 
-    // إضافة الجهاز الجديد
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-      'deviceIds': FieldValue.arrayUnion([deviceId])
-    });
+    // 3. إذا لم يكن للحساب أي جهاز مسجل (حساب جديد أو قام المدير بإلغاء القيد) -> ربط هذا الجهاز كجهاز وحيد معتمد
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'deviceIds': [deviceId],
+      'deviceId': deviceId,
+      'deviceBoundAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
-    await prefs.setBool(cacheKey, true);
+    debugPrint('✅ [Security] Account bound to new device successfully: $deviceId');
     return true;
+  }
+
+  /// فك قيد الجهاز يدوياً (للطالب أو للمدير)
+  static Future<void> resetDeviceBinding(String userId) async {
+    await FirebaseFirestore.instance.collection('users').doc(userId).set({
+      'deviceId': FieldValue.delete(),
+      'deviceIds': [],
+      'deviceBoundAt': FieldValue.delete(),
+    }, SetOptions(merge: true));
   }
 }

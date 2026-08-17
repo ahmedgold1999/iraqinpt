@@ -47,22 +47,26 @@ class _LuxuryLoadingState extends State<LuxuryLoading> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFF0F172A), // Dark Slate / Luxury Royal Navy
-            Color(0xFF1E1B4B), // Deep Indigo
-            Color(0xFF0284C7), // Academic Electric Blue Accent
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
+      body: Material(
+        type: MaterialType.transparency,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF0F172A), // Dark Slate / Luxury Royal Navy
+                Color(0xFF1E1B4B), // Deep Indigo
+                Color(0xFF0284C7), // Academic Electric Blue Accent
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
         children: [
           // Ambient Radial Light Halo
           Positioned(
@@ -157,6 +161,7 @@ class _LuxuryLoadingState extends State<LuxuryLoading> with TickerProviderStateM
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
+                      decoration: TextDecoration.none,
                       shadows: [
                         Shadow(
                           color: const Color(0xFF38BDF8).withOpacity(0.5),
@@ -186,6 +191,7 @@ class _LuxuryLoadingState extends State<LuxuryLoading> with TickerProviderStateM
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF93C5FD),
+                          decoration: TextDecoration.none,
                         ),
                       ),
                     ],
@@ -196,7 +202,9 @@ class _LuxuryLoadingState extends State<LuxuryLoading> with TickerProviderStateM
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 }
 

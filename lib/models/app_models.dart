@@ -1,7 +1,7 @@
 // lib/models/app_models.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum UserRole { student, teacher, admin }
+enum UserRole { student, admin }
 
 class UserModel {
   final String uid;
@@ -74,19 +74,14 @@ class UserModel {
         case 'admin':
           userRole = UserRole.admin;
           break;
-        case 'teacher':
-          userRole = UserRole.teacher;
-          break;
         default:
           userRole = UserRole.student;
       }
     } else if (roleData is int) {
       switch (roleData) {
         case 2:
-          userRole = UserRole.admin;
-          break;
         case 1:
-          userRole = UserRole.teacher;
+          userRole = UserRole.admin;
           break;
         default:
           userRole = UserRole.student;

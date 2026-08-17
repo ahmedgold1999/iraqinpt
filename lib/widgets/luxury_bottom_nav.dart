@@ -16,6 +16,7 @@ class LuxuryBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double bottomInset = MediaQuery.of(context).padding.bottom;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: EdgeInsets.zero,
@@ -23,7 +24,7 @@ class LuxuryBottomNav extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -41,11 +42,15 @@ class LuxuryBottomNav extends StatelessWidget {
               right: 4,
             ),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.90), // iOS Frosted Glass Effect
+              color: isDark
+                  ? const Color(0xFF0F172A).withOpacity(0.92)
+                  : Colors.white.withOpacity(0.90), // iOS Frosted Glass Effect
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border(
                 top: BorderSide(
-                  color: Colors.white.withOpacity(0.7),
+                  color: isDark
+                      ? Colors.white.withOpacity(0.12)
+                      : Colors.white.withOpacity(0.7),
                   width: 1.5,
                 ),
               ),
@@ -55,15 +60,16 @@ class LuxuryBottomNav extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildNavItem(0, Icons.home_rounded, 'الرئيسية', const Color(0xFF0F172A)),
-                  _buildNavItem(1, Icons.stars_rounded, 'التفعيل', const Color(0xFFD4AF37)),
-                  _buildNavItem(2, Icons.grid_view_rounded, 'الأدوات', const Color(0xFF00C853)),
-                  _buildNavItem(3, Icons.auto_stories_rounded, 'ملازم', const Color(0xFF2563EB)),
+                  _buildNavItem(0, Icons.home_rounded, 'الرئيسية', const Color(0xFF0F172A), isDark),
+                  _buildNavItem(1, Icons.stars_rounded, 'التفعيل', const Color(0xFFD4AF37), isDark),
+                  _buildNavItem(2, Icons.grid_view_rounded, 'الأدوات', const Color(0xFF00C853), isDark),
+                  _buildNavItem(3, Icons.auto_stories_rounded, 'ملازم', const Color(0xFF2563EB), isDark),
                   _buildNavItem(
                     4,
                     isAdmin ? Icons.admin_panel_settings_rounded : Icons.person_rounded,
                     isAdmin ? 'المدير' : 'ملفي',
                     const Color(0xFF8B5CF6),
+                    isDark,
                   ),
                 ],
               ),
@@ -74,48 +80,36 @@ class LuxuryBottomNav extends StatelessWidget {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, Color accentColor) {
+  Widget _buildNavItem(int index, IconData icon, String label, Color accentColor, bool isDark) {
     final bool isSelected = currentIndex == index;
 
     return Expanded(
-      child: InkWell(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => onTap(index),
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(vertical: 2),
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? (isDark ? accentColor.withOpacity(0.2) : accentColor.withOpacity(0.10))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // iOS Active Pill Indicator
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                width: isSelected ? 20 : 0,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: isSelected ? accentColor : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: accentColor.withOpacity(0.4),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : [],
-                ),
-              ),
-              const SizedBox(height: 4),
               AnimatedScale(
-                scale: isSelected ? 1.1 : 1.0,
+                scale: isSelected ? 1.15 : 1.0,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutBack,
                 child: Icon(
                   icon,
-                  color: isSelected ? accentColor : const Color(0xFF8E8E93),
+                  color: isSelected
+                      ? (isDark ? const Color(0xFF38BDF8) : accentColor)
+                      : (isDark ? Colors.white54 : const Color(0xFF8E8E93)),
                   size: 22,
                 ),
               ),
@@ -125,7 +119,9 @@ class LuxuryBottomNav extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: isSelected ? accentColor : const Color(0xFF8E8E93),
+                  color: isSelected
+                      ? (isDark ? const Color(0xFF38BDF8) : accentColor)
+                      : (isDark ? Colors.white54 : const Color(0xFF8E8E93)),
                   fontSize: 10.5,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                   fontFamily: 'Tajawal',

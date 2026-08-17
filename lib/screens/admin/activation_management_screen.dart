@@ -246,7 +246,9 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
                                 ),
                               ],
                             ),
-                            child: ListTile(
+                            child: Material(
+                              color: Colors.transparent,
+                              child: ListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                               leading: Container(
                                 width: 42,

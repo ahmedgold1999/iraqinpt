@@ -1,4 +1,4 @@
-// lib/screens/student/subscription_screen.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -36,6 +36,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   String _price1y = '30,000';
 
   String _selectedPlan = '1m';
+
+  StreamSubscription<DocumentSnapshot>? _pricesSubscription;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -75,6 +77,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     _animationController.forward();
     _loadUserName();
     _loadPrices();
+    _listenToFirestorePrices();
+  }
+
+  void _listenToFirestorePrices() {
+    _pricesSubscription = FirebaseFirestore.instance
+        .collection('system_settings')
+        .doc('maintenance_and_updates')
+        .snapshots()
+        .listen((doc) {
+      if (doc.exists && doc.data() != null && mounted) {
+        final data = doc.data()!;
+        setState(() {
+          if (data['price_1m'] != null && data['price_1m'].toString().trim().isNotEmpty) {
+            _price1m = data['price_1m'].toString().trim();
+          }
+          if (data['price_2m'] != null && data['price_2m'].toString().trim().isNotEmpty) {
+            _price2m = data['price_2m'].toString().trim();
+          }
+          if (data['price_3m'] != null && data['price_3m'].toString().trim().isNotEmpty) {
+            _price3m = data['price_3m'].toString().trim();
+          }
+          if (data['price_1y'] != null && data['price_1y'].toString().trim().isNotEmpty) {
+            _price1y = data['price_1y'].toString().trim();
+          }
+        });
+      }
+    }, onError: (e) => debugPrint('⚠️ Error listening to prices: $e'));
   }
 
   Future<void> _loadPrices() async {
@@ -88,6 +117,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
   @override
   void dispose() {
+    _pricesSubscription?.cancel();
     _animationController.dispose();
     _codeController.dispose();
     super.dispose();
@@ -334,10 +364,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       appBar: AppBar(
         title: const Text('الاشتراك المميز'),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: SafeArea(
         child: SingleChildScrollView(

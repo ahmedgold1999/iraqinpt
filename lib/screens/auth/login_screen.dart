@@ -14,6 +14,7 @@ import '../common/maintenance_screen.dart';
 import '../../routes.dart';
 import '../../services/auth_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/app_update_service.dart';
 import '../../models/app_models.dart';
 
 // ✅ ألوان زاهية وفاخرة بنمط تطبيقات الآيفون (iOS Vibrant Luxury Colors)
@@ -223,25 +224,7 @@ ahmeedgold1000@gmail.com
 
   Future<void> _checkForUpdate() async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('app_config')
-          .doc('version')
-          .get();
-
-      if (doc.exists) {
-        final data = doc.data();
-        if (data != null) {
-          final packageInfo = await PackageInfo.fromPlatform();
-          final currentVersion = packageInfo.version;
-          final latestVersion = data['version'] ?? '1.0.0';
-          final forceUpdate = data['forceUpdate'] ?? false;
-          final updateUrl = data['url'] ?? '';
-
-          if (_isVersionLower(currentVersion, latestVersion)) {
-            _showUpdateDialog(updateUrl, forceUpdate);
-          }
-        }
-      }
+      await AppUpdateService.checkAppUpdate(context);
     } catch (e) {
       debugPrint('Error checking update: $e');
     } finally {
@@ -747,7 +730,7 @@ ahmeedgold1000@gmail.com
 
   void _showPrivacyPolicyDialog() {
     _showTextDialog(
-      title: 'سياسة الخصوصية',
+      title: 'سياسة الخصـوصية',
       content: _privacyPolicyText,
       accentColor: _kIosAccent,
       icon: Icons.policy_rounded,
@@ -907,7 +890,7 @@ ahmeedgold1000@gmail.com
               _termsError!,
               textAlign: TextAlign.end,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 color: Color(0xFFEF4444),
                 fontFamily: 'Tajawal',
               ),
