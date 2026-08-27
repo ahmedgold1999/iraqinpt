@@ -16,6 +16,7 @@ import 'screens/student/true_false_quiz_screen.dart';
 import 'screens/student/about_national_exam_screen.dart';
 import 'screens/student/qualification_score_screen.dart';
 import 'screens/student/ai_tutor_screen.dart';
+import 'screens/admin/leaderboard_management_screen.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -25,6 +26,7 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String adminHome = '/admin-home';
   static const String adminDashboard = '/admin-dashboard';
+  static const String leaderboardManagement = '/leaderboard-management';
   static const String examsSchedule = '/exams-schedule';
   static const String studyMaterials = '/study-materials';
   static const String subscription = '/subscription';
@@ -98,6 +100,9 @@ class AppRoutes {
 
       case adminDashboard:
         return MaterialPageRoute(builder: (_) => const AdminDashboard());
+
+      case leaderboardManagement:
+        return MaterialPageRoute(builder: (_) => const LeaderboardManagementScreen());
 
       case adminHome:
         return MaterialPageRoute(builder: (_) => const StudentMainShell());
