@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -48,13 +49,16 @@ class AppUpdateService {
     await checkAppUpdate(context, isManualCheck: false);
   }
 
-  /// فحص التحديث (يدوي أو تلقائي)
+  /// فحص التحديث (يدوي أو تلقائي) مع دعم الاستهداف حسب المنصة (أندرويد / آيفون / ويب)
   static Future<void> checkAppUpdate(BuildContext context, {bool isManualCheck = false}) async {
     try {
       String latestVersion = '1.0.0';
       String updateUrl = '';
       bool isForceUpdate = false;
       String changeLog = '';
+      bool targetAndroid = true;
+      bool targetIos = true;
+      bool targetWeb = true;
 
       // 1. القراءة من system_settings/maintenance_and_updates
       final docSettings = await _db.collection('system_settings').doc('maintenance_and_updates').get();
@@ -64,6 +68,18 @@ class AppUpdateService {
         updateUrl = (data['update_url'] ?? data['url'] ?? '').toString().trim();
         isForceUpdate = data['is_force_update'] ?? data['forceUpdate'] ?? false;
         changeLog = (data['change_log'] ?? data['notes'] ?? '').toString().trim();
+        targetAndroid = data['target_android'] ?? true;
+        targetIos = data['target_ios'] ?? true;
+        targetWeb = data['target_web'] ?? true;
+
+        // دعم روابط مخصصة لكل منصة
+        if (kIsWeb && (data['web_update_url'] ?? '').toString().trim().isNotEmpty) {
+          updateUrl = data['web_update_url'].toString().trim();
+        } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && (data['android_update_url'] ?? '').toString().trim().isNotEmpty) {
+          updateUrl = data['android_update_url'].toString().trim();
+        } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS && (data['ios_update_url'] ?? '').toString().trim().isNotEmpty) {
+          updateUrl = data['ios_update_url'].toString().trim();
+        }
       } else {
         // 2. Fallback إلى app_config/version
         final docConfig = await _db.collection('app_config').doc('version').get();
@@ -73,7 +89,39 @@ class AppUpdateService {
           updateUrl = (data['url'] ?? '').toString().trim();
           isForceUpdate = data['forceUpdate'] ?? false;
           changeLog = (data['change_log'] ?? '').toString().trim();
+          targetAndroid = data['target_android'] ?? true;
+          targetIos = data['target_ios'] ?? true;
+          targetWeb = data['target_web'] ?? true;
         }
+      }
+
+      // 🔍 فحص هل منصة جهاز المستخدم الحالية مفعّلة ومستهدفة بالإشعار والتحديث
+      bool isPlatformIncluded = true;
+      if (kIsWeb) {
+        isPlatformIncluded = targetWeb;
+      } else if (defaultTargetPlatform == TargetPlatform.android) {
+        isPlatformIncluded = targetAndroid;
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        isPlatformIncluded = targetIos;
+      }
+
+      // إذا كانت منصة المستخدم غير مستهدفة، نتجاهل التحديث كلياً ولا يظهر أي إشعار أو قفل إجباري
+      if (!isPlatformIncluded) {
+        debugPrint('⏭️ AppUpdate: Skipped because current platform is disabled in update targets.');
+        if (isManualCheck && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'لا تتوفر تحديثات جديدة لمنصتك حالياً ✨',
+                style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 13.5),
+              ),
+              backgroundColor: const Color(0xFF2563EB),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          );
+        }
+        return;
       }
 
       final packageInfo = await PackageInfo.fromPlatform();

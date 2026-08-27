@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/auth_service.dart';
 import '../../services/device_service.dart';
+import '../../models/app_models.dart';
+import '../../routes.dart';
 
 class DeviceLimitScreen extends StatefulWidget {
   const DeviceLimitScreen({super.key});
@@ -21,7 +23,12 @@ class _DeviceLimitScreenState extends State<DeviceLimitScreen> {
     setState(() => _isChecking = false);
 
     if (isAllowed) {
-      Navigator.pushReplacementNamed(context, '/home');
+      final user = await AuthService().getCurrentUser();
+      if (!mounted) return;
+      final targetRoute = (user != null && user.role == UserRole.admin)
+          ? AppRoutes.adminDashboard
+          : AppRoutes.studentHome;
+      Navigator.pushNamedAndRemoveUntil(context, targetRoute, (route) => false);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -144,7 +151,7 @@ class _DeviceLimitScreenState extends State<DeviceLimitScreen> {
                     onPressed: () async {
                       await AuthService().signOut();
                       if (context.mounted) {
-                        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                        Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
                       }
                     },
                     style: OutlinedButton.styleFrom(

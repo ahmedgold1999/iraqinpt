@@ -4,7 +4,6 @@ import 'screens/auth/login_screen.dart';
 import 'screens/student/quiz_screen.dart';
 import 'screens/student/profile_screen.dart';
 import 'screens/admin/admin_dashboard.dart';
-import 'screens/admin/admin_home.dart';
 import 'screens/student/exams_schedule_screen.dart';
 import 'screens/student/study_materials_screen.dart';
 // تأكد من أن subscription_screen.dart لا يتم استيراده هنا إذا كان يحتوي على StudyMaterialsScreen
@@ -16,9 +15,11 @@ import 'screens/student/question_search_screen.dart';
 import 'screens/student/true_false_quiz_screen.dart';
 import 'screens/student/about_national_exam_screen.dart';
 import 'screens/student/qualification_score_screen.dart';
+import 'screens/student/ai_tutor_screen.dart';
 
 class AppRoutes {
   static const String login = '/login';
+  static const String home = '/home';
   static const String studentHome = '/student-home';
   static const String quiz = '/quiz';
   static const String profile = '/profile';
@@ -34,12 +35,17 @@ class AppRoutes {
   static const String trueFalseQuiz = '/true-false-quiz';
   static const String aboutExam = '/about-exam';
   static const String qualificationScore = '/qualification-score';
+  static const String aiTutor = '/ai-tutor';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case aiTutor:
+        return MaterialPageRoute(builder: (_) => const AiTutorScreen());
+
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
 
+      case home:
       case studentHome:
         return MaterialPageRoute(builder: (_) => const StudentMainShell());
 

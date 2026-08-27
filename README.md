@@ -1,16 +1,45 @@
-# iraqinpt
+# 🇮🇶 تطبيق الامتحان الوطني الموحد (INPT - Iraqi National Proficiency Test)
 
-A new Flutter project.
+منصة تعليمية متكاملة لطلبة الدراسات العليا في العراق لمحاكاة واجتياز الامتحان الوطني الموحد في (اللغة العربية، الحاسوب، واللغة الإنجليزية) عبر الهواتف والويب.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 📖 الدليل الشامل لتسليم المشروع (Developer Handover & Documentation)
 
-A few resources to get you started if this is your first Flutter project:
+تم إعداد وثيقة توثيق وتسليم تقنية كاملة ومفصلة للمشروع تشرح كل ملف، خدمة، نموذج بيانات، ومنظومات الأمان والإشعارات:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+👉 **[اضغط هنا لقراءة ملف تسليم المشروع الكامل: PROJECT_HANDOVER.md](./PROJECT_HANDOVER.md)**
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+
+## 🚀 ملخص الأوامر السريعة (Quick Commands)
+
+### 1. تشغيل التطبيق في بيئة التطوير (Development):
+```bash
+flutter run
+```
+
+### 2. تصدير تطبيق الأندرويد (Release APK):
+```bash
+flutter build apk --release
+```
+
+### 3. تصدير حزمة متجر جوجل بلاي (AAB):
+```bash
+flutter build appbundle --release
+```
+
+### 4. بناء ونشر تطبيق الويب على Firebase Hosting:
+```bash
+flutter build web --release
+npx -y firebase-tools@latest deploy --only hosting
+```
+- **رابط الويب المباشر**: [https://inptiq.web.app](https://inptiq.web.app)
+
+---
+
+## 🛠️ أهم التقنيات المستخدمة:
+- **Framework**: Flutter 3 (Dart)
+- **Backend & Cloud**: Firebase (Auth, Firestore, Cloud Messaging, Crashlytics, Hosting)
+- **Security**: Single Device Hardware Locking, VPN Detection, Maintenance Mode
+- **Features**: Real-time Exam Simulation, AI Question Explanations, TTS Audio, Offline Caching, Leaderboard, Smart Mistake Vault.

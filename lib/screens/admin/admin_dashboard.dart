@@ -7,6 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../models/question_model.dart';
 import '../../services/announcement_service.dart';
 import '../../services/auth_service.dart';
@@ -82,9 +84,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
       TextEditingController(text: 'AIzaSyDy8Av3HcsiX-ZY5suKmpbyuZOX8q4HDC0');
   bool _isForceUpdate = false;
   bool _isMaintenanceOn = false;
+  bool _targetAndroid = true;
+  bool _targetIos = true;
+  bool _targetWeb = true;
   bool _isLoadingUpdateConfig = false;
   bool _isSavingUpdateConfig = false;
   String _currentInstalledVersion = '';
+
+  // Materials & Google Forms Manager State
+  String _materialCategoryFilter = 'all'; // all, computer, arabic, english
+  String _materialTypeFilter = 'all'; // all, materials, forms
+
+  // Support Tickets Manager State
+  String _supportFilterStatus = 'all'; // all, pending, resolved
+  String _supportCategoryFilter = 'all'; // all, question, technical_issue, subscription, suggestion, materials, other
 
   @override
   void initState() {
@@ -142,78 +155,88 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  // ✅ جلب الطلاب بذكاء مرتبين من الأحدث للأقدم
+  // ✅ دالة تطبيع النصوص العربية لجعل البحث دقيقاً وشاملاً لكافة الحالات
+  String _normalizeSearchText(String input) {
+    var s = input.trim().toLowerCase();
+    // إزالة التشكيل وحركات الإعراب
+    s = s.replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '');
+    // تطبيع الألف والهمزات المختلفة
+    s = s.replaceAll(RegExp(r'[أإآٱ]'), 'ا');
+    // تطبيع التاء المربوطة والهاء
+    s = s.replaceAll('ة', 'ه');
+    // تطبيع الياء والألف المقصورة
+    s = s.replaceAll('ى', 'ي');
+    // إزالة الفراغات المكررة
+    s = s.replaceAll(RegExp(r'\s+'), ' ');
+    return s;
+  }
+
+  // ✅ جلب كافة الطلاب والمشتركين مباشرة بدون قيود أو زر عرض المزيد
   Future<void> _fetchUsers({bool isRefresh = false}) async {
-    if (isRefresh) {
-      setState(() {
-        _isLoadingUsers = true;
-        _userDocs.clear();
-        _lastDoc = null;
-        _hasMoreUsers = true;
-      });
-    } else {
-      if (_isLoadingMore || !_hasMoreUsers) return;
-      setState(() => _isLoadingMore = true);
-    }
+    setState(() {
+      _isLoadingUsers = true;
+      _userDocs.clear();
+      _lastDoc = null;
+      _hasMoreUsers = false;
+    });
 
     try {
-      Query query = _db.collection('users').orderBy('createdAt', descending: true);
-
-      if (_lastDoc != null) {
-        query = query.startAfterDocument(_lastDoc!);
-      }
-
-      final snapshot = await query.limit(_pageSize).get();
+      final snapshot = await _db.collection('users').get();
 
       if (mounted) {
         setState(() {
-          if (snapshot.docs.isNotEmpty) {
-            _userDocs.addAll(snapshot.docs);
-            _lastDoc = snapshot.docs.last;
-            _hasMoreUsers = snapshot.docs.length >= _pageSize;
-          } else {
-            _hasMoreUsers = false;
-          }
+          _userDocs = snapshot.docs;
           _isLoadingUsers = false;
           _isLoadingMore = false;
+          _hasMoreUsers = false;
+          _totalUsers = snapshot.docs.length;
         });
       }
     } catch (e) {
-      try {
-        Query fallbackQuery = _db.collection('users').limit(_pageSize);
-        if (_lastDoc != null) {
-          fallbackQuery = fallbackQuery.startAfterDocument(_lastDoc!);
-        }
-        final snapshot = await fallbackQuery.get();
-        if (mounted) {
-          setState(() {
-            _userDocs.addAll(snapshot.docs);
-            _lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
-            _hasMoreUsers = snapshot.docs.length >= _pageSize;
-            _isLoadingUsers = false;
-            _isLoadingMore = false;
-          });
-        }
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _isLoadingUsers = false;
-            _isLoadingMore = false;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _isLoadingUsers = false;
+          _isLoadingMore = false;
+        });
       }
     }
   }
 
   void _onSearchChanged(String val) {
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 200), () {
       if (mounted) {
         setState(() {
-          _searchQuery = val.trim().toLowerCase();
+          _searchQuery = val.trim();
         });
       }
     });
+  }
+
+  // ✅ استخراج البريد الإلكتروني للمستخدم حتى لو كان مسجلاً باسم المستخدم فقط
+  String _resolveUserEmail(Map<String, dynamic> data) {
+    final email = (data['email'] ?? '').toString().trim();
+    if (email.isNotEmpty && email != 'null' && email != 'بدون بريد' && email != 'بدون بريد إلكتروني') {
+      return email;
+    }
+    final username = (data['username'] ?? '').toString().trim();
+    if (username.isNotEmpty && username != 'null') {
+      return '$username@ahmeed.inpt';
+    }
+    return 'بدون بريد';
+  }
+
+  // ✅ استخراج اسم المستخدم
+  String _resolveUsername(Map<String, dynamic> data) {
+    final username = (data['username'] ?? '').toString().trim();
+    if (username.isNotEmpty && username != 'null') {
+      return username;
+    }
+    final email = (data['email'] ?? '').toString().trim();
+    if (email.contains('@ahmeed.inpt')) {
+      return email.split('@')[0];
+    }
+    return '';
   }
 
   Future<void> _loadAnnouncement() async {
@@ -491,6 +514,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _changeLogController.text = (data['change_log'] ?? data['notes'] ?? '').toString();
         _isForceUpdate = data['is_force_update'] ?? data['forceUpdate'] ?? false;
         _isMaintenanceOn = data['is_maintenance_on'] ?? false;
+        _targetAndroid = data['target_android'] ?? true;
+        _targetIos = data['target_ios'] ?? true;
+        _targetWeb = data['target_web'] ?? true;
         _price1mController.text = (data['price_1m'] ?? '10,000').toString();
         _price2mController.text = (data['price_2m'] ?? '15,000').toString();
         _price3mController.text = (data['price_3m'] ?? '20,000').toString();
@@ -505,6 +531,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
           _updateUrlController.text = (data['url'] ?? '').toString();
           _changeLogController.text = (data['change_log'] ?? '').toString();
           _isForceUpdate = data['forceUpdate'] ?? false;
+          _targetAndroid = data['target_android'] ?? true;
+          _targetIos = data['target_ios'] ?? true;
+          _targetWeb = data['target_web'] ?? true;
         }
       }
     } catch (e) {
@@ -532,6 +561,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         'is_force_update': _isForceUpdate,
         'forceUpdate': _isForceUpdate,
         'is_maintenance_on': _isMaintenanceOn,
+        'target_android': _targetAndroid,
+        'target_ios': _targetIos,
+        'target_web': _targetWeb,
         'change_log': _changeLogController.text.trim(),
         'price_1m': _price1mController.text.trim().isNotEmpty ? _price1mController.text.trim() : '10,000',
         'price_2m': _price2mController.text.trim().isNotEmpty ? _price2mController.text.trim() : '15,000',
@@ -602,6 +634,67 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
+  void _showChangePasswordDialog(String uid, String name) {
+    final passCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'تعيين كلمة مرور لـ $name',
+          style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'اكتب كلمة المرور الجديدة لحفظها في الحساب لتظهر لك وللطالب مباشرة:',
+              style: TextStyle(fontFamily: 'Tajawal', fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: passCtrl,
+              decoration: InputDecoration(
+                hintText: 'كلمة المرور الجديدة (مثال: 123456)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.lock_rounded),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newPass = passCtrl.text.trim();
+              if (newPass.isNotEmpty) {
+                await _db.collection('users').doc(uid).set({'password': newPass}, SetOptions(merge: true));
+                if (mounted) {
+                  Navigator.pop(ctx);
+                  if (Navigator.canPop(context)) Navigator.pop(context); // close bottom sheet to refresh
+                  _fetchUsers(isRefresh: true);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('تم حفظ وتحديث كلمة المرور بنجاح!')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F172A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('حفظ كلمة المرور', style: TextStyle(fontFamily: 'Tajawal')),
+          ),
+        ],
+      ),
+    );
+  }
+
   // =========================================================================
   // نافذة تفاصيل الطالب وتعديل الاسم والاشتراك (Student Details & Editor Sheet)
   // =========================================================================
@@ -621,7 +714,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         builder: (modalCtx, setModalState) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
           final currentName = nameEditController.text.trim();
-          final email = data['email'] ?? 'بدون بريد إلكتروني';
+          final email = _resolveUserEmail(data);
+          final username = _resolveUsername(data);
+          final password = (data['password'] ?? data['pass'] ?? data['plainPassword'] ?? '').toString().trim();
           final phone = data['phone'] ?? data['phoneNumber'] ?? 'غير مسجل';
           final role = data['role'] ?? 'student';
           final deviceId = data['deviceId'] ?? 'غير مقيد';
@@ -858,16 +953,51 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             ),
                           ),
                           const SizedBox(height: 8),
+                          if (username.isNotEmpty)
+                            _buildDetailTile(
+                              icon: Icons.alternate_email_rounded,
+                              label: 'اسم المستخدم (Username)',
+                              value: username,
+                              actionIcon: Icons.copy_rounded,
+                              actionTooltip: 'نسخ اسم المستخدم',
+                              onAction: () {
+                                Clipboard.setData(ClipboardData(text: username));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم نسخ اسم المستخدم!')),
+                                );
+                              },
+                              isDark: isDark,
+                            ),
                           _buildDetailTile(
                             icon: Icons.email_rounded,
                             label: 'البريد الإلكتروني',
                             value: email,
                             actionIcon: Icons.copy_rounded,
+                            actionTooltip: 'نسخ البريد الإلكتروني',
                             onAction: () {
                               Clipboard.setData(ClipboardData(text: email));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('تم نسخ البريد!')),
                               );
+                            },
+                            isDark: isDark,
+                          ),
+                          _buildDetailTile(
+                            icon: Icons.lock_rounded,
+                            label: 'كلمة المرور (Password)',
+                            value: password.isNotEmpty ? password : 'مشفرة عبر Firebase Auth 🔒',
+                            valueColor: password.isNotEmpty ? const Color(0xFF10B981) : null,
+                            actionIcon: password.isNotEmpty ? Icons.copy_rounded : Icons.edit_rounded,
+                            actionTooltip: password.isNotEmpty ? 'نسخ كلمة المرور' : 'تعيين كلمة مرور جديدة',
+                            onAction: () {
+                              if (password.isNotEmpty) {
+                                Clipboard.setData(ClipboardData(text: password));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم نسخ كلمة المرور!')),
+                                );
+                              } else {
+                                _showChangePasswordDialog(uid, name);
+                              }
                             },
                             isDark: isDark,
                           ),
@@ -928,6 +1058,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               }
                             },
                             isDark: isDark,
+                          ),
+                          const SizedBox(height: 14),
+                          // 4. زر حذف الحساب نهائياً
+                          Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: Colors.red.withOpacity(0.25)),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(14),
+                              child: InkWell(
+                                onTap: () => _confirmDeleteUser(context, ctx, uid, currentName),
+                                borderRadius: BorderRadius.circular(14),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.delete_forever_rounded, color: Colors.redAccent, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'حذف حساب الطالب نهائياً من النظام 🗑️',
+                                        style: GoogleFonts.notoKufiArabic(
+                                          color: Colors.redAccent,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 12),
                         ],
@@ -1034,6 +1200,102 @@ class _AdminDashboardState extends State<AdminDashboard> {
         },
       ),
     );
+  }
+
+  Future<void> _confirmDeleteUser(
+    BuildContext rootContext,
+    BuildContext sheetContext,
+    String uid,
+    String studentName,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: rootContext,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 24),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'تأكيد حذف الحساب',
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'هل أنت متأكد من حذف حساب الطالب "$studentName" نهائياً؟\n\n⚠️ سيتم مسح وثيقة الطالب وبياناته بالكامل من السيرفر ولا يمكن التراجع عن هذا الإجراء.',
+          style: const TextStyle(
+            fontFamily: 'Tajawal',
+            fontSize: 13.5,
+            color: Color(0xFFCBD5E1),
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal', color: Colors.white60)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            icon: const Icon(Icons.delete_forever_rounded, size: 18),
+            label: const Text('نعم، احذف نهائياً', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _db.collection('users').doc(uid).delete();
+        setState(() {
+          _userDocs.removeWhere((doc) => doc.id == uid);
+          if (_totalUsers > 0) _totalUsers--;
+        });
+        if (Navigator.canPop(sheetContext)) {
+          Navigator.pop(sheetContext);
+        }
+        if (rootContext.mounted) {
+          ScaffoldMessenger.of(rootContext).showSnackBar(
+            SnackBar(
+              content: Text('✅ تم حذف حساب الطالب "$studentName" بنجاح!'),
+              backgroundColor: const Color(0xFF10B981),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (rootContext.mounted) {
+          ScaffoldMessenger.of(rootContext).showSnackBar(
+            SnackBar(
+              content: Text('❌ حدث خطأ أثناء حذف الحساب: $e'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildDetailTile({
@@ -1249,13 +1511,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   const SizedBox(width: 6),
                   _buildTabButton(1, '👥 إدارة الطلاب (${_totalUsers > 0 ? _totalUsers : _userDocs.length})', isDark),
                   const SizedBox(width: 6),
-                  _buildTabButton(2, '📢 إشعار جماعي', isDark),
+                  _buildTabButton(2, '📚 إدارة الملازم والفورمات', isDark),
                   const SizedBox(width: 6),
-                  _buildTabButton(3, '📣 شريط التنبيه', isDark),
+                  _buildTabButton(3, '📬 رسائل وتذاكر الدعم', isDark),
                   const SizedBox(width: 6),
-                  _buildTabButton(4, '⚙️ التحديثات والصيانة', isDark),
+                  _buildTabButton(4, '📢 إشعار جماعي', isDark),
                   const SizedBox(width: 6),
-                  _buildTabButton(5, '📦 استيراد الأسئلة JSON', isDark),
+                  _buildTabButton(5, '📣 شريط التنبيه', isDark),
+                  const SizedBox(width: 6),
+                  _buildTabButton(6, '⚙️ التحديثات والصيانة', isDark),
+                  const SizedBox(width: 6),
+                  _buildTabButton(7, '📦 استيراد الأسئلة JSON', isDark),
                 ],
               ),
             ),
@@ -1267,6 +1533,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           _buildKpiOverviewTab(isDark),
           _buildStudentsManagerTab(isDark),
+          _buildStudyMaterialsManagerTab(isDark),
+          _buildSupportTicketsTab(isDark),
           _buildBroadcastNotificationTab(isDark),
           _buildAnnouncementTab(isDark),
           _buildUpdateSettingsTab(isDark),
@@ -1407,11 +1675,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           const SizedBox(height: 8),
           _buildQuickActionTile(
+            title: 'إدارة الملازم والفورمات (PDF / Forms)',
+            subtitle: 'إضافة وتعديل وحذف الملازم المرفوعة والفورمات',
+            icon: Icons.auto_stories_rounded,
+            color: const Color(0xFF8B5CF6),
+            onTap: () => setState(() => _selectedTabIndex = 2),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+          _buildQuickActionTile(
+            title: 'رسائل وتذاكر الدعم الفني 📬',
+            subtitle: 'مراجعة استفسارات ومشاكل الطلاب والمراسلة عبر واتساب',
+            icon: Icons.support_agent_rounded,
+            color: const Color(0xFF10B981),
+            onTap: () => setState(() => _selectedTabIndex = 3),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+          _buildQuickActionTile(
             title: 'إرسال إشعار جماعي فوري',
             subtitle: 'إشعار مباشر يصل لجميع الطلاب المشتركين',
             icon: Icons.campaign_rounded,
             color: const Color(0xFF2563EB),
-            onTap: () => setState(() => _selectedTabIndex = 2),
+            onTap: () => setState(() => _selectedTabIndex = 4),
             isDark: isDark,
           ),
           const SizedBox(height: 8),
@@ -1420,7 +1706,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             subtitle: 'تثبيت إعلان حي يظهر أعلى الشاشة الرئيسية',
             icon: Icons.notifications_active_rounded,
             color: const Color(0xFFD97706),
-            onTap: () => setState(() => _selectedTabIndex = 3),
+            onTap: () => setState(() => _selectedTabIndex = 5),
             isDark: isDark,
           ),
           const SizedBox(height: 8),
@@ -1429,7 +1715,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             subtitle: 'تغيير رقم الإصدار، رابط التحديث، وتفعيل القفل الإجباري',
             icon: Icons.system_update_alt_rounded,
             color: const Color(0xFF2563EB),
-            onTap: () => setState(() => _selectedTabIndex = 4),
+            onTap: () => setState(() => _selectedTabIndex = 6),
             isDark: isDark,
           ),
           const SizedBox(height: 8),
@@ -1619,16 +1905,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
       }).toList();
     }
 
-    // 3. تصفية البحث
+    // 3. تصفية البحث الذكية والمطابقة الدقيقة للحروف والهمزات العربية
     if (_searchQuery.isNotEmpty) {
+      final normalizedQuery = _normalizeSearchText(_searchQuery);
+      final rawQuery = _searchQuery.toLowerCase();
+
       filteredDocs = filteredDocs.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        final name = (data['name'] ?? data['displayName'] ?? '')
-            .toString()
-            .toLowerCase();
-        final email = (data['email'] ?? '').toString().toLowerCase();
+        final uid = doc.id.toLowerCase();
+        final rawName = (data['name'] ?? data['displayName'] ?? '').toString();
+        final normalizedName = _normalizeSearchText(rawName);
+        final email = _resolveUserEmail(data).toLowerCase();
+        final username = _resolveUsername(data).toLowerCase();
         final phone = (data['phone'] ?? data['phoneNumber'] ?? '').toString().toLowerCase();
-        return name.contains(_searchQuery) || email.contains(_searchQuery) || phone.contains(_searchQuery);
+        final code = (data['activationCode'] ?? data['code'] ?? '').toString().toLowerCase();
+        final password = (data['password'] ?? data['pass'] ?? data['plainPassword'] ?? '').toString().toLowerCase();
+
+        return normalizedName.contains(normalizedQuery) ||
+            rawName.toLowerCase().contains(rawQuery) ||
+            username.contains(rawQuery) ||
+            email.contains(rawQuery) ||
+            phone.contains(rawQuery) ||
+            uid.contains(rawQuery) ||
+            code.contains(rawQuery) ||
+            password.contains(rawQuery);
       }).toList();
     }
 
@@ -1653,7 +1953,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 controller: _searchController,
                 onChanged: _onSearchChanged,
                 decoration: InputDecoration(
-                  hintText: 'ابحث بالاسم، الإيميل أو الهاتف...',
+                  hintText: 'ابحث بالاسم، اسم المستخدم، الإيميل، رقم الهاتف، أو كود التفعيل...',
                   hintStyle:
                       const TextStyle(fontFamily: 'Tajawal', fontSize: 12.5),
                   prefixIcon: const Icon(Icons.search_rounded,
@@ -1682,7 +1982,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _buildFilterChip('الكل', 'all', isDark),
+                  _buildFilterChip('الكل (${_userDocs.length})', 'all', isDark),
                   const SizedBox(width: 6),
                   _buildFilterChip('⭐ المميزون', 'premium', isDark),
                   const SizedBox(width: 6),
@@ -1721,33 +2021,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   : ListView.builder(
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 130),
-                      itemCount: filteredDocs.length + (_hasMoreUsers ? 1 : 0),
+                      itemCount: filteredDocs.length,
                       itemBuilder: (context, index) {
-                        if (index == filteredDocs.length) {
-                          return Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: _isLoadingMore
-                                  ? const CircularProgressIndicator(strokeWidth: 2)
-                                  : OutlinedButton.icon(
-                                      onPressed: () => _fetchUsers(isRefresh: false),
-                                      icon: const Icon(Icons.arrow_downward_rounded, size: 16),
-                                      label: const Text('عرض المزيد من الطلاب (+50 إضافي) 👥', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      ),
-                                    ),
-                            ),
-                          );
-                        }
-
                         final doc = filteredDocs[index];
                         final data = doc.data() as Map<String, dynamic>;
                         final uid = doc.id;
                         final name =
                             data['name'] ?? data['displayName'] ?? 'طالب';
-                        final email = data['email'] ?? 'بدون بريد';
+                        final email = _resolveUserEmail(data);
+                        final username = _resolveUsername(data);
                         final isPremium = data['isPremium'] == true;
 
                         DateTime? expiryDate;
@@ -1762,6 +2044,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           data: data,
                           name: name,
                           email: email,
+                          username: username,
                           isPremium: isPremium,
                           expiryDate: expiryDate,
                           isDark: isDark,
@@ -1800,6 +2083,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     required Map<String, dynamic> data,
     required String name,
     required String email,
+    String? username,
     required bool isPremium,
     DateTime? expiryDate,
     required bool isDark,
@@ -1891,7 +2175,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ],
                       ),
                       Text(
-                        email,
+                        (username != null && username.isNotEmpty) ? '@$username • $email' : email,
                         style: const TextStyle(
                             fontFamily: 'Cairo',
                             fontSize: 10.5,
@@ -2408,6 +2692,66 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 const SizedBox(height: 18),
 
+                // Platform Targeting Selection Section
+                Text(
+                  '🎯 المنصات المستهدفة بالتحديث والإشعار:',
+                  style: GoogleFonts.notoKufiArabic(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'اختر المنصات التي سيصلها إشعار التحديث الجديد أو القفل الإجباري (المنصات المعطلة لن يظهر لمستخدميها أي إشعار نهائياً):',
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 11.5,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildPlatformToggleCard(
+                        title: 'أندرويد',
+                        subtitle: 'Android',
+                        icon: Icons.android_rounded,
+                        activeColor: const Color(0xFF10B981),
+                        isSelected: _targetAndroid,
+                        onTap: () => setState(() => _targetAndroid = !(_targetAndroid)),
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildPlatformToggleCard(
+                        title: 'آيفون',
+                        subtitle: 'iOS / Apple',
+                        icon: Icons.apple_rounded,
+                        activeColor: const Color(0xFF0284C7),
+                        isSelected: _targetIos,
+                        onTap: () => setState(() => _targetIos = !(_targetIos)),
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildPlatformToggleCard(
+                        title: 'الويب',
+                        subtitle: 'Web Browser',
+                        icon: Icons.language_rounded,
+                        activeColor: const Color(0xFF8B5CF6),
+                        isSelected: _targetWeb,
+                        onTap: () => setState(() => _targetWeb = !(_targetWeb)),
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
                 // Force Update Switch
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -2757,6 +3101,79 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  Widget _buildPlatformToggleCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color activeColor,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? activeColor.withOpacity(0.12)
+              : (isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFF8FAFC)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? activeColor
+                : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFCBD5E1)),
+            width: isSelected ? 1.8 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? activeColor.withOpacity(0.2) : Colors.grey.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? activeColor : Colors.grey,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: GoogleFonts.notoKufiArabic(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? activeColor : (isDark ? Colors.white70 : const Color(0xFF334155)),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected ? activeColor : Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                isSelected ? 'مفعّل ✅' : 'معطّل ❌',
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ==========================================
   // TAB 6: 📦 JSON Bulk Questions Importer
   // ==========================================
@@ -2992,5 +3409,1253 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ],
       ),
     );
+  }
+
+  // ==========================================
+  // TAB: 📚 إدارة الملازم والفورمات (CRUD)
+  // ==========================================
+  Widget _buildStudyMaterialsManagerTab(bool isDark) {
+    final categories = [
+      {'id': 'all', 'name': 'الكل', 'icon': Icons.apps_rounded, 'color': const Color(0xFF6366F1)},
+      {'id': 'computer', 'name': 'حاسوب', 'icon': Icons.laptop_chromebook_rounded, 'color': const Color(0xFF2563EB)},
+      {'id': 'arabic', 'name': 'عربي', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFFD97706)},
+      {'id': 'english', 'name': 'إنكليزي', 'icon': Icons.language_rounded, 'color': const Color(0xFF059669)},
+    ];
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Column(
+        children: [
+          // 1. شريط الأزرار العلوية وفلاتر التصنيف
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                // أزرار الإضافة السريعة
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showAddEditMaterialDialog(),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                        label: const Text(
+                          'إضافة ملزمة PDF 📄',
+                          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12.5),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showAddEditFormDialog(),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                        label: const Text(
+                          'إضافة فورمة تفاعلية 📝',
+                          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12.5),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // تصنيفات المواد (الكل / حاسوب / عربي / إنكليزي)
+                Row(
+                  children: categories.map((cat) {
+                    final isSelected = _materialCategoryFilter == cat['id'];
+                    final color = cat['color'] as Color;
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _materialCategoryFilter = cat['id'] as String),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? color
+                                  : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              cat['name'] as String,
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 8),
+
+                // فلتر النوع (الكل / الملازم فقط / الفورمات فقط)
+                Row(
+                  children: [
+                    _buildMaterialTypeChip('all', 'الكل', isDark),
+                    const SizedBox(width: 6),
+                    _buildMaterialTypeChip('materials', 'الملازم PDF فقط', isDark),
+                    const SizedBox(width: 6),
+                    _buildMaterialTypeChip('forms', 'الفورمات فقط', isDark),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // 2. قائمة الملازم والفورمات المباشرة من Firestore
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // الملازم PDF
+                  if (_materialTypeFilter == 'all' || _materialTypeFilter == 'materials') ...[
+                    StreamBuilder<QuerySnapshot>(
+                      stream: _db.collection('study_materials').orderBy('createdAt', descending: true).snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Text('خطأ في تحميل الملازم: ${snapshot.error}', style: const TextStyle(color: Colors.red));
+                        }
+                        if (!snapshot.hasData) {
+                          return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+                        }
+
+                        final docs = snapshot.data!.docs.where((d) {
+                          if (_materialCategoryFilter == 'all') return true;
+                          final data = d.data() as Map<String, dynamic>;
+                          return data['category'] == _materialCategoryFilter;
+                        }).toList();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFDC2626), size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'الملازم الدراسية PDF (${docs.length})',
+                                  style: GoogleFonts.notoKufiArabic(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (docs.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                                ),
+                                child: const Center(
+                                  child: Text('لا توجد ملازم مضافة في هذا القسم', style: TextStyle(fontFamily: 'Tajawal', color: Color(0xFF94A3B8))),
+                                ),
+                              )
+                            else
+                              ...docs.map((doc) => _buildMaterialAdminCard(doc, isDark)),
+                            const SizedBox(height: 20),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+
+                  // الفورمات التفاعلية
+                  if (_materialTypeFilter == 'all' || _materialTypeFilter == 'forms') ...[
+                    StreamBuilder<QuerySnapshot>(
+                      stream: _db.collection('google_forms').orderBy('createdAt', descending: true).snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Text('خطأ في تحميل الفورمات: ${snapshot.error}', style: const TextStyle(color: Colors.red));
+                        }
+                        if (!snapshot.hasData) {
+                          return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+                        }
+
+                        final docs = snapshot.data!.docs.where((d) {
+                          if (_materialCategoryFilter == 'all') return true;
+                          final data = d.data() as Map<String, dynamic>;
+                          return data['category'] == _materialCategoryFilter;
+                        }).toList();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.quiz_rounded, color: Color(0xFF2563EB), size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'الفورمات والاختبارات التفاعلية (${docs.length})',
+                                  style: GoogleFonts.notoKufiArabic(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (docs.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                                ),
+                                child: const Center(
+                                  child: Text('لا توجد فورمات مضافة في هذا القسم', style: TextStyle(fontFamily: 'Tajawal', color: Color(0xFF94A3B8))),
+                                ),
+                              )
+                            else
+                              ...docs.map((doc) => _buildFormAdminCard(doc, isDark)),
+                            const SizedBox(height: 20),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMaterialTypeChip(String type, String label, bool isDark) {
+    final isSelected = _materialTypeFilter == type;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _materialTypeFilter = type),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF0F172A)
+                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFFFACC15)
+                  : (isDark ? Colors.white10 : const Color(0xFFCBD5E1)),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+              color: isSelected ? const Color(0xFFFACC15) : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialAdminCard(DocumentSnapshot doc, bool isDark) {
+    final data = doc.data() as Map<String, dynamic>;
+    final name = data['name'] ?? 'بدون عنوان';
+    final description = data['description'] ?? '';
+    final category = data['category'] ?? 'computer';
+    final pdfUrl = data['pdfUrl'] ?? '';
+
+    String catName = 'حاسوب';
+    Color catColor = const Color(0xFF2563EB);
+    if (category == 'arabic') {
+      catName = 'عربي';
+      catColor = const Color(0xFFD97706);
+    } else if (category == 'english') {
+      catName = 'إنكليزي';
+      catColor = const Color(0xFF059669);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: catColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(catName, style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, fontWeight: FontWeight.bold, color: catColor)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  name,
+                  style: GoogleFonts.notoKufiArabic(fontSize: 13.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_rounded, color: Color(0xFF2563EB), size: 20),
+                tooltip: 'تعديل',
+                onPressed: () => _showAddEditMaterialDialog(doc: doc),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                tooltip: 'حذف',
+                onPressed: () => _confirmDelete(doc.reference, name, 'الملزمة'),
+              ),
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(description, style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B)), maxLines: 2, overflow: TextOverflow.ellipsis),
+          ],
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.link_rounded, size: 14, color: Color(0xFF94A3B8)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    pdfUrl,
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Color(0xFF64748B)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormAdminCard(DocumentSnapshot doc, bool isDark) {
+    final data = doc.data() as Map<String, dynamic>;
+    final name = data['name'] ?? 'بدون عنوان';
+    final description = data['description'] ?? '';
+    final category = data['category'] ?? 'computer';
+    final formUrl = data['formUrl'] ?? '';
+
+    String catName = 'حاسوب';
+    Color catColor = const Color(0xFF2563EB);
+    if (category == 'arabic') {
+      catName = 'عربي';
+      catColor = const Color(0xFFD97706);
+    } else if (category == 'english') {
+      catName = 'إنكليزي';
+      catColor = const Color(0xFF059669);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: catColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(catName, style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, fontWeight: FontWeight.bold, color: catColor)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  name,
+                  style: GoogleFonts.notoKufiArabic(fontSize: 13.5, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_rounded, color: Color(0xFF2563EB), size: 20),
+                tooltip: 'تعديل',
+                onPressed: () => _showAddEditFormDialog(doc: doc),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                tooltip: 'حذف',
+                onPressed: () => _confirmDelete(doc.reference, name, 'الفورمة'),
+              ),
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(description, style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: isDark ? Colors.white60 : const Color(0xFF64748B)), maxLines: 2, overflow: TextOverflow.ellipsis),
+          ],
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.link_rounded, size: 14, color: Color(0xFF94A3B8)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    formUrl,
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Color(0xFF64748B)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===== نافذة إضافة / تعديل ملزمة PDF =====
+  void _showAddEditMaterialDialog({DocumentSnapshot? doc}) {
+    final isEdit = doc != null;
+    final data = isEdit ? (doc.data() as Map<String, dynamic>) : null;
+
+    final nameController = TextEditingController(text: data?['name'] ?? '');
+    final descController = TextEditingController(text: data?['description'] ?? '');
+    final urlController = TextEditingController(text: data?['pdfUrl'] ?? '');
+    String selectedCat = data?['category'] ?? 'computer';
+    bool isSaving = false;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDC2626).withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFDC2626), size: 24),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        isEdit ? 'تعديل بيانات الملزمة' : 'إضافة ملزمة PDF جديدة',
+                        style: GoogleFonts.notoKufiArabic(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // اختيار المادة
+                  Text('المادة الدراسية:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: selectedCat,
+                    dropdownColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'computer', child: Text('الحاسوب 💻', style: TextStyle(fontFamily: 'Tajawal'))),
+                      DropdownMenuItem(value: 'arabic', child: Text('اللغة العربية 📖', style: TextStyle(fontFamily: 'Tajawal'))),
+                      DropdownMenuItem(value: 'english', child: Text('اللغة الإنكليزية 🇬🇧', style: TextStyle(fontFamily: 'Tajawal'))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedCat = val);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // اسم الملزمة
+                  Text('عنوان الملزمة:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      hintText: 'مثال: ملزمة الحاسوب الشاملة 2026',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13.5),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // الوصف
+                  Text('الوصف أو الملاحظات:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: descController,
+                    decoration: InputDecoration(
+                      hintText: 'مثال: خاصة بالأستاذ م. أحمد سلام الخزرجي',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13.5),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // رابط الـ PDF المباشر / Cloudflare R2
+                  Text('رابط ملف الـ PDF (Cloudflare R2 / Drive):', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: urlController,
+                    decoration: InputDecoration(
+                      hintText: 'https://pub-xxxxxx.r2.dev/file.pdf',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 22),
+
+                  // أزرار الحفظ والإلغاء
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (nameController.text.trim().isEmpty || urlController.text.trim().isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('يرجى ملء اسم الملزمة ورابط الـ PDF')),
+                                    );
+                                    return;
+                                  }
+
+                                  setDialogState(() => isSaving = true);
+                                  try {
+                                    final materialData = {
+                                      'name': nameController.text.trim(),
+                                      'description': descController.text.trim(),
+                                      'category': selectedCat,
+                                      'pdfUrl': urlController.text.trim(),
+                                      'updatedAt': FieldValue.serverTimestamp(),
+                                    };
+
+                                    if (isEdit) {
+                                      await doc.reference.update(materialData);
+                                    } else {
+                                      materialData['createdAt'] = FieldValue.serverTimestamp();
+                                      await _db.collection('study_materials').add(materialData);
+                                    }
+
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(isEdit ? 'تم تحديث الملزمة بنجاح 🚀' : 'تمت إضافة الملزمة بنجاح 🎉', style: const TextStyle(fontFamily: 'Tajawal')),
+                                          backgroundColor: const Color(0xFF10B981),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    setDialogState(() => isSaving = false);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+                                      );
+                                    }
+                                  }
+                                },
+                          child: isSaving
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : Text(isEdit ? 'حفظ التعديلات' : 'إضافة الآن 🚀', style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===== نافذة إضافة / تعديل فورمة Google Form =====
+  void _showAddEditFormDialog({DocumentSnapshot? doc}) {
+    final isEdit = doc != null;
+    final data = isEdit ? (doc.data() as Map<String, dynamic>) : null;
+
+    final nameController = TextEditingController(text: data?['name'] ?? '');
+    final descController = TextEditingController(text: data?['description'] ?? '');
+    final urlController = TextEditingController(text: data?['formUrl'] ?? '');
+    String selectedCat = data?['category'] ?? 'computer';
+    bool isSaving = false;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB).withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.quiz_rounded, color: Color(0xFF2563EB), size: 24),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        isEdit ? 'تعديل بيانات الفورمة' : 'إضافة فورمة تفاعلية جديدة',
+                        style: GoogleFonts.notoKufiArabic(fontSize: 15, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // اختيار المادة
+                  Text('المادة الدراسية:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: selectedCat,
+                    dropdownColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'computer', child: Text('الحاسوب 💻', style: TextStyle(fontFamily: 'Tajawal'))),
+                      DropdownMenuItem(value: 'arabic', child: Text('اللغة العربية 📖', style: TextStyle(fontFamily: 'Tajawal'))),
+                      DropdownMenuItem(value: 'english', child: Text('اللغة الإنكليزية 🇬🇧', style: TextStyle(fontFamily: 'Tajawal'))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedCat = val);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // اسم الفورمة
+                  Text('عنوان الفورمة:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      hintText: 'مثال: اختبار تجريبي حاسوب - نماذج 2026',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13.5),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // الوصف
+                  Text('الوصف:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: descController,
+                    decoration: InputDecoration(
+                      hintText: 'مثال: تدريب على أسئلة الاختيارات المتعددة',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13.5),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // رابط الفورمة
+                  Text('رابط الفورمة (Google Form):', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: urlController,
+                    decoration: InputDecoration(
+                      hintText: 'https://docs.google.com/forms/d/e/.../viewform',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 22),
+
+                  // أزرار الحفظ والإلغاء
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  if (nameController.text.trim().isEmpty || urlController.text.trim().isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('يرجى ملء اسم الفورمة ورابطها')),
+                                    );
+                                    return;
+                                  }
+
+                                  setDialogState(() => isSaving = true);
+                                  try {
+                                    final formData = {
+                                      'name': nameController.text.trim(),
+                                      'description': descController.text.trim(),
+                                      'category': selectedCat,
+                                      'formUrl': urlController.text.trim(),
+                                      'updatedAt': FieldValue.serverTimestamp(),
+                                    };
+
+                                    if (isEdit) {
+                                      await doc.reference.update(formData);
+                                    } else {
+                                      formData['createdAt'] = FieldValue.serverTimestamp();
+                                      await _db.collection('google_forms').add(formData);
+                                    }
+
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(isEdit ? 'تم تحديث الفورمة بنجاح 🚀' : 'تمت إضافة الفورمة بنجاح 🎉', style: const TextStyle(fontFamily: 'Tajawal')),
+                                          backgroundColor: const Color(0xFF10B981),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    setDialogState(() => isSaving = false);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+                                      );
+                                    }
+                                  }
+                                },
+                          child: isSaving
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : Text(isEdit ? 'حفظ التعديلات' : 'إضافة الآن 🚀', style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===== نافذة تأكيد الحذف =====
+  void _confirmDelete(DocumentReference ref, String title, String typeName) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.delete_forever_rounded, color: Colors.red, size: 26),
+            const SizedBox(width: 8),
+            Text('حذف $typeName', style: GoogleFonts.notoKufiArabic(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red)),
+          ],
+        ),
+        content: Text(
+          'هل أنت متأكد من رغبتك في حذف "$title" نهائياً من قاعدة البيانات؟',
+          style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal', color: isDark ? Colors.white70 : Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ref.delete();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('تم حذف $typeName بنجاح 🗑️', style: const TextStyle(fontFamily: 'Tajawal')), backgroundColor: Colors.red),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ في الحذف: $e'), backgroundColor: Colors.red));
+                }
+              }
+            },
+            child: const Text('تأكيد الحذف', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB: 📬 رسائل وتذاكر الدعم الفني (Support Tickets)
+  // ==========================================
+  Widget _buildSupportTicketsTab(bool isDark) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Column(
+        children: [
+          // 1. شريط الفلاتر العلوية
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                // فلتر الحالة (الكل / قيد الانتظار / تم الحل)
+                Row(
+                  children: [
+                    _buildSupportStatusChip('all', 'الكل 📬', isDark),
+                    const SizedBox(width: 6),
+                    _buildSupportStatusChip('pending', 'قيد الانتظار ⏳', isDark),
+                    const SizedBox(width: 6),
+                    _buildSupportStatusChip('resolved', 'تم الحل والتواصل ✅', isDark),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // 2. قائمة الرسائل والتذاكر المباشرة من Firestore
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _db.collection('support_tickets').orderBy('createdAt', descending: true).snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text('خطأ في تحميل الرسائل: ${snapshot.error}', style: const TextStyle(color: Colors.red)),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+                }
+
+                final allDocs = snapshot.data!.docs;
+                final filteredDocs = allDocs.where((d) {
+                  final data = d.data() as Map<String, dynamic>;
+                  final status = data['status'] ?? 'pending';
+
+                  if (_supportFilterStatus == 'all') return true;
+                  return status == _supportFilterStatus;
+                }).toList();
+
+                if (filteredDocs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withOpacity(0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.mark_email_read_rounded, size: 48, color: Color(0xFF10B981)),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'لا توجد رسائل دعم في هذا القسم حالياً',
+                          style: GoogleFonts.notoKufiArabic(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white70 : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredDocs.length,
+                  itemBuilder: (context, index) {
+                    final doc = filteredDocs[index];
+                    return _buildSupportTicketCard(doc, isDark);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupportStatusChip(String status, String label, bool isDark) {
+    final isSelected = _supportFilterStatus == status;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _supportFilterStatus = status),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF10B981)
+                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF10B981) : (isDark ? Colors.white10 : const Color(0xFFCBD5E1)),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 11.5,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+              color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSupportTicketCard(DocumentSnapshot doc, bool isDark) {
+    final data = doc.data() as Map<String, dynamic>;
+    final userName = data['userName'] ?? 'طالب';
+    final userEmail = data['userEmail'] ?? '';
+    final categoryLabel = data['categoryLabel'] ?? 'استفسار عام';
+    final whatsapp = data['whatsapp'] ?? '';
+    final message = data['message'] ?? '';
+    final status = data['status'] ?? 'pending';
+    final isResolved = status == 'resolved';
+
+    DateTime? createdAt;
+    if (data['createdAt'] != null && data['createdAt'] is Timestamp) {
+      createdAt = (data['createdAt'] as Timestamp).toDate();
+    }
+    final formattedDate = createdAt != null ? DateFormat('yyyy/MM/dd - hh:mm a', 'en').format(createdAt) : '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isResolved
+              ? const Color(0xFF10B981).withOpacity(0.5)
+              : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+          width: isResolved ? 1.5 : 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // الرأس: نوع الاستعلام والحالة وتاريخ الإرسال
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  categoryLabel,
+                  style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isResolved ? const Color(0xFF10B981).withOpacity(0.12) : const Color(0xFFF59E0B).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isResolved ? 'تم الحل والتواصل ✅' : 'قيد الانتظار ⏳',
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isResolved ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                formattedDate,
+                style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Color(0xFF94A3B8)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // معلومات الطالب المرسل
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: const Color(0xFF0F172A),
+                child: Text(
+                  userName.isNotEmpty ? userName[0].toUpperCase() : 'ط',
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      userName,
+                      style: GoogleFonts.notoKufiArabic(fontSize: 13, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    ),
+                    if (userEmail.isNotEmpty)
+                      Text(
+                        userEmail,
+                        style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Color(0xFF94A3B8)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // نص الرسالة
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+            ),
+            child: Text(
+              message,
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 13,
+                height: 1.4,
+                color: isDark ? Colors.white70 : const Color(0xFF334155),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // شريط أزرار الإجراءات والواتساب
+          Row(
+            children: [
+              // زر مراسلة الواتساب المباشر
+              if (whatsapp.isNotEmpty)
+                ElevatedButton.icon(
+                  onPressed: () => _openWhatsApp(whatsapp, userName, categoryLabel),
+                  icon: const FaIcon(FontAwesomeIcons.whatsapp, size: 16),
+                  label: Text(
+                    'واتساب: $whatsapp 💬',
+                    style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+              const Spacer(),
+
+              // زر تبديل الحالة (تم الحل / قيد الانتظار)
+              IconButton(
+                icon: Icon(
+                  isResolved ? Icons.restart_alt_rounded : Icons.check_circle_outline_rounded,
+                  color: isResolved ? const Color(0xFFD97706) : const Color(0xFF10B981),
+                  size: 22,
+                ),
+                tooltip: isResolved ? 'إعادة إلى قيد الانتظار' : 'تحديد كـ تم الحل',
+                onPressed: () async {
+                  await doc.reference.update({
+                    'status': isResolved ? 'pending' : 'resolved',
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+                },
+              ),
+
+              // زر حذف الرسالة
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                tooltip: 'حذف التذكرة',
+                onPressed: () => _confirmDelete(doc.reference, userName, 'تذكرة الدعم'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // فتح المحادثة المباشرة على واتساب مع الطالب
+  void _openWhatsApp(String phone, String userName, String issueCategory) async {
+    String cleanNumber = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanNumber.startsWith('07')) {
+      cleanNumber = '964${cleanNumber.substring(1)}';
+    } else if (cleanNumber.startsWith('7')) {
+      cleanNumber = '964$cleanNumber';
+    }
+
+    final message = 'مرحباً $userName، معك فريق الدعم الفني لتطبيق الاختبارات الوطني (INPT) بخصوص تذكرتك ($issueCategory). كيف يمكننا مساعدتك؟';
+    final url = 'https://wa.me/$cleanNumber?text=${Uri.encodeComponent(message)}';
+
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر فتح واتساب: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }

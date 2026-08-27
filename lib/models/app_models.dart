@@ -12,6 +12,8 @@ class UserModel {
   final String activationCode;
   final DateTime? expiryDate;
   final List<String> deviceIds; // ✅ إضافة قائمة معرفات الأجهزة
+  final String gender; // 'male', 'female', 'unspecified'
+  final String avatarId; // e.g. 'boy_1', 'girl_1', etc.
 
   UserModel({
     required this.uid,
@@ -22,6 +24,8 @@ class UserModel {
     required this.activationCode,
     this.expiryDate,
     this.deviceIds = const [], // ✅ افتراضي فارغ
+    this.gender = 'male',
+    this.avatarId = 'boy_1',
   });
 
   String get roleName => role.name;
@@ -35,6 +39,8 @@ class UserModel {
     String? activationCode,
     DateTime? expiryDate,
     List<String>? deviceIds,
+    String? gender,
+    String? avatarId,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -45,6 +51,8 @@ class UserModel {
       activationCode: activationCode ?? this.activationCode,
       expiryDate: expiryDate ?? this.expiryDate,
       deviceIds: deviceIds ?? this.deviceIds,
+      gender: gender ?? this.gender,
+      avatarId: avatarId ?? this.avatarId,
     );
   }
 
@@ -58,6 +66,8 @@ class UserModel {
       'activationCode': activationCode,
       'expiryDate': expiryDate,
       'deviceIds': deviceIds, // ✅ حفظ الأجهزة
+      'gender': gender,
+      'avatarId': avatarId,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
@@ -111,6 +121,8 @@ class UserModel {
       activationCode: data['activationCode']?.toString() ?? '',
       expiryDate: expiryDate,
       deviceIds: deviceIds,
+      gender: data['gender']?.toString() ?? 'male',
+      avatarId: data['avatarId']?.toString() ?? (data['gender'] == 'female' ? 'girl_1' : 'boy_1'),
     );
   }
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../services/leaderboard_service.dart';
+import '../../utils/avatar_helper.dart';
+import '../../routes.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -179,6 +182,72 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               },
             ),
           ),
+
+          // شريط تشجيعي سفلي جذاب للانضمام لـ VIP
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              border: Border(
+                top: BorderSide(color: _gold.withOpacity(0.3), width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _gold.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Text('👑', style: TextStyle(fontSize: 16)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'كن من نخبة المتصدرين مع تاج VIP 🌟',
+                        style: GoogleFonts.notoKufiArabic(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: _gold,
+                        ),
+                      ),
+                      const Text(
+                        'احصل على شارة التميز الملكية والوصول لجميع بنوك الأسئلة',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 10.5,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pushNamed(context, AppRoutes.subscription),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _gold,
+                    foregroundColor: const Color(0xFF0F172A),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'ترقية ✨',
+                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 11.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -215,23 +284,31 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       );
     }
 
+    final isVip = entry.isPremium;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: isMe
-            ? (isDark ? const Color(0xFF2563EB).withOpacity(0.18) : const Color(0xFFEFF6FF))
-            : (isDark ? const Color(0xFF131C31) : Colors.white),
+        color: isVip
+            ? (isDark ? const Color(0xFF1E1B4B).withOpacity(0.6) : const Color(0xFFFFFBEB))
+            : (isMe
+                ? (isDark ? const Color(0xFF2563EB).withOpacity(0.18) : const Color(0xFFEFF6FF))
+                : (isDark ? const Color(0xFF131C31) : Colors.white)),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isMe
-              ? const Color(0xFF2563EB)
-              : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0)),
-          width: isMe ? 1.5 : 1.0,
+          color: isVip
+              ? _gold.withOpacity(0.6)
+              : (isMe
+                  ? const Color(0xFF2563EB)
+                  : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0))),
+          width: isVip ? 1.6 : (isMe ? 1.5 : 1.0),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.15 : 0.02),
-            blurRadius: 6,
+            color: isVip
+                ? _gold.withOpacity(0.1)
+                : Colors.black.withOpacity(isDark ? 0.15 : 0.02),
+            blurRadius: isVip ? 8 : 6,
             offset: const Offset(0, 2),
           ),
         ],
@@ -245,31 +322,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
           const SizedBox(width: 8),
 
-          // 2. الصورة الشخصية أو الحرف الأول
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: rank == 1
-                    ? [_gold, const Color(0xFFD97706)]
-                    : rank == 2
-                        ? [_silver, const Color(0xFF64748B)]
-                        : rank == 3
-                            ? [_bronze, const Color(0xFF9A3412)]
-                            : [const Color(0xFF2563EB), const Color(0xFF7C3AED)],
-              ),
-            ),
-            child: entry.photoUrl != null && entry.photoUrl!.isNotEmpty
-                ? ClipOval(
-                    child: Image.network(
-                      entry.photoUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildInitialAvatar(entry.name, rank),
-                    ),
-                  )
-                : _buildInitialAvatar(entry.name, rank),
+          // 2. الأفاتار المخصص مع التاج الملكي
+          AvatarHelper.buildAvatarWidget(
+            avatarId: entry.avatarId,
+            gender: entry.gender,
+            radius: 19,
+            isPremium: isVip,
+            showCrown: isVip,
           ),
           const SizedBox(width: 12),
 
@@ -288,16 +347,39 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontFamily: 'Tajawal',
-                          fontWeight: isMe ? FontWeight.bold : FontWeight.w600,
+                          fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          color: isVip
+                              ? (isDark ? const Color(0xFFFDE047) : const Color(0xFFB45309))
+                              : (isDark ? Colors.white : const Color(0xFF0F172A)),
                         ),
                       ),
                     ),
-                    if (isMe) ...[
-                      const SizedBox(width: 6),
+                    if (isVip) ...[
+                      const SizedBox(width: 5),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFACC15), Color(0xFFD97706)],
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'VIP 👑',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                            fontFamily: 'Tajawal',
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (isMe) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
                           color: const Color(0xFF2563EB).withOpacity(0.15),
                           borderRadius: BorderRadius.circular(6),
@@ -305,7 +387,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         child: const Text(
                           'أنت',
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 9.5,
                             color: Color(0xFF2563EB),
                             fontWeight: FontWeight.bold,
                             fontFamily: 'Tajawal',
@@ -332,12 +414,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+              color: isVip
+                  ? (isDark ? const Color(0xFF0F172A) : const Color(0xFFFEF3C7))
+                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: rank <= 3
-                    ? rankColor.withOpacity(0.4)
-                    : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0)),
+                color: isVip
+                    ? _gold.withOpacity(0.5)
+                    : (rank <= 3
+                        ? rankColor.withOpacity(0.4)
+                        : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0))),
               ),
             ),
             child: Row(
@@ -345,7 +431,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               children: [
                 Icon(
                   Icons.bolt_rounded,
-                  color: rank <= 3 ? rankColor : const Color(0xFFF59E0B),
+                  color: isVip ? _gold : (rank <= 3 ? rankColor : const Color(0xFFF59E0B)),
                   size: 15,
                 ),
                 const SizedBox(width: 4),
@@ -354,7 +440,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   style: TextStyle(
                     fontFamily: 'Tajawal',
                     fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    color: isVip
+                        ? (isDark ? const Color(0xFFFDE047) : const Color(0xFFB45309))
+                        : (isDark ? Colors.white : const Color(0xFF0F172A)),
                     fontSize: 13,
                   ),
                 ),
@@ -372,21 +460,5 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       return part.isNotEmpty ? part : 'طالب متميز';
     }
     return name.trim().isNotEmpty ? name.trim() : 'طالب متميز';
-  }
-
-  Widget _buildInitialAvatar(String name, int rank) {
-    final clean = _formatDisplayName(name);
-    final initial = clean.isNotEmpty ? clean[0].toUpperCase() : 'ط';
-    return Center(
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: rank == 1 ? Colors.black : Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 15,
-          fontFamily: 'Tajawal',
-        ),
-      ),
-    );
   }
 }

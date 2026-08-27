@@ -14,6 +14,7 @@ import 'qualification_score_screen.dart';
 import 'exam_centers_screen.dart';
 import 'certificate_verification_screen.dart';
 import 'exam_instructions_screen.dart';
+import 'home_screen.dart';
 import '../../widgets/luxury_exam_countdown_card.dart';
 import '../../routes.dart';
 import 'package:http/http.dart' as http;
@@ -2457,19 +2458,22 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
               Row(
                 children: [
                   _buildIosToolCard(
+                    icon: Icons.history_edu_rounded,
+                    title: 'الاختبارات السابقة',
+                    subtitle: 'سجل درجاتي ومراجعتها',
+                    color: const Color(0xFF6366F1),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const PreviousExamsScreen()),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildIosToolCard(
                     icon: Icons.psychology_alt_rounded,
                     title: 'بنك أخطائي',
                     subtitle: 'مراجعة أخطائي السابقة',
                     color: const Color(0xFFEF4444),
                     onTap: () => Navigator.pushNamed(context, AppRoutes.mistakes),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildIosToolCard(
-                    icon: Icons.search_rounded,
-                    title: 'البحث في الأسئلة',
-                    subtitle: 'محرك بحث فوري',
-                    color: const Color(0xFF2563EB),
-                    onTap: () => Navigator.pushNamed(context, AppRoutes.questionSearch),
                   ),
                 ],
               ),
@@ -2477,13 +2481,25 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
               Row(
                 children: [
                   _buildIosToolCard(
+                    icon: Icons.search_rounded,
+                    title: 'البحث في الأسئلة',
+                    subtitle: 'محرك بحث فوري',
+                    color: const Color(0xFF2563EB),
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.questionSearch),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildIosToolCard(
                     icon: Icons.bolt_rounded,
                     title: 'تحدي الـ 60 ثانية',
                     subtitle: 'اختبار السرعة الحماسي',
                     color: const Color(0xFFF59E0B),
                     onTap: () => Navigator.pushNamed(context, AppRoutes.speedQuiz),
                   ),
-                  const SizedBox(width: 12),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
                   _buildIosToolCard(
                     icon: Icons.alarm_rounded,
                     title: 'المنبه وسؤال اليوم',
@@ -2494,11 +2510,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                       MaterialPageRoute(builder: (context) => const NotificationsScreen()),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
+                  const SizedBox(width: 12),
                   _buildIosToolCard(
                     icon: Icons.qr_code_scanner_rounded,
                     title: 'فحص الشهادة',
@@ -2509,13 +2521,28 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                       MaterialPageRoute(builder: (context) => const CertificateVerificationScreen()),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
                   _buildIosToolCard(
                     icon: Icons.menu_book_rounded,
                     title: 'ضوابط القبول',
                     subtitle: 'الدليل الوزاري الرسمي',
                     color: const Color(0xFF4F46E5),
                     onTap: _showAdmissionsWebView,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildIosToolCard(
+                    icon: Icons.stars_rounded,
+                    title: 'درجة التأهيل',
+                    subtitle: 'حسب تخصصك الدراسي',
+                    color: const Color(0xFF2563EB),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const QualificationScoreScreen()),
+                    ),
                   ),
                 ],
               ),

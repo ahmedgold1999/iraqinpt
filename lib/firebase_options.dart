@@ -45,7 +45,7 @@ class DefaultFirebaseOptions {
     appId: '1:527094263196:web:82b37722b7c66bd8a4ec59',
     messagingSenderId: '527094263196',
     projectId: 'inpt-app-20260108022659',
-    authDomain: 'inptiq.web.app', // ✅ تم التغيير من الرابط الطويل إلى رابطك المخصص
+    authDomain: 'inpt-app-20260108022659.firebaseapp.com',
     storageBucket: 'inpt-app-20260108022659.firebasestorage.app',
   );
 

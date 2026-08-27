@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'quiz_screen.dart';
 import 'smart_vault_screen.dart';
 import 'notifications_screen.dart';
+import 'subscription_screen.dart';
 import '../../services/auth_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/subscription_service.dart';
@@ -497,6 +498,197 @@ class StudentHomeScreen extends StatelessWidget {
     return isLocked ? const Color(0xFFB91C1C) : const Color(0xFF15803D);
   }
 
+  void _navigateToSubscriptionWithSlide(BuildContext context) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const SubscriptionScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOutCubic;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(position: animation.drive(tween), child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 380),
+      ),
+    );
+  }
+
+  void _showLuxurySubscriptionDialog(BuildContext context, {
+    String title = 'فتح الباقة الملكية VIP 👑',
+    String subtitle = 'اشترك الآن للوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي واجتياز الامتحان الوطني بتفوق!',
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: Colors.transparent,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF0F172A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFFACC15).withOpacity(0.35), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFACC15).withOpacity(0.15),
+                    blurRadius: 30,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFACC15), Color(0xFFD97706)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFACC15).withOpacity(0.4),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF0F172A), size: 36),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    title,
+                    style: GoogleFonts.notoKufiArabic(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 13,
+                      color: Color(0xFFCBD5E1),
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildVipBenefitRow('بنوك الأسئلة الشاملة (100 سؤال كامل) لكل مادة'),
+                        const SizedBox(height: 8),
+                        _buildVipBenefitRow('استخدام غير محدود لـ "الأستاذ الذكي AI" على مدار الساعة'),
+                        const SizedBox(height: 8),
+                        _buildVipBenefitRow('كافة الملازم ونماذج الفورمات الوزارية المعتمدة'),
+                        const SizedBox(height: 8),
+                        _buildVipBenefitRow('إحصائيات متقدمة ودعم فني مباشر عبر الواتساب'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('لاحقاً', style: TextStyle(fontFamily: 'Tajawal', color: Colors.white70)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFACC15),
+                            foregroundColor: const Color(0xFF0F172A),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 4,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _navigateToSubscriptionWithSlide(context);
+                          },
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.workspace_premium_rounded, size: 18),
+                              SizedBox(width: 6),
+                              Text(
+                                'الترقية والاشتراك 👑',
+                                style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVipBenefitRow(String text) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(3),
+          decoration: const BoxDecoration(
+            color: Color(0xFF22C55E),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.check_rounded, color: Colors.white, size: 12),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showFreeArabicDialog(
       BuildContext context, String subjectName, String subjectKey) async {
     final prefs = await SharedPreferences.getInstance();
@@ -504,73 +696,10 @@ class StudentHomeScreen extends StatelessWidget {
 
     if (hasTakenFree) {
       if (!context.mounted) return;
-      showDialog(
-        context: context,
-        builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-          backgroundColor: Colors.transparent,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                padding: const EdgeInsets.all(26),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0B1220).withOpacity(0.92),
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.stars_rounded, color: Colors.amber, size: 44),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لقد استهلكت تجربتك المجانية',
-                      style: _t(20, w: FontWeight.w900, c: Colors.white, ls: 0.5),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'نأمل أن تكون التجربة قد نالت إعجابك. للاستمرار في إجراء الاختبارات والوصول إلى كافة الميزات، يرجى الاشتراك في النسخة المميزة.',
-                      style: TextStyle(color: Colors.white70, height: 1.5, fontFamily: 'Tajawal'),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.pushNamed(context, AppRoutes.subscription);
-                        },
-                        child: const Text('اشترك الآن', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('إغلاق', style: TextStyle(color: Colors.white54)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+      _showLuxurySubscriptionDialog(
+        context,
+        title: 'لقد استهلكت تجربتك المجانية ✨',
+        subtitle: 'نأمل أن تكون التجربة قد نالت إعجابك! للاستمرار في إجراء الاختبارات والوصول إلى كافة المواد والميزات، اشترك الآن في باقة VIP.',
       );
       return;
     }
@@ -727,138 +856,10 @@ class StudentHomeScreen extends StatelessWidget {
   }
 
   void _showNonPremiumDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-        backgroundColor: Colors.transparent,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(26),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B1220).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.45),
-                    blurRadius: 40,
-                    offset: const Offset(0, 16),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFFFACC15),
-                          Color(0xFFFB7185),
-                          Color(0xFFEF4444)
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(Icons.lock_outline_rounded,
-                        color: Colors.white, size: 40),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'اشتراك مطلوب!',
-                    style: _t(24, w: FontWeight.w900, c: _gold, ls: 0.5),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'هذه المادة تتطلب اشتراكاً مميزاً',
-                    style: _t(16, w: FontWeight.w700, c: Colors.white70),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'قم بالاشتراك للوصول إلى جميع المواد والامتحانات الكاملة',
-                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white54),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  if (defaultTargetPlatform == TargetPlatform.iOS)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _gold,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('فهمت', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
-                      ),
-                    )
-                  else
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
-                              side: BorderSide(
-                                  color: Colors.white.withOpacity(0.18),
-                                  width: 1.2),
-                            ),
-                            onPressed: () => Navigator.pop(context),
-                            child: Text('إلغاء',
-                                style: _t(14,
-                                    w: FontWeight.w800, c: Colors.white70)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _gold,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
-                              elevation: 0,
-                            ),
-                            onPressed: () {
-                              Navigator.pop(context);
-                              Navigator.pushNamed(
-                                  context, AppRoutes.subscription);
-                            },
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.workspace_premium_rounded,
-                                    size: 18),
-                                const SizedBox(width: 6),
-                                Text('الاشتراك',
-                                    style: _t(14,
-                                        w: FontWeight.w900, c: Colors.black)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    _showLuxurySubscriptionDialog(
+      context,
+      title: 'باقة VIP الملكية مطلوبة 👑',
+      subtitle: 'هذه المادة والامتحان الكامل مخصص لمشتركي باقة VIP. اشترك الآن وافتح كافة المواد والميزات فوراً!',
     );
   }
 
@@ -1346,6 +1347,114 @@ class StudentHomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildAiTutorBanner(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.3), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4338CA).withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () {
+            Navigator.pushNamed(context, AppRoutes.aiTutor);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFA855F7).withOpacity(0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Flexible(
+                            child: Text(
+                              'الأستاذ الذكي المساعد (AI) 🤖',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFACC15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'جديد ✨',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'اسأل الأستاذ الذكي عن أي سؤال أو قاعدة وافهمها فوراً!',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFFC7D2FE),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF818CF8), size: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _luxuryBackground(BuildContext context, {required Widget child}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -1505,6 +1614,20 @@ class StudentHomeScreen extends StatelessWidget {
               ],
             ),
             actions: [
+              Container(
+                margin: const EdgeInsets.only(left: 4),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.psychology_rounded, color: Colors.white, size: 20),
+                  tooltip: 'الأستاذ الذكي AI',
+                  onPressed: () => Navigator.pushNamed(context, AppRoutes.aiTutor),
+                ),
+              ),
               _buildNotificationBell(context, isDark),
             ],
           ),
@@ -1534,10 +1657,10 @@ class StudentHomeScreen extends StatelessWidget {
                                 subject['name'] as String, user.isPremium);
                             return _buildSubjectCard(
                                 context, subject, isLocked, user);
-                          }).toList(),
+                          }),
                           
-                          const SizedBox(height: 12),
-                          _buildPreviousExamsCard(context),
+                          const SizedBox(height: 14),
+                          _buildAiTutorBanner(context),
                         ],
                       ),
                     ),
@@ -2279,34 +2402,52 @@ class MarqueeAnnouncementText extends StatefulWidget {
 class _MarqueeAnnouncementTextState extends State<MarqueeAnnouncementText>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<Offset> _animation;
+  double _textWidth = 0.0;
+  double _textHeight = 24.0;
+  double _containerWidth = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _initAnimation();
+    _controller = AnimationController(vsync: this);
+    _measureText();
   }
 
-  void _initAnimation() {
-    final int speedSeconds = (widget.text.length * 0.25).clamp(8.0, 35.0).toInt();
-    _controller = AnimationController(
-      duration: Duration(seconds: speedSeconds),
-      vsync: this,
-    )..repeat();
+  void _measureText() {
+    if (widget.text.isEmpty) return;
+    final textPainter = TextPainter(
+      text: TextSpan(text: widget.text, style: widget.style),
+      maxLines: 1,
+      textDirection: TextDirection.rtl,
+    )..layout();
 
-    // التحرك المستمر من اليمين (1.3) إلى أقصى اليسار (-1.3) لضمان خروج النص كاملاً وإعادته
-    _animation = Tween<Offset>(
-      begin: const Offset(1.3, 0.0),
-      end: const Offset(-1.3, 0.0),
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.linear));
+    _textWidth = textPainter.width;
+    _textHeight = textPainter.height > 0 ? textPainter.height : 24.0;
+  }
+
+  void _setupAnimation(double containerWidth) {
+    if (containerWidth <= 0 || widget.text.isEmpty) return;
+
+    _measureText();
+    _containerWidth = containerWidth;
+
+    // المسافة الإجمالية التي يقطعها النص: يبدأ من أقصى اليمين (عرض الحاوية) حتى يختفي تماماً في أقصى اليسار (-عرض النص)
+    final double totalDistance = _containerWidth + _textWidth;
+    
+    // سرعة متناسقة ومريحة للقراءة (~45 بكسل بالثانية)
+    final double durationSeconds = (totalDistance / 45.0).clamp(6.0, 60.0);
+
+    _controller.duration = Duration(milliseconds: (durationSeconds * 1000).round());
+    _controller.reset();
+    _controller.repeat();
   }
 
   @override
   void didUpdateWidget(MarqueeAnnouncementText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text) {
-      _controller.dispose();
-      _initAnimation();
+    if (oldWidget.text != widget.text || oldWidget.style != widget.style) {
+      _measureText();
+      _setupAnimation(_containerWidth);
     }
   }
 
@@ -2318,16 +2459,54 @@ class _MarqueeAnnouncementTextState extends State<MarqueeAnnouncementText>
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: SlideTransition(
-        position: _animation,
-        child: Text(
-          widget.text,
-          maxLines: 1,
-          softWrap: false,
-          style: widget.style,
-        ),
+    final double safeHeight = _textHeight.clamp(20.0, 36.0);
+
+    return SizedBox(
+      height: safeHeight,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth != _containerWidth && constraints.maxWidth > 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _setupAnimation(constraints.maxWidth);
+                });
+              }
+            });
+          }
+
+          return ClipRect(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                // التحرك المعكوس: يبدأ من أقصى اليسار إلى أقصى اليمين
+                final double dx = -_textWidth + _controller.value * (_containerWidth + _textWidth);
+
+                return Transform.translate(
+                  offset: Offset(dx, 0),
+                  child: child,
+                );
+              },
+              child: OverflowBox(
+                minWidth: 0.0,
+                maxWidth: double.infinity,
+                minHeight: safeHeight,
+                maxHeight: safeHeight,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  widget.text,
+                  maxLines: 1,
+                  softWrap: false,
+                  textDirection: TextDirection.rtl,
+                  style: widget.style,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 }
+
+

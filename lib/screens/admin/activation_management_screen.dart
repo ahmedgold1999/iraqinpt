@@ -18,6 +18,28 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
   List<DocumentSnapshot> _users = [];
   bool _isLoading = false;
 
+  String _normalizeSearchText(String input) {
+    var s = input.trim().toLowerCase();
+    s = s.replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '');
+    s = s.replaceAll(RegExp(r'[أإآٱ]'), 'ا');
+    s = s.replaceAll('ة', 'ه');
+    s = s.replaceAll('ى', 'ي');
+    s = s.replaceAll(RegExp(r'\s+'), ' ');
+    return s;
+  }
+
+  String _resolveUserEmail(Map<String, dynamic> data) {
+    final email = (data['email'] ?? '').toString().trim();
+    if (email.isNotEmpty && email != 'null' && email != 'بدون بريد') {
+      return email;
+    }
+    final username = (data['username'] ?? '').toString().trim();
+    if (username.isNotEmpty && username != 'null') {
+      return '$username@ahmeed.inpt';
+    }
+    return 'بدون بريد';
+  }
+
   Future<void> _searchUsers(String query) async {
     if (query.isEmpty) {
       setState(() => _users = []);
@@ -26,14 +48,33 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
 
     setState(() => _isLoading = true);
     try {
-      final snapshot = await _db.collection('users')
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThanOrEqualTo: '$query\uf8ff')
-          .limit(20)
-          .get();
+      final snapshot = await _db.collection('users').get();
+      final normalizedQuery = _normalizeSearchText(query);
+      final rawQuery = query.toLowerCase();
+
+      final matched = snapshot.docs.where((doc) {
+        final data = doc.data();
+        final rawName = (data['name'] ?? data['displayName'] ?? '').toString();
+        final normalizedName = _normalizeSearchText(rawName);
+        final email = _resolveUserEmail(data).toLowerCase();
+        final username = (data['username'] ?? '').toString().toLowerCase();
+        final phone = (data['phone'] ?? data['phoneNumber'] ?? '').toString().toLowerCase();
+        final uid = doc.id.toLowerCase();
+        final code = (data['activationCode'] ?? data['code'] ?? '').toString().toLowerCase();
+        final password = (data['password'] ?? data['pass'] ?? data['plainPassword'] ?? '').toString().toLowerCase();
+
+        return normalizedName.contains(normalizedQuery) ||
+            rawName.toLowerCase().contains(rawQuery) ||
+            username.contains(rawQuery) ||
+            email.contains(rawQuery) ||
+            phone.contains(rawQuery) ||
+            uid.contains(rawQuery) ||
+            code.contains(rawQuery) ||
+            password.contains(rawQuery);
+      }).toList();
       
       setState(() {
-        _users = snapshot.docs;
+        _users = matched;
         _isLoading = false;
       });
     } catch (e) {
@@ -64,7 +105,7 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
+      builder: (dialogCtx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         backgroundColor: Colors.white,
         child: Padding(
@@ -73,7 +114,7 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'تعديل تفعيل: ${userData['name']}',
+                'تعديل تفعيل: ${userData['name'] ?? 'طالب'}',
                 style: const TextStyle(
                   color: Color(0xFF1C1C1E),
                   fontFamily: 'Tajawal',
@@ -108,6 +149,43 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
               _buildDurationBtn('تفعيل دائمي (مدى الحياة)', -1, userId, const Color(0xFF00C853)),
               const Divider(color: Color(0xFFE5E5EA), height: 26),
               _buildDurationBtn('إلغاء التفعيل', 0, userId, const Color(0xFFEF4444), isDeactivate: true),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 42,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(dialogCtx);
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (c) => AlertDialog(
+                        backgroundColor: const Color(0xFF0F172A),
+                        title: const Text('حذف الحساب نهائياً', style: TextStyle(fontFamily: 'Tajawal', color: Colors.white)),
+                        content: Text('هل أنت متأكد من حذف حساب الطالب "${userData['name']}" نهائياً من النظام؟', style: const TextStyle(fontFamily: 'Tajawal', color: Colors.white70)),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء', style: TextStyle(color: Colors.white60))),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            onPressed: () => Navigator.pop(c, true),
+                            child: const Text('حذف'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await _db.collection('users').doc(userId).delete();
+                      _searchUsers(_searchController.text);
+                    }
+                  },
+                  icon: const Icon(Icons.delete_forever_rounded, size: 18),
+                  label: const Text('حذف الحساب نهائياً 🗑️', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12.5)),
+                ),
+              ),
             ],
           ),
         ),
@@ -280,7 +358,7 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    data['email'] ?? '',
+                                    _resolveUserEmail(data),
                                     style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontFamily: 'Tajawal'),
                                   ),
                                   if (isPremium && expiryDate != null)

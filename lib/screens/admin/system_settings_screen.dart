@@ -25,6 +25,9 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
   bool _forceUpdate = false;
   bool _maintenanceMode = false;
+  bool _targetAndroid = true;
+  bool _targetIos = true;
+  bool _targetWeb = true;
   bool _isLoading = true;
   String _currentAppVersion = '';
 
@@ -52,6 +55,9 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
           _storeUrlController.text = data['update_url'] ?? '';
           _forceUpdate = data['is_force_update'] ?? false;
           _maintenanceMode = data['is_maintenance_on'] ?? false;
+          _targetAndroid = data['target_android'] ?? true;
+          _targetIos = data['target_ios'] ?? true;
+          _targetWeb = data['target_web'] ?? true;
           
           _price1mController.text = (data['price_1m'] ?? '10,000').toString();
           _price2mController.text = (data['price_2m'] ?? '15,000').toString();
@@ -98,6 +104,9 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
         'latest_version': _versionController.text.trim(),
         'update_url': _storeUrlController.text.trim(),
         'is_force_update': _forceUpdate,
+        'target_android': _targetAndroid,
+        'target_ios': _targetIos,
+        'target_web': _targetWeb,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       setState(() => _isLoading = false);
@@ -253,9 +262,45 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                         decoration: _inputDecoration('رابط التحديث على المتجر', Icons.link_rounded),
                       ),
                       const SizedBox(height: 12),
+                      const Text('المنصات المستهدفة بالتحديث:', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilterChip(
+                              label: const Text('🤖 أندرويد', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
+                              selected: _targetAndroid,
+                              selectedColor: const Color(0xFF10B981).withOpacity(0.2),
+                              checkmarkColor: const Color(0xFF10B981),
+                              onSelected: (v) => setState(() => _targetAndroid = v),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: FilterChip(
+                              label: const Text('🍎 آيفون', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
+                              selected: _targetIos,
+                              selectedColor: const Color(0xFF0284C7).withOpacity(0.2),
+                              checkmarkColor: const Color(0xFF0284C7),
+                              onSelected: (v) => setState(() => _targetIos = v),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: FilterChip(
+                              label: const Text('🌐 الويب', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
+                              selected: _targetWeb,
+                              selectedColor: const Color(0xFF8B5CF6).withOpacity(0.2),
+                              checkmarkColor: const Color(0xFF8B5CF6),
+                              onSelected: (v) => setState(() => _targetWeb = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       SwitchListTile(
                         title: const Text('تحديث إجباري', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 15)),
-                        subtitle: const Text('يمنع الطالب من الاستمرار دون تحديث التطبيق', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontFamily: 'Tajawal')),
+                        subtitle: const Text('يمنع الطالب من الاستمرار دون تحديث التطبيق على المنصات المختارة', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontFamily: 'Tajawal')),
                         value: _forceUpdate,
                         activeColor: const Color(0xFF0F172A),
                         onChanged: (v) => setState(() => _forceUpdate = v),

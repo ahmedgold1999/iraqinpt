@@ -4,6 +4,9 @@ class LeaderboardEntry {
   final String userId;
   final String name;
   final String? photoUrl;
+  final String? avatarId;
+  final String? gender;
+  final bool isPremium;
   final int totalScore;
   final int arabicScore;
   final int computerScore;
@@ -16,6 +19,9 @@ class LeaderboardEntry {
     required this.userId,
     required this.name,
     this.photoUrl,
+    this.avatarId,
+    this.gender,
+    this.isPremium = false,
     required this.totalScore,
     this.arabicScore = 0,
     this.computerScore = 0,
@@ -46,6 +52,9 @@ class LeaderboardEntry {
       userId: doc.id,
       name: data['name'] ?? 'طالب متميز',
       photoUrl: data['photoUrl'],
+      avatarId: data['avatarId']?.toString(),
+      gender: data['gender']?.toString(),
+      isPremium: data['isPremium'] == true,
       totalScore: (data['totalScore'] ?? 0) as int,
       arabicScore: (data['arabicScore'] ?? 0) as int,
       computerScore: (data['computerScore'] ?? 0) as int,
@@ -80,16 +89,23 @@ class LeaderboardService {
       final docRef = _leaderboardRef.doc(userId);
       final docSnapshot = await docRef.get();
 
-      // ✅ جلب الاسم الفعلي الحقيقي من وثيقة المستخدم users/{uid} للتأكد من عدم استخدام اسم المستخدم أو الإيميل
+      // ✅ جلب الاسم الفعلي وحالة الأفاتار والاشتراك من وثيقة المستخدم users/{uid}
       String realName = name;
+      String? userAvatarId;
+      String? userGender;
+      bool userIsPremium = false;
+
       try {
         final userDoc = await _firestore.collection('users').doc(userId).get();
         if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>?;
+          final userData = userDoc.data();
           final docName = userData?['name'] ?? userData?['displayName'];
           if (docName != null && docName.toString().trim().isNotEmpty) {
             realName = docName.toString().trim();
           }
+          userAvatarId = userData?['avatarId']?.toString();
+          userGender = userData?['gender']?.toString();
+          userIsPremium = userData?['isPremium'] == true;
         }
       } catch (_) {}
 
@@ -99,6 +115,9 @@ class LeaderboardService {
         final Map<String, dynamic> initialData = {
           'name': realName,
           'photoUrl': photoUrl,
+          'avatarId': userAvatarId,
+          'gender': userGender,
+          'isPremium': userIsPremium,
           'totalScore': scoreEarned,
           'arabicScore': cleanSubject == 'arabic' ? scoreEarned : 0,
           'computerScore': cleanSubject == 'computer' ? scoreEarned : 0,
@@ -120,6 +139,10 @@ class LeaderboardService {
           'highestPercentage': newHighest,
           'lastActive': FieldValue.serverTimestamp(),
         };
+
+        if (userAvatarId != null) updateData['avatarId'] = userAvatarId;
+        if (userGender != null) updateData['gender'] = userGender;
+        updateData['isPremium'] = userIsPremium;
 
         if (photoUrl != null && photoUrl.isNotEmpty) {
           updateData['photoUrl'] = photoUrl;

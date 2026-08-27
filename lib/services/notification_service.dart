@@ -1,15 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 /// ✅ معالج الإشعارات والتطبيق مغلق تماماً (Background & Terminated)
 @pragma('vm:entry-point')
 Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp();
+  } catch (_) {}
+
   debugPrint('📬 Background message received: ${message.messageId}');
   
   final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
@@ -45,7 +52,7 @@ Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
     );
 
     await localNotifications.show(
-      message.messageId.hashCode,
+      message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title,
       body,
       const NotificationDetails(android: androidDetails, iOS: iosDetails),
@@ -469,25 +476,31 @@ class NotificationService {
         serverKey = 'AIzaSyDy8Av3HcsiX-ZY5suKmpbyuZOX8q4HDC0';
       }
 
-      String topic = 'all';
-      if (targetSegment == 'premium') topic = 'premium';
-      if (targetSegment == 'free') topic = 'free';
+      List<String> topics = [];
+      if (targetSegment == 'all') {
+        topics = ['all', 'global', 'students'];
+      } else if (targetSegment == 'premium') {
+        topics = ['premium'];
+      } else if (targetSegment == 'free') {
+        topics = ['free'];
+      } else {
+        topics = ['all'];
+      }
 
-      final response = await http.post(
-        Uri.parse('https://fcm.googleapis.com/fcm/send'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'key=$serverKey',
-        },
-        body: json.encode({
+      bool anySuccess = false;
+
+      for (var topic in topics) {
+        final payload = {
           'to': '/topics/$topic',
           'priority': 'high',
           'content_available': true,
+          'time_to_live': 2419200,
           'notification': {
             'title': title,
             'body': body,
             'sound': 'default',
             'android_channel_id': 'high_importance_channel',
+            'click_action': 'FLUTTER_NOTIFICATION_CLICK',
           },
           'data': {
             'title': title,
@@ -496,11 +509,28 @@ class NotificationService {
             'screen': 'notifications',
             'isGlobal': 'true',
           },
-        }),
-      );
+        };
 
-      debugPrint('📬 FCM Response: ${response.statusCode} -> ${response.body}');
-      return response.statusCode == 200;
+        try {
+          final response = await http.post(
+            Uri.parse('https://fcm.googleapis.com/fcm/send'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'key=$serverKey',
+            },
+            body: json.encode(payload),
+          );
+
+          debugPrint('📬 FCM Topic ($topic) Response: ${response.statusCode} -> ${response.body}');
+          if (response.statusCode == 200) {
+            anySuccess = true;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error sending to topic $topic: $e');
+        }
+      }
+
+      return anySuccess;
     } catch (e) {
       debugPrint('❌ Error sending FCM broadcast push: $e');
       return false;

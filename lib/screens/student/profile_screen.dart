@@ -3,12 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/social_service.dart';
 import '../../models/app_models.dart';
+import '../../utils/avatar_helper.dart';
 import '../../widgets/luxury_loading.dart';
 import '../../routes.dart';
+import 'home_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,56 +21,27 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
-    with SingleTickerProviderStateMixin {
-
-  // ===== Animation =====
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _slideAnimation;
-  late Animation<Color?> _containerColorAnimation;
-  Animation<double>? _scaleAnimation;
+
+  static const _gold = Color(0xFFFACC15);
+  static const _goldDark = Color(0xFFD97706);
+  static const _sapphire = Color(0xFF2563EB);
+
+  // Local state for active gender filter in avatar picker
+  String? _currentSelectedGender;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 600),
     );
-
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.7, curve: Curves.easeInOut),
-      ),
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
-
-    _slideAnimation = Tween<double>(begin: 40, end: 0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
-      ),
-    );
-
-    _containerColorAnimation = ColorTween(
-      begin: const Color(0xFFF8F9FA),
-      end: Colors.white,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
-    );
-
-    // Start animation after initialization
     _controller.forward();
   }
 
@@ -76,33 +51,39 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
-  // ===== Account Deletion Dialog =====
+  // ===== نافذة تأكيد حذف الحساب =====
   void _showDeleteAccountDialog(BuildContext context, AuthService authService) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
-          'حذف الحساب نهائياً',
-          textAlign: TextAlign.right,
-          style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: Colors.red),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            const SizedBox(width: 8),
+            Text(
+              'حذف الحساب نهائياً',
+              style: GoogleFonts.notoKufiArabic(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red),
+            ),
+          ],
         ),
         content: const Text(
-          'هل أنت متأكد من حذف حسابك؟ سيتم حذف جميع بياناتك ونتائجك ولا يمكن استعادتها مرة أخرى. هذا الإجراء نهائي.',
-          textAlign: TextAlign.right,
-          style: TextStyle(fontFamily: 'Cairo'),
+          'هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ سيتم مسح كافة نتائجك وسجلاتك وتقدمك الدراسي ولا يمكن استرجاعها.',
+          style: TextStyle(fontFamily: 'Tajawal', fontSize: 14, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Cairo', color: Colors.grey)),
+            child: Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () async {
               try {
                 await authService.deleteAccount();
                 if (context.mounted) {
-                  Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -115,31 +96,32 @@ class _ProfileScreenState extends State<ProfileScreen>
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('تأكيد الحذف', style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+            child: const Text('تأكيد الحذف', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  // ===== Logout Dialog =====
+  // ===== نافذة تأكيد تسجيل الخروج =====
   void _showLogoutDialog(BuildContext context, AuthService authService) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (dialogCtx) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(horizontal: 24),
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF131C31) : Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withOpacity(0.3),
                   blurRadius: 30,
                   offset: const Offset(0, 10),
                 ),
@@ -149,25 +131,20 @@ class _ProfileScreenState extends State<ProfileScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 68,
-                  height: 68,
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
                     color: Colors.red.withOpacity(0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.logout_rounded,
-                    color: Color(0xFFEF4444),
-                    size: 34,
-                  ),
+                  child: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 30),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 Text(
                   'تسجيل الخروج',
-                  style: TextStyle(
-                    fontSize: 22,
+                  style: GoogleFonts.notoKufiArabic(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    fontFamily: 'Tajawal',
                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                 ),
@@ -175,7 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Text(
                   'هل أنت متأكد من رغبتك في تسجيل الخروج من التطبيق؟',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13.5,
                     color: isDark ? Colors.white60 : const Color(0xFF64748B),
                     fontFamily: 'Tajawal',
                   ),
@@ -190,7 +167,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0)),
+                          side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFCBD5E1)),
                         ),
                         child: Text(
                           'إلغاء',
@@ -211,7 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             await authService.signOut();
                             await FirebaseAuth.instance.signOut();
                           } catch (e) {
-                            print('Logout error: $e');
+                            // Ignored
                           }
                           if (context.mounted) {
                             Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
@@ -229,10 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                         child: const Text(
                           'تأكيد الخروج',
-                          style: TextStyle(
-                            fontFamily: 'Tajawal',
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -246,230 +220,956 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildSubscriptionStatusCard(UserModel user) {
-    final isPremium = user.isPremium;
-    final expiryDate = user.expiryDate;
-    final now = DateTime.now();
-    
-    String status = isPremium ? 'مشترك مميز ✨' : 'حساب مجاني';
-    String subTitle = 'استمتع بكامل ميزات التطبيق';
-    Color color = isPremium ? const Color(0xFFF59E0B) : const Color(0xFF6B7280);
-    
-    if (isPremium && expiryDate != null) {
-      if (expiryDate.isBefore(now)) {
-        status = 'انتهى الاشتراك';
-        subTitle = 'يرجى التجديد للاستمرار';
-        color = const Color(0xFFEF4444);
-      } else {
-        final days = expiryDate.difference(now).inDays;
-        subTitle = days > 365 ? 'اشتراك دائمي' : 'ينتهي بعد $days يوم';
-      }
-    }
+  // ===== نافذة إرسال تذكرة الدعم الفني والمساعدة =====
+  void _showSupportTicketDialog(BuildContext context, UserModel user) {
+    final phoneController = TextEditingController();
+    final messageController = TextEditingController();
+    String selectedCategory = 'question';
+    bool isSubmitting = false;
+
+    final categories = [
+      {'id': 'question', 'label': 'سؤال أو استفسار عام ❓'},
+      {'id': 'technical_issue', 'label': 'مشكلة تقنية أو خطأ بالتطبيق 🛠️'},
+      {'id': 'subscription', 'label': 'استفسار حول الاشتراك والترقية 💳'},
+      {'id': 'suggestion', 'label': 'اقتراح لتطوير التطبيق 💡'},
+      {'id': 'materials', 'label': 'ملاحظة حول الملازم أو الأسئلة 📄'},
+      {'id': 'other', 'label': 'أخرى 💬'},
+    ];
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.support_agent_rounded, color: Color(0xFF10B981), size: 26),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'الدعم الفني والمساعدة',
+                              style: GoogleFonts.notoKufiArabic(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            const Text(
+                              'يسعدنا التواصل معك وحل أي استفسار',
+                              style: TextStyle(fontFamily: 'Tajawal', fontSize: 11.5, color: Color(0xFF94A3B8)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // 1. نوع الاستعلام
+                  Text('نوع الاستعلام:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    value: selectedCategory,
+                    dropdownColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFCBD5E1))),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    ),
+                    items: categories.map((cat) {
+                      return DropdownMenuItem<String>(
+                        value: cat['id'],
+                        child: Text(
+                          cat['label']!,
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 13,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedCategory = val);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 2. رقم هاتف الواتساب للتواصل
+                  Text('رقم الواتساب للتواصل معك:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      hintText: '07XXXXXXXXX',
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 20),
+                      ),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFCBD5E1))),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13.5, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 3. نص الرسالة
+                  Text('تفاصيل الرسالة أو المشكلة:', style: GoogleFonts.notoKufiArabic(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: messageController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'اكتب استفسارك أو تفاصيل المشكلة التي تواجهها هنا بدقة...',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: isDark ? Colors.white12 : const Color(0xFFCBD5E1))),
+                      contentPadding: const EdgeInsets.all(12),
+                    ),
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // 4. أزرار الإلغاء والإرسال
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  final phone = phoneController.text.trim();
+                                  final msg = messageController.text.trim();
+
+                                  if (phone.isEmpty || msg.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('يرجى إدخال رقم الواتساب وتفاصيل الرسالة', style: TextStyle(fontFamily: 'Tajawal')),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  setDialogState(() => isSubmitting = true);
+
+                                  try {
+                                    final catObj = categories.firstWhere((c) => c['id'] == selectedCategory);
+                                    await FirebaseFirestore.instance.collection('support_tickets').add({
+                                      'userId': user.uid,
+                                      'userName': user.name.isNotEmpty ? user.name : 'طالب',
+                                      'userEmail': user.email,
+                                      'category': selectedCategory,
+                                      'categoryLabel': catObj['label'] ?? 'استفسار',
+                                      'whatsapp': phone,
+                                      'message': msg,
+                                      'status': 'pending', // 'pending', 'resolved'
+                                      'createdAt': FieldValue.serverTimestamp(),
+                                    });
+
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (context.mounted) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                                          title: Row(
+                                            children: [
+                                              const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'تم الإرسال بنجاح',
+                                                style: GoogleFonts.notoKufiArabic(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)),
+                                              ),
+                                            ],
+                                          ),
+                                          content: const Text(
+                                            'تم استلام رسالتك وتذكرتك بنجاح لدى الإدارة، وسيتواصل معك فريق الدعم الفني عبر الواتساب في أقرب وقت ممكن. شكراً لتواصلك معنا! 🌟',
+                                            style: TextStyle(fontFamily: 'Tajawal', fontSize: 13.5, height: 1.4),
+                                          ),
+                                          actions: [
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFF10B981),
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                              ),
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text('حسناً', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    setDialogState(() => isSubmitting = false);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('حدث خطأ في الإرسال: $e'), backgroundColor: Colors.red),
+                                      );
+                                    }
+                                  }
+                                },
+                          child: isSubmitting
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Text('إرسال الآن 🚀', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = AuthService();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return StreamBuilder<UserModel?>(
+      stream: authService.userData,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data == null) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF0F172A),
+            body: LuxuryLoading(message: 'جاري تحميل الملف الشخصي...'),
+          );
+        }
+
+        final user = snapshot.data!;
+        final isPremium = user.isPremium;
+        final expiryDate = user.expiryDate;
+        final now = DateTime.now();
+
+        int daysRemaining = 0;
+        if (expiryDate != null && isPremium) {
+          daysRemaining = expiryDate.difference(now).inDays;
+          if (daysRemaining < 0) daysRemaining = 0;
+        }
+
+        final activeGender = _currentSelectedGender ?? user.gender;
+
+        return Scaffold(
+          backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          body: FadeTransition(
+            opacity: _fadeAnimation,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // ================= الرأس الفاخر الملكي بنمط آبل =================
+                SliverAppBar(
+                  expandedHeight: 210,
+                  pinned: true,
+                  backgroundColor: const Color(0xFF0F172A),
+                  elevation: 0,
+                  automaticallyImplyLeading: false,
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF2563EB)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: SafeArea(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(height: 10),
+                            // الأفاتار المخصص المتوهج
+                            AvatarHelper.buildAvatarWidget(
+                              avatarId: user.avatarId,
+                              gender: user.gender,
+                              radius: 38,
+                              isPremium: isPremium,
+                              showCrown: isPremium,
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  user.name.isNotEmpty ? user.name : 'مستخدم التطبيق',
+                                  style: GoogleFonts.notoKufiArabic(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                if (isPremium) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFFFACC15), Color(0xFFD97706)],
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'VIP 👑',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0F172A),
+                                        fontFamily: 'Tajawal',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              user.email,
+                              style: const TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 12.5,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ================= قسم تخصيص الأفاتار والجنس =================
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: _buildAvatarCustomizerSection(user, activeGender, authService, isDark),
+                  ),
+                ),
+
+                // ================= بطاقة الاشتراك الفاخرة =================
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: isPremium
+                            ? const LinearGradient(
+                                colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF2E1065)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : LinearGradient(
+                                colors: isDark
+                                    ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                                    : [Colors.white, const Color(0xFFF1F5F9)],
+                              ),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isPremium ? _gold.withOpacity(0.4) : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isPremium ? _gold.withOpacity(0.12) : Colors.black.withOpacity(0.04),
+                            blurRadius: 18,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: isPremium
+                                    ? [const Color(0xFFFACC15), const Color(0xFFD97706)]
+                                    : [const Color(0xFF64748B), const Color(0xFF475569)],
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(
+                              isPremium ? Icons.workspace_premium_rounded : Icons.lock_outline_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      isPremium ? 'باقة دراسية مميزة ✨' : 'حساب تجريبي مجاني',
+                                      style: GoogleFonts.notoKufiArabic(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: isPremium ? _gold : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  isPremium
+                                      ? (daysRemaining > 365
+                                          ? 'اشتراك دائمي فعال'
+                                          : 'متبقي على الصلاحية: $daysRemaining يوم')
+                                      : 'قم بالترقية لفتح كامل الملازم وبنوك الامتحانات',
+                                  style: TextStyle(
+                                    fontFamily: 'Tajawal',
+                                    fontSize: 12,
+                                    color: isPremium ? Colors.white70 : const Color(0xFF94A3B8),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pushNamed(context, AppRoutes.subscription),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isPremium ? _gold : const Color(0xFF0F172A),
+                              foregroundColor: isPremium ? const Color(0xFF0F172A) : Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              isPremium ? 'إدارة' : 'ترقية ⚡',
+                              style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12.5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ================= بطاقة إحصائيات المواد الذكية =================
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: _buildSmartStatsSection(user.uid, isDark),
+                  ),
+                ),
+
+                // ================= بوابة لوحة تحكم المدير (إذا كان مدير) =================
+                if (user.role == UserRole.admin)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF2563EB)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF2563EB).withOpacity(0.3),
+                              blurRadius: 14,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(20),
+                          child: InkWell(
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.adminDashboard),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: _gold.withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.admin_panel_settings_rounded, color: _gold, size: 26),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'لوحة تحكم المدير الشاملة 👑',
+                                          style: GoogleFonts.notoKufiArabic(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text(
+                                          'إدارة الطلاب، الملازم، الأكواد، الإشعارات، والنظام',
+                                          style: TextStyle(
+                                            fontFamily: 'Tajawal',
+                                            fontSize: 11.5,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // ================= قسم الإعدادات والتفضيلات =================
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                    child: Text(
+                      'تفضيلات التطبيق والمظهر',
+                      style: GoogleFonts.notoKufiArabic(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white70 : const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildThemeSwitchTile(isDark),
+                          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+                          _buildFontSizeSelector(isDark),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ================= قسم الأدوات والحساب =================
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                    child: Text(
+                      'الأدوات وإدارة الحساب',
+                      style: GoogleFonts.notoKufiArabic(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white70 : const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildActionTile(
+                            icon: Icons.history_edu_rounded,
+                            color: const Color(0xFF6366F1),
+                            title: 'سجل الاختبارات السابقة',
+                            subtitle: 'مراجعة درجاتك وإجاباتك في الامتحانات التي أجريتها',
+                            isDark: isDark,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const PreviousExamsScreen()),
+                              );
+                            },
+                          ),
+                          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+                          _buildActionTile(
+                            icon: Icons.support_agent_rounded,
+                            color: const Color(0xFF10B981),
+                            title: 'الدعم الفني والمساعدة',
+                            subtitle: 'إرسال استفسار أو مشكلة وسيتم الرد عبر الواتساب',
+                            isDark: isDark,
+                            onTap: () => _showSupportTicketDialog(context, user),
+                          ),
+                          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+                          _buildActionTile(
+                            icon: Icons.delete_forever_rounded,
+                            color: const Color(0xFFDC2626),
+                            title: 'حذف الحساب نهائياً',
+                            subtitle: 'مسح كافة بياناتك وسجلاتك من السيرفر',
+                            isDark: isDark,
+                            onTap: () => _showDeleteAccountDialog(context, authService),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ================= زر تسجيل الخروج الملكي =================
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                    child: Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          onTap: () => _showLogoutDialog(context, authService),
+                          borderRadius: BorderRadius.circular(16),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.logout_rounded, color: Colors.red, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'تسجيل الخروج من الحساب',
+                                style: TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // مسافة سفلية واسعة لتفادي شريط التنقل السفلي العائم
+                const SliverToBoxAdapter(child: SizedBox(height: 125)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ================= قسم تخصيص الأفاتار والجنس =================
+  Widget _buildAvatarCustomizerSection(
+    UserModel user,
+    String activeGender,
+    AuthService authService,
+    bool isDark,
+  ) {
+    final availableAvatars = AvatarHelper.getAvatarsByGender(activeGender);
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2), width: 1.2),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isPremium ? Icons.stars_rounded : Icons.person_outline_rounded,
-              color: color,
-              size: 26,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  status,
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: color,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.face_retouching_natural_rounded, color: Color(0xFF8B5CF6), size: 18),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subTitle,
-                  style: const TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 13,
-                    color: Color(0xFF8E8E93),
+                  const SizedBox(width: 8),
+                  Text(
+                    'تخصيص الأفاتار والجنس',
+                    style: GoogleFonts.notoKufiArabic(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          if (!isPremium)
-            ElevatedButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.subscription),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ],
               ),
-              child: const Text('ترقية', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 13)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_done_rounded, color: Color(0xFF10B981), size: 13),
+                    SizedBox(width: 4),
+                    Text(
+                      'حفظ فوري',
+                      style: TextStyle(fontFamily: 'Tajawal', fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // اختيار الجنس (ذكر / أنثى / عام)
+          Row(
+            children: [
+              _buildGenderChip('male', 'ذكر 👦', activeGender, isDark, () {
+                setState(() => _currentSelectedGender = 'male');
+                authService.updateGenderAndAvatar('male', 'boy_1');
+              }),
+              const SizedBox(width: 8),
+              _buildGenderChip('female', 'أنثى 👧', activeGender, isDark, () {
+                setState(() => _currentSelectedGender = 'female');
+                authService.updateGenderAndAvatar('female', 'girl_1');
+              }),
+              const SizedBox(width: 8),
+              _buildGenderChip('unspecified', 'عام 🎓', activeGender, isDark, () {
+                setState(() => _currentSelectedGender = 'unspecified');
+                authService.updateGenderAndAvatar('unspecified', 'general_1');
+              }),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // قائمة الأفاتارات التفاعلية
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: availableAvatars.map((avatar) {
+                final isSelected = user.avatarId == avatar.id;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: GestureDetector(
+                    onTap: () async {
+                      try {
+                        await authService.updateGenderAndAvatar(activeGender, avatar.id);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  Text(avatar.emoji, style: const TextStyle(fontSize: 18)),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'تم اختيار افتار "${avatar.name}" وحفظه بنجاح!',
+                                    style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: const Color(0xFF0F172A),
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        // Ignored
+                      }
+                    },
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? _gold : Colors.transparent,
+                              width: 2.5,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: _gold.withOpacity(0.4),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: AvatarHelper.buildAvatarWidget(
+                            avatarId: avatar.id,
+                            gender: avatar.gender,
+                            radius: 26,
+                            isPremium: isSelected && user.isPremium,
+                            showCrown: false,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          avatar.name,
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected
+                                ? (isDark ? _gold : const Color(0xFF0F172A))
+                                : (isDark ? Colors.white60 : const Color(0xFF64748B)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSmartStatsCard(String userId) {
+  Widget _buildGenderChip(
+    String genderKey,
+    String label,
+    String currentActiveGender,
+    bool isDark,
+    VoidCallback onTap,
+  ) {
+    final isSelected = currentActiveGender == genderKey;
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF2563EB)
+                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFF2563EB)
+                  : (isDark ? Colors.white10 : const Color(0xFFCBD5E1)),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+              color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ================= عناصر الإحصائيات والتفضيلات =================
+  Widget _buildSmartStatsSection(String userId, bool isDark) {
     return StreamBuilder<Map<String, dynamic>>(
       stream: SocialService().getSubjectStats(userId),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Color(0xFF0F172A)));
-        
-        final stats = snapshot.data!;
-        
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFE5E5EA), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 15,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              _buildProgressBar('اللغة العربية', stats['arabic'] ?? 0.0, const Color(0xFF00C853)),
-              const SizedBox(height: 14),
-              _buildProgressBar('الحاسوب', stats['computer'] ?? 0.0, const Color(0xFF8B5CF6)),
-              const SizedBox(height: 14),
-              _buildProgressBar('اللغة الإنجليزية', stats['english'] ?? 0.0, const Color(0xFF2563EB)),
-            ],
-          ),
-        );
-      },
-    );
-  }
+        final stats = snapshot.data ?? {};
+        final double arabicAcc = (stats['arabic'] ?? 0.0).toDouble();
+        final double computerAcc = (stats['computer'] ?? 0.0).toDouble();
+        final double englishAcc = (stats['english'] ?? 0.0).toDouble();
 
-  Widget _buildProgressBar(String label, double percentage, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label, style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF1C1C1E))),
-            Text('${percentage.toStringAsFixed(1)}%', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, color: color, fontSize: 13)),
-          ],
-        ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: percentage / 100,
-            backgroundColor: color.withOpacity(0.12),
-            color: color,
-            minHeight: 7,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildThemeSettingsCard() {
-    return Consumer<SettingsProvider>(
-      builder: (context, settings, _) {
-        final isDark = settings.isDarkMode;
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF131C31) : Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE5E5EA),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                blurRadius: 15,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                    color: isDark ? const Color(0xFFFACC15) : const Color(0xFF0F172A),
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'الوضع الليلي (Dark Mode)',
-                    style: TextStyle(
-                      fontFamily: 'Tajawal',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: isDark ? Colors.white : const Color(0xFF1C1C1E),
-                    ),
-                  ),
-                ],
-              ),
-              Switch.adaptive(
-                value: isDark,
-                activeColor: const Color(0xFF2563EB),
-                onChanged: (_) => settings.toggleTheme(),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFontSettingsCard() {
-    return Consumer<SettingsProvider>(
-      builder: (context, settings, _) {
-        final isDark = settings.isDarkMode;
-        return Container(
-          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF131C31) : Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE5E5EA),
-              width: 1,
-            ),
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
@@ -483,19 +1183,170 @@ class _ProfileScreenState extends State<ProfileScreen>
             children: [
               Row(
                 children: [
-                  Icon(Icons.text_fields_rounded, color: isDark ? Colors.white : const Color(0xFF0F172A), size: 20),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.analytics_rounded, color: Color(0xFF2563EB), size: 18),
+                  ),
                   const SizedBox(width: 8),
-                  Text('حجم النص في التطبيق', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF1C1C1E))),
+                  Text(
+                    'مستواك ودقتك في المواد',
+                    style: GoogleFonts.notoKufiArabic(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
+              _buildSubjectProgressBar('اللغة العربية 📖', arabicAcc, const Color(0xFFD97706), isDark),
+              const SizedBox(height: 12),
+              _buildSubjectProgressBar('الحاسوب 💻', computerAcc, const Color(0xFF2563EB), isDark),
+              const SizedBox(height: 12),
+              _buildSubjectProgressBar('اللغة الإنكليزية 🇬🇧', englishAcc, const Color(0xFF10B981), isDark),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSubjectProgressBar(String label, double percentage, Color color, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white70 : const Color(0xFF334155),
+              ),
+            ),
+            Text(
+              '${percentage.toStringAsFixed(1)}%',
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 12.5,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(
+            value: (percentage / 100).clamp(0.0, 1.0),
+            backgroundColor: color.withOpacity(0.15),
+            color: color,
+            minHeight: 6.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThemeSwitchTile(bool isDark) {
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, _) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (isDark ? const Color(0xFFFACC15) : const Color(0xFF0F172A)).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  color: isDark ? const Color(0xFFFACC15) : const Color(0xFF0F172A),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'المظهر الليلي (Dark Luxury)',
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    const Text(
+                      'راحة فائقة للعين أثناء المذاكرة ليلاً',
+                      style: TextStyle(fontFamily: 'Tajawal', fontSize: 11.5, color: Color(0xFF94A3B8)),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: settings.isDarkMode,
+                activeColor: const Color(0xFF2563EB),
+                onChanged: (_) => settings.toggleTheme(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFontSizeSelector(bool isDark) {
+    return Consumer<SettingsProvider>(
+      builder: (context, settings, _) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.format_size_rounded, color: Color(0xFF8B5CF6), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'حجم خط القراءة في التطبيق',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildFontOption(context, settings, 'صغير', 0.85, isDark),
-                  _buildFontOption(context, settings, 'افتراضي', 1.0, isDark),
-                  _buildFontOption(context, settings, 'كبير', 1.15, isDark),
-                  _buildFontOption(context, settings, 'ضخم', 1.3, isDark),
+                  _buildFontPill(context, settings, 'صغير', 0.85, isDark),
+                  _buildFontPill(context, settings, 'افتراضي', 1.0, isDark),
+                  _buildFontPill(context, settings, 'كبير', 1.15, isDark),
+                  _buildFontPill(context, settings, 'كبير جداً', 1.3, isDark),
                 ],
               ),
             ],
@@ -505,453 +1356,90 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildFontOption(BuildContext context, SettingsProvider settings, String label, double scale, bool isDark) {
+  Widget _buildFontPill(BuildContext context, SettingsProvider settings, String label, double scale, bool isDark) {
     final isSelected = settings.fontScale == scale;
     return GestureDetector(
       onTap: () => settings.setFontScale(scale),
-      child: Column(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? const Color(0xFF2563EB)
-                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF2F2F7)),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected
-                    ? const Color(0xFF2563EB)
-                    : (isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE5E5EA)),
-              ),
-            ),
-            child: Text(
-              'ع',
-              style: TextStyle(
-                fontSize: 14 * scale,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.white70 : const Color(0xFF8E8E93)),
-              ),
-            ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF2563EB)
+              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF2563EB) : (isDark ? Colors.white10 : const Color(0xFFCBD5E1)),
           ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Tajawal',
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected
-                  ? (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0F172A))
-                  : (isDark ? Colors.white54 : const Color(0xFF8E8E93)),
-            ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Tajawal',
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF64748B)),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  String _roleName(UserRole role) {
-    switch (role) {
-      case UserRole.admin:
-        return 'مدير النظام';
-      default:
-        return 'طالب';
-    }
-  }
-
-  Widget _buildInfoCard({
+  Widget _buildActionTile({
     required IconData icon,
-    required String title,
-    required String value,
     required Color color,
-    VoidCallback? onTap,
+    required String title,
+    required String subtitle,
+    required bool isDark,
+    required VoidCallback onTap,
   }) {
-    return Transform.translate(
-      offset: Offset(0, _slideAnimation.value),
-      child: Opacity(
-        opacity: _fadeAnimation.value,
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 25,
-                offset: const Offset(0, 5),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
               ),
-            ],
-            border: Border.all(
-              color: Colors.grey.shade100,
-              width: 1,
-            ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-            child: InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(24),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            color.withOpacity(0.2),
-                            color.withOpacity(0.05),
-                          ],
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: color, size: 28),
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              color: Color(0xFF9CA3AF),
-                              fontFamily: 'Cairo',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            value,
-                            style: const TextStyle(
-                              color: Color(0xFF1F2937),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 18,
-                              fontFamily: 'Cairo',
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
                     ),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        color: color,
-                        size: 16,
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: isDark ? Colors.white30 : const Color(0xFF94A3B8)),
+            ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Text(
-        title,
-        style: GoogleFonts.notoKufiArabic(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: const Color(0xFF0F172A),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authService = AuthService();
-
-    return StreamBuilder<UserModel?>(
-      stream: authService.userData,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == null) {
-          return const Scaffold(
-            backgroundColor: Color(0xFFF8F9FA),
-            body: LuxuryLoading(message: 'جاري تحميل البيانات...'),
-          );
-        }
-
-        final user = snapshot.data!;
-        final daysLeft = user.expiryDate?.difference(DateTime.now()).inDays ?? 0;
-
-        return AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return Scaffold(
-              backgroundColor: _containerColorAnimation.value,
-              body: CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  // Luxurious Vibrant iOS Header
-                  SliverAppBar(
-                    expandedHeight: 140,
-                    floating: true,
-                    pinned: true,
-                    backgroundColor: const Color(0xFF0F172A),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF0F172A),
-                              Color(0xFF2563EB),
-                              Color(0xFF4F46E5),
-                            ],
-                          ),
-                        ),
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFF59E0B), Color(0xFF00C853), Color(0xFF2563EB)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF2563EB).withOpacity(0.35),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: const CircleAvatar(
-                              radius: 34,
-                              backgroundColor: Colors.white,
-                              child: Icon(
-                                Icons.person_rounded,
-                                size: 36,
-                                color: Color(0xFF2563EB),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      title: const Text(
-                        'الملف الشخصي والإعدادات',
-                        style: TextStyle(
-                          fontFamily: 'Tajawal',
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      centerTitle: true,
-                    ),
-                  ),
-
-                  // User Info with Animation
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 10, bottom: 8),
-                      child: Column(
-                        children: [
-                          if (_scaleAnimation != null)
-                            ScaleTransition(
-                              scale: _scaleAnimation!,
-                              child: Text(
-                                user.name,
-                                style: const TextStyle(
-                                  fontFamily: 'Cairo',
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
-                                  color: Color(0xFF1F2937),
-                                ),
-                              ),
-                            )
-                          else
-                            Text(
-                              user.name,
-                              style: const TextStyle(
-                                fontFamily: 'Cairo',
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.5,
-                                color: Color(0xFF1F2937),
-                              ),
-                            ),
-                          const SizedBox(height: 8),
-                          FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFEF3C7),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                user.email,
-                                style: const TextStyle(
-                                  fontFamily: 'Cairo',
-                                  fontSize: 14,
-                                  color: Color(0xFFB45309),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Personal Info Section
-                  SliverToBoxAdapter(
-                    child: _buildSectionHeader('المعلومات الشخصية'),
-                  ),
-
-                  SliverList(
-                    delegate: SliverChildListDelegate([
-                      _buildInfoCard(
-                        icon: Icons.badge_rounded,
-                        title: 'الدور',
-                        value: _roleName(user.role),
-                        color: const Color(0xFF3B82F6),
-                      ),
-                      _buildSubscriptionStatusCard(user),
-                      
-                      const SizedBox(height: 16),
-                      _buildSectionHeader('مستواك في المواد'),
-                      _buildSmartStatsCard(user.uid),
-
-                      if (user.role == UserRole.admin) ...[
-                        const SizedBox(height: 16),
-                        _buildSectionHeader('إدارة النظام'),
-                        _buildInfoCard(
-                          icon: Icons.admin_panel_settings_rounded,
-                          title: 'لوحة تحكم المدير الفاخرة',
-                          value: 'فتح لوحة التحكم والمؤشرات 👑',
-                          color: const Color(0xFF2563EB),
-                          onTap: () => Navigator.pushNamed(context, AppRoutes.adminDashboard),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      _buildSectionHeader('إعدادات التطبيق'),
-                      _buildThemeSettingsCard(),
-                      _buildFontSettingsCard(),
-                      
-                      const SizedBox(height: 16),
-                      _buildSectionHeader('الحساب'),
-                      _buildInfoCard(
-                        icon: Icons.logout_rounded,
-                        title: 'تسجيل الخروج',
-                        value: 'الخروج من الحساب الحالي',
-                        color: Colors.orange,
-                        onTap: () => _showLogoutDialog(context, authService),
-                      ),
-                      _buildInfoCard(
-                        icon: Icons.delete_forever_rounded,
-                        title: 'إدارة البيانات',
-                        value: 'حذف الحساب نهائياً',
-                        color: Colors.red,
-                        onTap: () => _showDeleteAccountDialog(context, authService),
-                      ),
-                    ]),
-                  ),
-
-                  // Bottom Logout Button
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 24,
-                      ),
-                      child: Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFFEF4444),
-                              Color(0xFFDC2626),
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.shade400.withOpacity(0.35),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(18),
-                          child: InkWell(
-                            onTap: () => _showLogoutDialog(context, authService),
-                            borderRadius: BorderRadius.circular(18),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.logout_rounded,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                                SizedBox(width: 10),
-                                Text(
-                                  'تسجيل الخروج من التطبيق',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontFamily: 'Tajawal',
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Footer Spacing
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 40),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }

@@ -11,7 +11,7 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const String _webClientId = '527094263196-em54nrkgk7bbll25anr1drkegv7f36h6.apps.googleusercontent.com';
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: _webClientId,
+    clientId: kIsWeb ? _webClientId : null,
     serverClientId: _webClientId,
   );
   final String _usersCollection = 'users';
@@ -310,6 +310,7 @@ class AuthService {
 
       final userData = userModel.toMap();
       userData['username'] = username.toLowerCase().trim();
+      userData['password'] = password.trim();
       userData['createdAt'] = FieldValue.serverTimestamp();
 
       await _firestore.collection(_usersCollection).doc(user.uid).set(userData);
@@ -336,11 +337,49 @@ class AuthService {
     }
   }
 
-  /// تيار بيانات المستخدم
+  /// تحديث جنس وأفاتار المستخدم وحفظهما بالسيرفر ولوحة الشرف
+  Future<void> updateGenderAndAvatar(String gender, String avatarId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final updateData = {
+        'gender': gender,
+        'avatarId': avatarId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection(_usersCollection).doc(user.uid).set(updateData, SetOptions(merge: true));
+
+      // مزامنة فورية مع لوحة الشرف
+      try {
+        await _firestore.collection('leaderboard').doc(user.uid).set({
+          'gender': gender,
+          'avatarId': avatarId,
+        }, SetOptions(merge: true));
+      } catch (_) {}
+
+      _cachedUser = null;
+    } catch (e) {
+      print('❌ خطأ في تحديث الأفاتار: $e');
+      rethrow;
+    }
+  }
+
+  /// تيار بيانات المستخدم المباشر والمتزامن لحظياً مع التغييرات
   Stream<UserModel?> get userData {
-    return _auth.authStateChanges().asyncMap((User? firebaseUser) async {
-      if (firebaseUser == null) return null;
-      return await _getUserFromFirestore(firebaseUser.uid);
+    return _auth.authStateChanges().asyncExpand((User? firebaseUser) {
+      if (firebaseUser == null) return Stream.value(null);
+      return _firestore
+          .collection(_usersCollection)
+          .doc(firebaseUser.uid)
+          .snapshots()
+          .map((doc) {
+        if (!doc.exists || doc.data() == null) return null;
+        final userModel = UserModel.fromMap(doc.data()!);
+        _cachedUser = userModel;
+        return userModel;
+      });
     });
   }
 
