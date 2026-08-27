@@ -2,7 +2,7 @@ name: inpt
 description: تطبيق الاختبارات الوطني الموحد. تطبيق تعليمي متكامل للاختبارات مع نظام اشتراكات متقدم.
 publish_to: 'none'
 
-version: 1.2.5+30
+version: 1.2.6+31
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
