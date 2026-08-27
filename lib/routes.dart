@@ -17,6 +17,7 @@ import 'screens/student/about_national_exam_screen.dart';
 import 'screens/student/qualification_score_screen.dart';
 import 'screens/student/ai_tutor_screen.dart';
 import 'screens/admin/leaderboard_management_screen.dart';
+import 'screens/student/delete_account_screen.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -38,6 +39,7 @@ class AppRoutes {
   static const String aboutExam = '/about-exam';
   static const String qualificationScore = '/qualification-score';
   static const String aiTutor = '/ai-tutor';
+  static const String deleteAccount = '/delete-account';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -115,6 +117,9 @@ class AppRoutes {
 
       case subscription:
         return MaterialPageRoute(builder: (_) => const SubscriptionScreen());
+
+      case deleteAccount:
+        return MaterialPageRoute(builder: (_) => const DeleteAccountScreen());
 
       default:
         return MaterialPageRoute(

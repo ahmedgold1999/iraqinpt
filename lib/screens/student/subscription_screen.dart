@@ -1,16 +1,11 @@
 import 'dart:async';
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/config_service.dart';
-import '../../services/subscription_service.dart';
-import '../../routes.dart';
 
 const Color _kIosBg = Color(0xFFF8F9FA);
-const Color _kIosCardBg = Colors.white;
 const Color _kIosTextDark = Color(0xFF1C1C1E);
 const Color _kIosTextMuted = Color(0xFF8E8E93);
 const Color _kIosPrimary = Color(0xFF0F172A);
@@ -219,21 +214,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     );
   }
 
-  Widget _buildStepItem(String text, int index) {
+  Widget _buildStepItem(String text, int index, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F7),
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF2F2F7),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
       ),
       child: Row(
         children: [
           Container(
             width: 32,
             height: 32,
-            decoration: const BoxDecoration(
-              color: _kIosPrimary,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2563EB) : _kIosPrimary,
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -252,9 +248,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: _kIosTextDark,
+                color: isDark ? Colors.white70 : _kIosTextDark,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Tajawal',
               ),
@@ -285,7 +281,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     }
   }
 
-  Widget _buildPlanCard(String id, String label, String price) {
+  Widget _buildPlanCard(String id, String label, String price, bool isDark) {
     bool isSelected = _selectedPlan == id;
     return GestureDetector(
       onTap: () => setState(() => _selectedPlan = id),
@@ -294,10 +290,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFFBEB) : Colors.white,
+          color: isSelected
+              ? (isDark ? const Color(0xFF1E1B4B) : const Color(0xFFFFFBEB))
+              : (isDark ? const Color(0xFF0F172A) : Colors.white),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? _kIosGold : _kIosBorder,
+            color: isSelected ? _kIosGold : (isDark ? Colors.white10 : _kIosBorder),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
@@ -319,7 +317,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? _kIosGold : _kIosTextMuted,
+                  color: isSelected ? _kIosGold : (isDark ? Colors.white38 : _kIosTextMuted),
                   width: 2,
                 ),
                 color: isSelected ? _kIosGold : Colors.transparent,
@@ -330,11 +328,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Tajawal',
-                  color: _kIosTextDark,
+                  color: isDark ? Colors.white : _kIosTextDark,
                 ),
               ),
             ),
@@ -344,7 +342,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Tajawal',
-                color: isSelected ? _kIosGold : _kIosTextMuted,
+                color: isSelected ? _kIosGold : (isDark ? Colors.white60 : _kIosTextMuted),
               ),
             ),
           ],
@@ -353,18 +351,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     );
   }
 
-  bool _isAppleUI() {
-    return defaultTargetPlatform == TargetPlatform.iOS;
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: _kIosBg,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : _kIosBg,
       appBar: AppBar(
-        title: const Text('الاشتراك المميز'),
+        title: const Text('الاشتراك المميز 👑'),
         centerTitle: true,
         automaticallyImplyLeading: false,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -383,14 +382,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [_kIosPrimary, Color(0xFF1E293B)],
+                          colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF2563EB)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: _kIosPrimary.withOpacity(0.2),
+                            color: const Color(0xFF2563EB).withOpacity(0.25),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -444,12 +443,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: _kIosBorder, width: 1),
+                  border: Border.all(color: isDark ? Colors.white10 : _kIosBorder, width: 1),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
+                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                       blurRadius: 15,
                       offset: const Offset(0, 4),
                     ),
@@ -458,20 +457,20 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'اختر مدة الاشتراك',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: _kIosTextDark,
+                        color: isDark ? Colors.white : _kIosTextDark,
                         fontFamily: 'Tajawal',
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _buildPlanCard('1m', 'شهر واحد', '$_price1m د.ع'),
-                    _buildPlanCard('2m', 'شهرين', '$_price2m د.ع'),
-                    _buildPlanCard('3m', '3 أشهر', '$_price3m د.ع'),
-                    _buildPlanCard('1y', 'سنة كاملة', '$_price1y د.ع'),
+                    _buildPlanCard('1m', 'شهر واحد', '$_price1m د.ع', isDark),
+                    _buildPlanCard('2m', 'شهرين', '$_price2m د.ع', isDark),
+                    _buildPlanCard('3m', '3 أشهر', '$_price3m د.ع', isDark),
+                    _buildPlanCard('1y', 'سنة كاملة', '$_price1y د.ع', isDark),
                   ],
                 ),
               ),
@@ -483,12 +482,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: _kIosBorder, width: 1),
+                  border: Border.all(color: isDark ? Colors.white10 : _kIosBorder, width: 1),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
+                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                       blurRadius: 15,
                       offset: const Offset(0, 4),
                     ),
@@ -496,19 +495,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 ),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       'خطوات التفعيل الفوري',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
-                        color: _kIosTextDark,
+                        color: isDark ? Colors.white : _kIosTextDark,
                         fontFamily: 'Tajawal',
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _buildStepItem('اختر مدة الاشتراك المناسبة من الأعلى', 1),
-                    _buildStepItem('اضغط على رابط الدعم (واتساب أو تليجرام)', 2),
-                    _buildStepItem('سيقوم الأدمن بتفعيل حسابك فوراً', 3),
+                    _buildStepItem('اختر مدة الاشتراك المناسبة من الأعلى', 1, isDark),
+                    _buildStepItem('اضغط على رابط الدعم (واتساب أو تليجرام)', 2, isDark),
+                    _buildStepItem('سيقوم الأدمن بتفعيل حسابك فوراً', 3, isDark),
 
                     const SizedBox(height: 20),
 

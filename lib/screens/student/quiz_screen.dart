@@ -374,6 +374,7 @@ class _ResultsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final icon = isPassed
         ? Icons.workspace_premium_rounded
         : Icons.sentiment_dissatisfied_rounded;
@@ -384,7 +385,7 @@ class _ResultsHeader extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 50, 16, 12),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: accentColor.withOpacity(0.3), width: 1.5),
         boxShadow: [
@@ -413,17 +414,17 @@ class _ResultsHeader extends StatelessWidget {
               fontFamily: _QuizUI.font,
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1C1C1E),
+              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
           Text(
             subject,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: _QuizUI.font,
               fontSize: 15,
-              color: Color(0xFF8E8E93),
+              color: isDark ? Colors.white60 : const Color(0xFF8E8E93),
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
@@ -731,8 +732,11 @@ class _ResultsStatsCard extends StatelessWidget {
         ? (durationInSeconds / totalQuestions)
         : 0;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
       elevation: 0,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_QuizUI.radiusXL)),
       child: Container(
@@ -742,12 +746,12 @@ class _ResultsStatsCard extends StatelessWidget {
           gradient: LinearGradient(
             colors: [
               mainColor.withOpacity(.10),
-              Colors.white,
+              isDark ? const Color(0xFF1E293B) : Colors.white,
             ],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
-          border: Border.all(color: Colors.black.withOpacity(.06)),
+          border: Border.all(color: isDark ? Colors.white10 : Colors.black.withOpacity(.06)),
           boxShadow: [_QuizUI.softShadow(Colors.black)],
         ),
         child: Column(
@@ -764,12 +768,17 @@ class _ResultsStatsCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('تقرير الأداء والتشخيص الذكي 📊', style: _QuizUI.title),
+                      Text(
+                        'تقرير الأداء والتشخيص الذكي 📊',
+                        style: _QuizUI.title.copyWith(
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         _getDiagnosisText(),
                         style: _QuizUI.body.copyWith(
-                          color: const Color(0xFF334155),
+                          color: isDark ? Colors.white70 : const Color(0xFF334155),
                           fontSize: 13,
                           height: 1.4,
                           fontWeight: FontWeight.w500,
@@ -900,6 +909,7 @@ class _MiniStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
@@ -925,7 +935,7 @@ class _MiniStat extends StatelessWidget {
             style: TextStyle(
               fontFamily: _QuizUI.font,
               fontSize: 12,
-              color: Colors.black54,
+              color: isDark ? Colors.white70 : Colors.black54,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1001,12 +1011,14 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
       });
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('جميع الأسئلة والنتائج',
             style: TextStyle(fontFamily: _QuizUI.font, fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
@@ -1064,15 +1076,16 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
 
           return Card(
             elevation: 0,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: borderColor, width: 1.5),
+              side: BorderSide(color: borderColor.withOpacity(0.4), width: 1.5),
             ),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1141,6 +1154,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                       fontFamily: _QuizUI.font,
                       fontSize: _fontSize + 2,
                       fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF1C1C1E),
                       height: 1.4,
                     ),
                   ),
@@ -1151,8 +1165,8 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isCorrect
-                          ? Colors.green.withOpacity(0.08)
-                          : Colors.red.withOpacity(0.08),
+                          ? (isDark ? const Color(0xFF064E3B).withOpacity(0.3) : Colors.green.withOpacity(0.08))
+                          : (isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : Colors.red.withOpacity(0.08)),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -1175,7 +1189,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                                     fontFamily: _QuizUI.font,
                                     fontSize: _fontSize,
                                     fontWeight: FontWeight.w600,
-                                    color: isCorrect ? Colors.green : Colors.red,
+                                    color: isCorrect ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
                                   ),
                                   children: [
                                     const TextSpan(
@@ -1205,7 +1219,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                                     fontFamily: _QuizUI.font,
                                     fontSize: _fontSize,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.green,
+                                    color: const Color(0xFF22C55E),
                                   ),
                                   children: [
                                     const TextSpan(
@@ -1229,14 +1243,14 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.05),
+                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : Colors.blue.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                        border: Border.all(color: isDark ? const Color(0xFF2563EB).withOpacity(0.3) : Colors.blue.withOpacity(0.2)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.lightbulb_outline, color: Colors.blue, size: _fontSize),
+                          Icon(Icons.lightbulb_outline, color: const Color(0xFF38BDF8), size: _fontSize),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
@@ -1248,7 +1262,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                                     fontFamily: _QuizUI.font,
                                     fontSize: _fontSize - 2,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                                    color: const Color(0xFF38BDF8),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -1258,7 +1272,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                                     fontFamily: _QuizUI.font,
                                     fontSize: _fontSize - 2,
                                     fontWeight: FontWeight.w500,
-                                    color: Colors.blue.shade800,
+                                    color: isDark ? const Color(0xFF93C5FD) : Colors.blue.shade800,
                                     height: 1.5,
                                   ),
                                 ),
@@ -1334,6 +1348,7 @@ class WrongAnswersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final wrongItems = <_WrongItem>[];
 
     for (int i = 0; i < questions.length; i++) {
@@ -1348,11 +1363,11 @@ class WrongAnswersScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('الإجابات الخاطئة والمراجعة',
             style: TextStyle(fontFamily: _QuizUI.font, fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
@@ -1402,19 +1417,21 @@ class _WrongCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final q = item.question;
 
     return Card(
       elevation: 0,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_QuizUI.radiusXL)),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(_QuizUI.radiusXL),
-          border: Border.all(color: Colors.black.withOpacity(.06)),
+          border: Border.all(color: isDark ? Colors.white10 : Colors.black.withOpacity(.06)),
           boxShadow: [_QuizUI.softShadow(Colors.black)],
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1440,7 +1457,13 @@ class _WrongCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text(q.question, style: _QuizUI.title.copyWith(fontSize: 18)),
+            Text(
+              q.question,
+              style: _QuizUI.title.copyWith(
+                fontSize: 18,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
             const SizedBox(height: 14),
             _AnswerBox(
               label: 'اختيارك:',
@@ -1475,10 +1498,11 @@ class _ExplanationBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(.05),
+        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : Colors.blue.withOpacity(.05),
         borderRadius: BorderRadius.circular(_QuizUI.radiusL),
         border: Border.all(color: Colors.blue.withOpacity(.25)),
       ),
@@ -2074,14 +2098,15 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     }
 
     final q = _randomQuestions[_currentQuestionIndex];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8F9FA),
         appBar: AppBar(
           title: Text(widget.subject, style: const TextStyle(fontFamily: _QuizUI.font, fontWeight: FontWeight.bold)),
-          backgroundColor: const Color(0xFF0F172A),
+          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
           foregroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
@@ -2157,12 +2182,12 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                   final current = index == _currentQuestionIndex;
 
                   final Color bg = current
-                      ? const Color(0xFF0F172A)
+                      ? (isDark ? const Color(0xFF2563EB) : const Color(0xFF0F172A))
                       : answered
                       ? const Color(0xFF00C853)
-                      : const Color(0xFFE5E5EA);
+                      : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE5E5EA));
 
-                  final Color fg = current || answered ? Colors.white : const Color(0xFF8E8E93);
+                  final Color fg = current || answered ? Colors.white : (isDark ? Colors.white60 : const Color(0xFF8E8E93));
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -2173,10 +2198,11 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                       decoration: BoxDecoration(
                         color: bg,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
                         boxShadow: current
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFF0F172A).withOpacity(0.2),
+                                  color: const Color(0xFF2563EB).withOpacity(0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 3),
                                 ),
@@ -2209,8 +2235,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                 child: LinearProgressIndicator(
                   value: (_currentQuestionIndex + 1) / _randomQuestions.length,
                   minHeight: 6,
-                  backgroundColor: const Color(0xFFE5E5EA),
-                  color: const Color(0xFF0F172A),
+                  backgroundColor: isDark ? Colors.white12 : const Color(0xFFE5E5EA),
+                  color: const Color(0xFF2563EB),
                 ),
               ),
             ),
@@ -2230,11 +2256,11 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
-                      color: Colors.white,
-                      border: Border.all(color: const Color(0xFFE5E5EA), width: 1),
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5E5EA), width: 1),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -2254,16 +2280,16 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFF2F2F7),
+                                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF2F2F7),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       'السؤال ${_currentQuestionIndex + 1} من ${_randomQuestions.length}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontFamily: _QuizUI.font,
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF8E8E93),
+                                        color: isDark ? Colors.white70 : const Color(0xFF8E8E93),
                                       ),
                                     ),
                                   ),
@@ -2315,7 +2341,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                           : Icons.star_outline_rounded,
                                       color: _bookmarkedQuestions.contains(q.question)
                                           ? const Color(0xFFF59E0B)
-                                          : Colors.grey.shade400,
+                                          : (isDark ? Colors.white38 : Colors.grey.shade400),
                                       size: 22,
                                     ),
                                     onPressed: () => _toggleBookmark(q),
@@ -2360,21 +2386,21 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF0F172A).withOpacity(0.06),
+                                        color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFF0F172A).withOpacity(0.06),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: const Row(
+                                      child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.volume_up_rounded, size: 15, color: Color(0xFF0F172A)),
-                                          SizedBox(width: 4),
+                                          Icon(Icons.volume_up_rounded, size: 15, color: isDark ? Colors.white70 : const Color(0xFF0F172A)),
+                                          const SizedBox(width: 4),
                                           Text(
                                             'استماع',
                                             style: TextStyle(
                                               fontFamily: _QuizUI.font,
                                               fontSize: 11.5,
                                               fontWeight: FontWeight.bold,
-                                              color: Color(0xFF0F172A),
+                                              color: isDark ? Colors.white70 : const Color(0xFF0F172A),
                                             ),
                                           ),
                                         ],
@@ -2392,7 +2418,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                               fontFamily: _QuizUI.font,
                               fontWeight: FontWeight.bold,
                               fontSize: _fontSize + 1,
-                              color: const Color(0xFF1C1C1E),
+                              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
                               height: 1.5,
                             ),
                           ),
@@ -2432,10 +2458,12 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                   duration: const Duration(milliseconds: 200),
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFFF0FDF4) : const Color(0xFFF2F2F7),
+                                    color: isSelected
+                                        ? (isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFF0FDF4))
+                                        : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF2F2F7)),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: isSelected ? const Color(0xFF00C853) : const Color(0xFFE5E5EA),
+                                      color: isSelected ? const Color(0xFF00C853) : (isDark ? Colors.white10 : const Color(0xFFE5E5EA)),
                                       width: isSelected ? 1.8 : 1,
                                     ),
                                   ),
@@ -2445,7 +2473,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                         width: 32,
                                         height: 32,
                                         decoration: BoxDecoration(
-                                          color: isSelected ? const Color(0xFF00C853) : Colors.white,
+                                          color: isSelected
+                                              ? const Color(0xFF00C853)
+                                              : (isDark ? const Color(0xFF1E293B) : Colors.white),
                                           shape: BoxShape.circle,
                                         ),
                                         alignment: Alignment.center,
@@ -2455,7 +2485,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                             fontFamily: _QuizUI.font,
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
-                                            color: isSelected ? Colors.white : const Color(0xFF1C1C1E),
+                                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF1C1C1E)),
                                           ),
                                         ),
                                       ),
@@ -2467,7 +2497,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                             fontFamily: _QuizUI.font,
                                             fontSize: _fontSize,
                                             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                            color: const Color(0xFF1C1C1E),
+                                            color: isDark ? Colors.white : const Color(0xFF1C1C1E),
                                             height: 1.3,
                                           ),
                                         ),
@@ -2490,8 +2520,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                 color: _userAnswers[_currentQuestionIndex] != null &&
                                     _randomQuestions[_currentQuestionIndex].options[_userAnswers[_currentQuestionIndex]!].trim() ==
                                         _randomQuestions[_currentQuestionIndex].originalAnswer.trim()
-                                    ? const Color(0xFFF0FDF4)
-                                    : const Color(0xFFFEF2F2),
+                                    ? (isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFF0FDF4))
+                                    : (isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : const Color(0xFFFEF2F2)),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: _userAnswers[_currentQuestionIndex] != null &&
@@ -2546,8 +2576,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: isDark ? const Color(0xFF0F172A) : Colors.white,
                                       borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
                                     ),
                                     child: Row(
                                       children: [
@@ -2569,11 +2600,11 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                               const SizedBox(height: 4),
                                               Text(
                                                 _randomQuestions[_currentQuestionIndex].originalAnswer,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontFamily: 'Tajawal',
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF1C1C1E),
+                                                  color: isDark ? Colors.white : const Color(0xFF1C1C1E),
                                                 ),
                                               ),
                                             ],
@@ -2589,13 +2620,14 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                     Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFEFF6FF),
+                                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : const Color(0xFFEFF6FF),
                                         borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: isDark ? const Color(0xFF2563EB).withOpacity(0.3) : Colors.transparent),
                                       ),
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF2563EB), size: 18),
+                                          const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF38BDF8), size: 18),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Column(
@@ -2607,17 +2639,17 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                                     fontFamily: 'Tajawal',
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.bold,
-                                                    color: Color(0xFF2563EB),
+                                                    color: Color(0xFF38BDF8),
                                                   ),
                                                 ),
                                                 const SizedBox(height: 4),
                                                 Text(
                                                   _randomQuestions[_currentQuestionIndex].explanation!,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontFamily: 'Tajawal',
                                                     fontSize: 13,
                                                     fontWeight: FontWeight.w500,
-                                                    color: Color(0xFF1E3A8A),
+                                                    color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E3A8A),
                                                     height: 1.4,
                                                   ),
                                                 ),
@@ -2640,9 +2672,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFEF2F2),
+                                color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : const Color(0xFFFEF2F2),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFFCA5A5)),
+                                border: Border.all(color: isDark ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFFFCA5A5)),
                               ),
                               child: Text(
                                 'الوقت الإجمالي المتبقي: ${_formatTime(_totalTimeLeft)}',
@@ -2680,8 +2712,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                   })
                               : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE5E5EA),
-                            foregroundColor: const Color(0xFF1C1C1E),
+                            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFE5E5EA),
+                            foregroundColor: isDark ? Colors.white70 : const Color(0xFF1C1C1E),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -2703,7 +2735,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                         child: ElevatedButton(
                           onPressed: _nextQuestionOrFinish,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0F172A),
+                            backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(

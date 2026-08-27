@@ -997,7 +997,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                   const SnackBar(content: Text('تم نسخ كلمة المرور!')),
                                 );
                               } else {
-                                _showChangePasswordDialog(uid, name);
+                                _showChangePasswordDialog(uid, currentName);
                               }
                             },
                             isDark: isDark,

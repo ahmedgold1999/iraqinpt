@@ -104,7 +104,19 @@ class UserModel {
     if (data['expiryDate'] != null) {
       if (data['expiryDate'] is Timestamp) {
         expiryDate = (data['expiryDate'] as Timestamp).toDate();
+      } else if (data['expiryDate'] is String) {
+        expiryDate = DateTime.tryParse(data['expiryDate'] as String);
+      } else if (data['expiryDate'] is int) {
+        expiryDate = DateTime.fromMillisecondsSinceEpoch(data['expiryDate'] as int);
       }
+    }
+
+    bool isPremium = data['isPremium'] is bool ? data['isPremium'] as bool : false;
+
+    // 🔥 فحص انتهاء صلاحية الاشتراك تلقائياً:
+    // إذا كان الحساب مميزاً ولكن تاريخ انتهاء الصلاحية محدد وقد مضى، تتوقف النسخة المميزة فوراً!
+    if (isPremium && expiryDate != null && DateTime.now().isAfter(expiryDate)) {
+      isPremium = false;
     }
 
     List<String> deviceIds = [];
@@ -117,7 +129,7 @@ class UserModel {
       name: data['name']?.toString() ?? '',
       email: data['email']?.toString() ?? '${data['username']?.toString() ?? ''}@ahmeed.inpt',
       role: userRole,
-      isPremium: data['isPremium'] is bool ? data['isPremium'] as bool : false,
+      isPremium: isPremium,
       activationCode: data['activationCode']?.toString() ?? '',
       expiryDate: expiryDate,
       deviceIds: deviceIds,
@@ -126,8 +138,22 @@ class UserModel {
     );
   }
 
+  /// هل الحساب مميز ونشط حالياً
+  bool get hasActiveSubscription => isPremium && (expiryDate == null || expiryDate!.isAfter(DateTime.now()));
+
+  /// هل انتهت صلاحية الاشتراك
+  bool get isSubscriptionExpired => expiryDate != null && DateTime.now().isAfter(expiryDate!);
+
+  /// عدد الأيام المتبقية على انتهاء الصلاحية
+  int get remainingDays {
+    if (expiryDate == null) return isPremium ? 9999 : 0;
+    final now = DateTime.now();
+    if (now.isAfter(expiryDate!)) return 0;
+    return expiryDate!.difference(now).inDays;
+  }
+
   @override
   String toString() {
-    return 'UserModel(uid: $uid, name: $name, email: $email, role: $role, isPremium: $isPremium)';
+    return 'UserModel(uid: $uid, name: $name, email: $email, role: $role, isPremium: $isPremium, expiryDate: $expiryDate)';
   }
 }

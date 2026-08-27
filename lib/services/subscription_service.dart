@@ -65,11 +65,10 @@ class SubscriptionService {
     }
   }
 
-  // إيقاف الاشتراك
+  // إيقاف الاشتراك عند انتهاء الصلاحية
   Future<void> deactivateSubscription(String userId) async {
     await _db.collection('users').doc(userId).update({
       'isPremium': false,
-      'expiryDate': null,
     });
     
     _sendSystemNotification(userId, 'انتهى الاشتراك', 'لقد انتهت فترة اشتراكك المميز. يمكنك التجديد الآن.');

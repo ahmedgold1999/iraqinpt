@@ -51,58 +51,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  // ===== نافذة تأكيد حذف الحساب =====
-  void _showDeleteAccountDialog(BuildContext context, AuthService authService) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            const SizedBox(width: 8),
-            Text(
-              'حذف الحساب نهائياً',
-              style: GoogleFonts.notoKufiArabic(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red),
-            ),
-          ],
-        ),
-        content: const Text(
-          'هل أنت متأكد من رغبتك في حذف حسابك نهائياً؟ سيتم مسح كافة نتائجك وسجلاتك وتقدمك الدراسي ولا يمكن استرجاعها.',
-          style: TextStyle(fontFamily: 'Tajawal', fontSize: 14, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await authService.deleteAccount();
-                if (context.mounted) {
-                  Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('تأكيد الحذف', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ===== نافذة تأكيد تسجيل الخروج =====
   void _showLogoutDialog(BuildContext context, AuthService authService) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -596,102 +544,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        gradient: isPremium
-                            ? const LinearGradient(
-                                colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF2E1065)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              )
-                            : LinearGradient(
-                                colors: isDark
-                                    ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                                    : [Colors.white, const Color(0xFFF1F5F9)],
-                              ),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: isPremium ? _gold.withOpacity(0.4) : (isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: isPremium ? _gold.withOpacity(0.12) : Colors.black.withOpacity(0.04),
-                            blurRadius: 18,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: isPremium
-                                    ? [const Color(0xFFFACC15), const Color(0xFFD97706)]
-                                    : [const Color(0xFF64748B), const Color(0xFF475569)],
-                              ),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Icon(
-                              isPremium ? Icons.workspace_premium_rounded : Icons.lock_outline_rounded,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      isPremium ? 'باقة دراسية مميزة ✨' : 'حساب تجريبي مجاني',
-                                      style: GoogleFonts.notoKufiArabic(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: isPremium ? _gold : (isDark ? Colors.white : const Color(0xFF0F172A)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  isPremium
-                                      ? (daysRemaining > 365
-                                          ? 'اشتراك دائمي فعال'
-                                          : 'متبقي على الصلاحية: $daysRemaining يوم')
-                                      : 'قم بالترقية لفتح كامل الملازم وبنوك الامتحانات',
-                                  style: TextStyle(
-                                    fontFamily: 'Tajawal',
-                                    fontSize: 12,
-                                    color: isPremium ? Colors.white70 : const Color(0xFF94A3B8),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pushNamed(context, AppRoutes.subscription),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isPremium ? _gold : const Color(0xFF0F172A),
-                              foregroundColor: isPremium ? const Color(0xFF0F172A) : Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                            ),
-                            child: Text(
-                              isPremium ? 'إدارة' : 'ترقية ⚡',
-                              style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12.5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _buildSubscriptionCard(user, isDark),
                   ),
                 ),
 
@@ -871,7 +724,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             title: 'حذف الحساب نهائياً',
                             subtitle: 'مسح كافة بياناتك وسجلاتك من السيرفر',
                             isDark: isDark,
-                            onTap: () => _showDeleteAccountDialog(context, authService),
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.deleteAccount),
                           ),
                         ],
                       ),
@@ -925,6 +778,238 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
         );
       },
+    );
+  }
+
+  // ================= بطاقة الاشتراك الفاخرة وتفاصيل الانتهاء =================
+  Widget _buildSubscriptionCard(UserModel user, bool isDark) {
+    final isPremium = user.isPremium;
+    final expiryDate = user.expiryDate;
+    final isExpired = user.isSubscriptionExpired;
+    final daysRemaining = user.remainingDays;
+
+    String formattedDate = '';
+    if (expiryDate != null) {
+      formattedDate = '${expiryDate.year}/${expiryDate.month.toString().padLeft(2, '0')}/${expiryDate.day.toString().padLeft(2, '0')}';
+    }
+
+    // الألوان والتدرجات حسب حالة الاشتراك
+    final LinearGradient cardGradient;
+    final Color borderColor;
+    final Color iconBgColor;
+    final IconData statusIcon;
+    final String titleText;
+    final Color titleColor;
+    final String subtitleText;
+    final String buttonText;
+    final Color buttonColor;
+    final Color buttonFgColor;
+
+    if (isPremium) {
+      cardGradient = const LinearGradient(
+        colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF2E1065)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+      borderColor = _gold.withOpacity(0.4);
+      iconBgColor = const Color(0xFFFACC15);
+      statusIcon = Icons.workspace_premium_rounded;
+      titleText = 'باقة دراسية مميزة 👑';
+      titleColor = _gold;
+      if (expiryDate != null) {
+        subtitleText = daysRemaining > 365
+            ? 'اشتراك دائمي فعال'
+            : 'متبقي على الصلاحية: $daysRemaining يوم';
+      } else {
+        subtitleText = 'اشتراك دائمي فعال مدى الحياة ♾️';
+      }
+      buttonText = 'إدارة ⚡';
+      buttonColor = _gold;
+      buttonFgColor = const Color(0xFF0F172A);
+    } else if (isExpired) {
+      cardGradient = LinearGradient(
+        colors: isDark
+            ? [const Color(0xFF450A0A), const Color(0xFF1E293B)]
+            : [const Color(0xFFFEF2F2), Colors.white],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+      borderColor = const Color(0xFFEF4444).withOpacity(0.4);
+      iconBgColor = const Color(0xFFEF4444);
+      statusIcon = Icons.timer_off_rounded;
+      titleText = 'انتهت صلاحية اشتراكك ⚠️';
+      titleColor = const Color(0xFFEF4444);
+      subtitleText = 'انتهى اشتراكك بتاريخ: $formattedDate\nجدّد الآن لفتح جميع المواد والامتحانات';
+      buttonText = 'تجديد 🚀';
+      buttonColor = const Color(0xFF10B981);
+      buttonFgColor = Colors.white;
+    } else {
+      cardGradient = LinearGradient(
+        colors: isDark
+            ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+            : [Colors.white, const Color(0xFFF1F5F9)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+      borderColor = isDark ? Colors.white10 : const Color(0xFFE2E8F0);
+      iconBgColor = const Color(0xFF64748B);
+      statusIcon = Icons.lock_outline_rounded;
+      titleText = 'حساب تجريبي مجاني 🔒';
+      titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+      subtitleText = 'قم بالترقية لفتح كامل الملازم وبنوك الامتحانات';
+      buttonText = 'ترقية ⚡';
+      buttonColor = const Color(0xFF2563EB);
+      buttonFgColor = Colors.white;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: cardGradient,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: borderColor,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isPremium
+                ? _gold.withOpacity(0.12)
+                : (isExpired ? const Color(0xFFEF4444).withOpacity(0.1) : Colors.black.withOpacity(0.04)),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: iconBgColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: iconBgColor.withOpacity(0.3)),
+                ),
+                child: Icon(
+                  statusIcon,
+                  color: iconBgColor,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          titleText,
+                          style: GoogleFonts.notoKufiArabic(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: titleColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitleText,
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 12,
+                        color: isPremium ? Colors.white70 : (isDark ? Colors.white60 : const Color(0xFF64748B)),
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.subscription),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: buttonColor,
+                  foregroundColor: buttonFgColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                child: Text(
+                  buttonText,
+                  style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12.5),
+                ),
+              ),
+            ],
+          ),
+
+          // تفاصيل إضافية مخصصة للطلاب المشتركين تظهر تاريخ الانتهاء والأيام المتبقية بوضوح
+          if (isPremium && expiryDate != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.event_available_rounded, size: 16, color: Color(0xFFFACC15)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'ينتهي في: $formattedDate',
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: daysRemaining <= 7
+                          ? const Color(0xFFEF4444).withOpacity(0.25)
+                          : const Color(0xFF10B981).withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          daysRemaining <= 7 ? Icons.hourglass_bottom_rounded : Icons.check_circle_outline_rounded,
+                          size: 13,
+                          color: daysRemaining <= 7 ? const Color(0xFFF87171) : const Color(0xFF34D399),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          daysRemaining > 365 ? 'اشتراك دائمي' : '$daysRemaining يوم متبقي',
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: daysRemaining <= 7 ? const Color(0xFFF87171) : const Color(0xFF34D399),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

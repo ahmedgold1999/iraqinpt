@@ -326,11 +326,17 @@ class AuthService {
   Future<UserModel?> _getUserFromFirestore(String uid) async {
     try {
       final doc = await _firestore.collection(_usersCollection).doc(uid).get();
-      if (!doc.exists) {
+      if (!doc.exists || doc.data() == null) {
         print('⚠️ لا يوجد مستخدم في Firestore: $uid');
         return null;
       }
-      return UserModel.fromMap(doc.data()!);
+      final data = doc.data()!;
+      final userModel = UserModel.fromMap(data);
+      // إذا كان مسجلاً بالداتابيز كـ Premium ولكن انتهت الصلاحية، نحدث الداتابيز
+      if (data['isPremium'] == true && !userModel.isPremium) {
+        _firestore.collection(_usersCollection).doc(uid).update({'isPremium': false}).catchError((_) => null);
+      }
+      return userModel;
     } catch (e) {
       print('❌ خطأ في جلب بيانات المستخدم من Firestore: $e');
       rethrow;
@@ -376,7 +382,11 @@ class AuthService {
           .snapshots()
           .map((doc) {
         if (!doc.exists || doc.data() == null) return null;
-        final userModel = UserModel.fromMap(doc.data()!);
+        final data = doc.data()!;
+        final userModel = UserModel.fromMap(data);
+        if (data['isPremium'] == true && !userModel.isPremium) {
+          _firestore.collection(_usersCollection).doc(firebaseUser.uid).update({'isPremium': false}).catchError((_) => null);
+        }
         _cachedUser = userModel;
         return userModel;
       });

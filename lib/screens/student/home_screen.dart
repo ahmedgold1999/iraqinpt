@@ -1747,23 +1747,25 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'اختباراتك السابقة',
           style: TextStyle(
             fontFamily: 'Tajawal',
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
+            color: isDark ? Colors.white : const Color(0xFF1E293B),
           ),
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1E293B)),
+          icon: Icon(Icons.arrow_back_ios, color: isDark ? Colors.white : const Color(0xFF1E293B)),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -1772,19 +1774,19 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
         child: CircularProgressIndicator(color: Color(0xFF3B82F6)),
       )
           : _results.isEmpty
-          ? _buildEmptyState()
+          ? _buildEmptyState(isDark)
           : ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _results.length,
         itemBuilder: (context, index) {
           final result = _results[index];
-          return _buildResultCard(result);
+          return _buildResultCard(result, isDark);
         },
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1802,13 +1804,13 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'لا توجد اختبارات سابقة',
             style: TextStyle(
               fontFamily: 'Tajawal',
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF64748B),
+              color: isDark ? Colors.white70 : const Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 8),
@@ -1817,7 +1819,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
             style: TextStyle(
               fontFamily: 'Tajawal',
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: isDark ? Colors.white38 : Colors.grey.shade500,
             ),
           ),
         ],
@@ -1825,17 +1827,18 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
     );
   }
 
-  Widget _buildResultCard(LocalQuizResult result) {
+  Widget _buildResultCard(LocalQuizResult result, bool isDark) {
     final scoreColor = _getScoreColor(result.scorePercentage);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -1846,7 +1849,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           onTap: () {
-            _showResultDetails(result);
+            _showResultDetails(result, isDark);
           },
           borderRadius: BorderRadius.circular(24),
           child: Padding(
@@ -1892,11 +1895,11 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
                         children: [
                           Text(
                             result.subjectName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'Tajawal',
-                              color: Color(0xFF1E293B),
+                              color: isDark ? Colors.white : const Color(0xFF1E293B),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -1904,7 +1907,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
                             '${_formatDate(result.date)} • ${_formatDuration(result.durationInSeconds)}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade500,
+                              color: isDark ? Colors.white60 : Colors.grey.shade500,
                               fontFamily: 'Tajawal',
                             ),
                           ),
@@ -1970,7 +1973,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
                   borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
                     value: result.scorePercentage / 100,
-                    backgroundColor: Colors.grey.shade200,
+                    backgroundColor: isDark ? Colors.white12 : Colors.grey.shade200,
                     color: scoreColor,
                     minHeight: 8,
                   ),
@@ -2027,12 +2030,12 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  void _showResultDetails(LocalQuizResult result) {
+  void _showResultDetails(LocalQuizResult result, bool isDark) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -2054,11 +2057,15 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(result.subjectName,
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Tajawal')),
+              Text(
+                result.subjectName,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Tajawal',
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
               Text(
                 'النتيجة: ${result.scorePercentage.round()}%',
                 style: TextStyle(
@@ -2071,20 +2078,20 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(16)),
                 child: Column(
                   children: [
                     _buildDetailRow('الإجابات الصحيحة',
-                        '${result.correctAnswers}', Colors.green),
-                    const Divider(),
+                        '${result.correctAnswers}', Colors.green, isDark),
+                    Divider(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
                     _buildDetailRow('الإجابات الخاطئة',
-                        '${result.wrongAnswers}', Colors.red),
-                    const Divider(),
+                        '${result.wrongAnswers}', Colors.red, isDark),
+                    Divider(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
                     _buildDetailRow(
                         'المدة',
                         _formatDuration(result.durationInSeconds),
-                        Colors.orange),
+                        Colors.orange, isDark),
                   ],
                 ),
               ),
@@ -2120,9 +2127,9 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
               const SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('إغلاق',
+                child: Text('إغلاق',
                     style:
-                    TextStyle(fontFamily: 'Tajawal', color: Colors.grey)),
+                    TextStyle(fontFamily: 'Tajawal', color: isDark ? Colors.white60 : Colors.grey)),
               ),
             ],
           ),
@@ -2131,7 +2138,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, Color color) {
+  Widget _buildDetailRow(String label, String value, Color color, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -2139,9 +2146,9 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF64748B),
+              color: isDark ? Colors.white70 : const Color(0xFF64748B),
               fontFamily: 'Tajawal',
             ),
           ),
@@ -2167,26 +2174,29 @@ class PreviousExamReviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           'مراجعة: ${result.subjectName}',
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Tajawal',
             fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
         elevation: 0,
         centerTitle: true,
       ),
       body: result.wrongQuestions.isEmpty
-          ? const Center(
+          ? Center(
         child: Text(
           'لا توجد بيانات متاحة لهذا الاختبار',
-          style: TextStyle(fontFamily: 'Tajawal', fontSize: 16),
+          style: TextStyle(fontFamily: 'Tajawal', fontSize: 16, color: isDark ? Colors.white70 : Colors.black87),
         ),
       )
           : ListView.builder(
@@ -2201,12 +2211,12 @@ class PreviousExamReviewScreen extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: statusColor.withOpacity(0.2), width: 1.5),
+              border: Border.all(color: statusColor.withOpacity(0.3), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 )
@@ -2248,10 +2258,11 @@ class PreviousExamReviewScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   item['question'] ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Tajawal',
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                     height: 1.4,
                   ),
                 ),
@@ -2259,9 +2270,9 @@ class PreviousExamReviewScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.05),
+                    color: statusColor.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: statusColor.withOpacity(0.1)),
+                    border: Border.all(color: statusColor.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
@@ -2294,9 +2305,9 @@ class PreviousExamReviewScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.05),
+                      color: Colors.green.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.green.withOpacity(0.1)),
+                      border: Border.all(color: Colors.green.withOpacity(0.2)),
                     ),
                     child: Row(
                       children: [
@@ -2336,14 +2347,14 @@ class PreviousExamReviewScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.05),
+                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : Colors.blue.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                        border: Border.all(color: isDark ? const Color(0xFF2563EB).withOpacity(0.3) : Colors.blue.withOpacity(0.2)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.lightbulb_outline, color: Colors.blue, size: 18),
+                          const Icon(Icons.lightbulb_outline, color: Color(0xFF38BDF8), size: 18),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
