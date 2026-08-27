@@ -17,6 +17,7 @@ import '../../services/question_service.dart';
 import '../../services/config_service.dart';
 import '../../services/notification_service.dart';
 import '../../routes.dart';
+import 'leaderboard_management_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -1627,6 +1628,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   color: const Color(0xFFD97706),
                   subtitle: 'طالب خاض الاختبارات',
                   isDark: isDark,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LeaderboardManagementScreen()),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1671,6 +1676,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
             icon: Icons.person_search_rounded,
             color: const Color(0xFF16A34A),
             onTap: () => setState(() => _selectedTabIndex = 1),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+          _buildQuickActionTile(
+            title: 'إدارة لوحة المتصدرين وقائمة الشرف 🏆',
+            subtitle: 'تعديل شامل للدرجات، حذف، وتغيير الأفاتارات لجميع المتصدرين',
+            icon: Icons.emoji_events_rounded,
+            color: const Color(0xFFD97706),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LeaderboardManagementScreen()),
+            ),
             isDark: isDark,
           ),
           const SizedBox(height: 8),
@@ -1739,8 +1756,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     required Color color,
     required String subtitle,
     required bool isDark,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF131C31) : Colors.white,
@@ -1797,6 +1815,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: card,
+      );
+    }
+    return card;
   }
 
   Widget _buildQuickActionTile({
