@@ -160,6 +160,8 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
   }
 
   void _showQuotaExceededDialog() {
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -218,9 +220,11 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'لقد استهلكت رصيدك اليومي المجاني (5 أسئلة).\nاشترك الآن في باقة VIP لفتح المحادثة مع الأستاذ الذكي بلا حدود على مدار الساعة!',
-                  style: TextStyle(
+                Text(
+                  isIos
+                      ? 'لقد استهلكت رصيدك اليومي المجاني (5 أسئلة).\nتتوفر المحادثة غير المحدودة مع الأستاذ الذكي للحسابات المميزة والمشتركين.'
+                      : 'لقد استهلكت رصيدك اليومي المجاني (5 أسئلة).\nاشترك الآن في باقة VIP لفتح المحادثة مع الأستاذ الذكي بلا حدود على مدار الساعة!',
+                  style: const TextStyle(
                     fontFamily: 'Tajawal',
                     fontSize: 13,
                     color: Color(0xFFCBD5E1),
@@ -257,14 +261,14 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                           Navigator.pop(ctx);
                           _navigateToSubscriptionWithSlide();
                         },
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.workspace_premium_rounded, size: 18),
-                            SizedBox(width: 6),
+                            const Icon(Icons.workspace_premium_rounded, size: 18),
+                            const SizedBox(width: 6),
                             Text(
-                              'ترقية لـ VIP 👑',
-                              style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 14),
+                              isIos ? 'عرض المميزات 👑' : 'ترقية لـ VIP 👑',
+                              style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 14),
                             ),
                           ],
                         ),

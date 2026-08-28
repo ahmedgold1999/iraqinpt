@@ -516,9 +516,15 @@ class StudentHomeScreen extends StatelessWidget {
   }
 
   void _showLuxurySubscriptionDialog(BuildContext context, {
-    String title = 'فتح الباقة الملكية VIP 👑',
-    String subtitle = 'اشترك الآن للوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي واجتياز الامتحان الوطني بتفوق!',
+    String? title,
+    String? subtitle,
   }) {
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+    final dialogTitle = title ?? (isIos ? 'عضوية الحساب المميز 👑' : 'فتح الباقة الملكية VIP 👑');
+    final dialogSubtitle = subtitle ?? (isIos
+        ? 'الوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي والملازم واجتياز الامتحان بتفوق!'
+        : 'اشترك الآن للوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي واجتياز الامتحان الوطني بتفوق!');
+
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -570,7 +576,7 @@ class StudentHomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    title,
+                    dialogTitle,
                     style: GoogleFonts.notoKufiArabic(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
@@ -580,7 +586,7 @@ class StudentHomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    subtitle,
+                    dialogSubtitle,
                     style: const TextStyle(
                       fontFamily: 'Tajawal',
                       fontSize: 13,
@@ -605,7 +611,7 @@ class StudentHomeScreen extends StatelessWidget {
                         const SizedBox(height: 8),
                         _buildVipBenefitRow('كافة الملازم ونماذج الفورمات الوزارية المعتمدة'),
                         const SizedBox(height: 8),
-                        _buildVipBenefitRow('إحصائيات متقدمة ودعم فني مباشر عبر الواتساب'),
+                        _buildVipBenefitRow(isIos ? 'إحصائيات متقدمة ودعم فني وإرشادات أكاديمية' : 'إحصائيات متقدمة ودعم فني مباشر عبر الواتساب'),
                       ],
                     ),
                   ),
@@ -638,14 +644,14 @@ class StudentHomeScreen extends StatelessWidget {
                             Navigator.pop(ctx);
                             _navigateToSubscriptionWithSlide(context);
                           },
-                          child: const Row(
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.workspace_premium_rounded, size: 18),
-                              SizedBox(width: 6),
+                              const Icon(Icons.workspace_premium_rounded, size: 18),
+                              const SizedBox(width: 6),
                               Text(
-                                'الترقية والاشتراك 👑',
-                                style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 14),
+                                isIos ? 'تفاصيل العضوية 👑' : 'الترقية والاشتراك 👑',
+                                style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 14),
                               ),
                             ],
                           ),

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class LuxuryBottomNav extends StatelessWidget {
@@ -61,7 +62,7 @@ class LuxuryBottomNav extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildNavItem(0, Icons.home_rounded, 'الرئيسية', const Color(0xFF0F172A), isDark),
-                  _buildNavItem(1, Icons.stars_rounded, 'التفعيل', const Color(0xFFD4AF37), isDark),
+                  _buildNavItem(1, Icons.stars_rounded, defaultTargetPlatform == TargetPlatform.iOS ? 'العضوية' : 'التفعيل', const Color(0xFFD4AF37), isDark),
                   _buildNavItem(2, Icons.grid_view_rounded, 'الأدوات', const Color(0xFF00C853), isDark),
                   _buildNavItem(3, Icons.auto_stories_rounded, 'ملازم', const Color(0xFF2563EB), isDark),
                   _buildNavItem(
