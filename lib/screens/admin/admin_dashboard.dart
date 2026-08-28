@@ -73,16 +73,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
   bool _isSavingAnn = false;
 
   // App Update & Maintenance State
-  final TextEditingController _versionController = TextEditingController();
-  final TextEditingController _updateUrlController = TextEditingController();
-  final TextEditingController _changeLogController = TextEditingController();
-  final TextEditingController _price1mController = TextEditingController(text: '10,000');
-  final TextEditingController _price2mController = TextEditingController(text: '15,000');
-  final TextEditingController _price3mController = TextEditingController(text: '20,000');
-  final TextEditingController _price1yController = TextEditingController(text: '30,000');
-  final TextEditingController _examEndDateController = TextEditingController(text: '2026-06-15');
-  final TextEditingController _fcmServerKeyController =
+  TextEditingController _versionController = TextEditingController();
+  TextEditingController _updateUrlController = TextEditingController();
+  TextEditingController _changeLogController = TextEditingController();
+  TextEditingController _price1mController = TextEditingController(text: '10,000');
+  TextEditingController _price2mController = TextEditingController(text: '15,000');
+  TextEditingController _price3mController = TextEditingController(text: '20,000');
+  TextEditingController _price1yController = TextEditingController(text: '30,000');
+  TextEditingController _examEndDateController = TextEditingController(text: '2026-06-15');
+  TextEditingController _admissionsPdfUrlController = TextEditingController(
+      text: 'https://pub-c2719701c033412b8917a6722dcf93d2.r2.dev/inpt/mohesr.pdf');
+  TextEditingController _fcmServerKeyController =
       TextEditingController(text: 'AIzaSyDy8Av3HcsiX-ZY5suKmpbyuZOX8q4HDC0');
+  TextEditingController _serviceAccountJsonController =
+      TextEditingController(text: NotificationService.defaultServiceAccountJson);
   bool _isForceUpdate = false;
   bool _isMaintenanceOn = false;
   bool _targetAndroid = true;
@@ -111,7 +115,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _ensureUpdateControllers() {
-    // Ensuring safety against uninitialized fields during hot reloads
+    _versionController ??= TextEditingController();
+    _updateUrlController ??= TextEditingController();
+    _changeLogController ??= TextEditingController();
+    _price1mController ??= TextEditingController(text: '10,000');
+    _price2mController ??= TextEditingController(text: '15,000');
+    _price3mController ??= TextEditingController(text: '20,000');
+    _price1yController ??= TextEditingController(text: '30,000');
+    _examEndDateController ??= TextEditingController(text: '2026-06-15');
+    _admissionsPdfUrlController ??= TextEditingController(
+        text: 'https://pub-c2719701c033412b8917a6722dcf93d2.r2.dev/inpt/mohesr.pdf');
+    _fcmServerKeyController ??=
+        TextEditingController(text: 'AIzaSyDy8Av3HcsiX-ZY5suKmpbyuZOX8q4HDC0');
+    _serviceAccountJsonController ??= TextEditingController();
   }
 
   @override
@@ -131,7 +147,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _price3mController.dispose();
     _price1yController.dispose();
     _examEndDateController.dispose();
+    _admissionsPdfUrlController.dispose();
     _fcmServerKeyController.dispose();
+    _serviceAccountJsonController.dispose();
     super.dispose();
   }
 
@@ -316,7 +334,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       await docRef.set(notifData);
 
       // إرسال عبر FCM Push لضمان وصوله لجميع الهواتف والتطبيق مغلق
-      await NotificationService.sendBroadcastPush(
+      final fcmResult = await NotificationService.sendBroadcastPush(
         title: title,
         body: body,
         targetSegment: _notifTargetSegment,
@@ -330,12 +348,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
         if (_notifTargetSegment == 'premium') targetText = 'للطلاب المميزين فقط 👑';
         if (_notifTargetSegment == 'free') targetText = 'للطلاب المجانيين فقط 🆓';
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('🚀 تم إرسال الإشعار وتعميمه بنجاح ($targetText)!'),
-            backgroundColor: const Color(0xFF16A34A),
-          ),
-        );
+        if (fcmResult.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('🚀 تم حفظ الإشعار وإرساله سحابياً لجميع الأجهزة ($targetText)!'),
+              backgroundColor: const Color(0xFF16A34A),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('⚠️ تم حفظ الإشعار في التطبيق ولكن: ${fcmResult.message}'),
+              backgroundColor: Colors.orange.shade800,
+              duration: const Duration(seconds: 7),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -502,6 +532,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _loadUpdateConfig() async {
+    _ensureUpdateControllers();
     setState(() => _isLoadingUpdateConfig = true);
     try {
       final info = await PackageInfo.fromPlatform();
@@ -522,8 +553,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _price2mController.text = (data['price_2m'] ?? '15,000').toString();
         _price3mController.text = (data['price_3m'] ?? '20,000').toString();
         _price1yController.text = (data['price_1y'] ?? '30,000').toString();
+        _examEndDateController.text = (data['exam_end_date'] ?? '2026-06-15').toString();
+        _admissionsPdfUrlController.text = (data['admissions_pdf_url'] ??
+                data['mohesr_pdf_url'] ??
+                'https://pub-c2719701c033412b8917a6722dcf93d2.r2.dev/inpt/mohesr.pdf')
+            .toString();
         final loadedKey = (data['fcm_server_key'] ?? '').toString().trim();
         _fcmServerKeyController.text = loadedKey.isNotEmpty ? loadedKey : 'AIzaSyDy8Av3HcsiX-ZY5suKmpbyuZOX8q4HDC0';
+        final loadedJson = (data['service_account_json'] ?? '').toString().trim();
+        _serviceAccountJsonController.text = loadedJson.isNotEmpty
+            ? loadedJson
+            : NotificationService.defaultServiceAccountJson;
       } else {
         final fallback = await _db.collection('app_config').doc('version').get();
         if (fallback.exists && fallback.data() != null) {
@@ -545,6 +585,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _saveUpdateConfig() async {
+    _ensureUpdateControllers();
     if (_versionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('يرجى كتابة رقم الإصدار')),
@@ -571,7 +612,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         'price_3m': _price3mController.text.trim().isNotEmpty ? _price3mController.text.trim() : '20,000',
         'price_1y': _price1yController.text.trim().isNotEmpty ? _price1yController.text.trim() : '30,000',
         'exam_end_date': _examEndDateController.text.trim().isNotEmpty ? _examEndDateController.text.trim() : '2026-06-15',
+        'admissions_pdf_url': _admissionsPdfUrlController.text.trim().isNotEmpty
+            ? _admissionsPdfUrlController.text.trim()
+            : 'https://pub-c2719701c033412b8917a6722dcf93d2.r2.dev/inpt/mohesr.pdf',
         'fcm_server_key': _fcmServerKeyController.text.trim(),
+        'service_account_json': _serviceAccountJsonController.text.trim(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -1420,6 +1465,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    _ensureUpdateControllers();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryBg = isDark ? const Color(0xFF0B1120) : const Color(0xFFF8FAFC);
     final cardBg = isDark ? const Color(0xFF131C31) : Colors.white;
@@ -3027,14 +3073,43 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       const SizedBox(height: 12),
                       TextField(
+                        controller: _admissionsPdfUrlController,
+                        keyboardType: TextInputType.url,
+                        decoration: InputDecoration(
+                          labelText: 'رابط ضوابط القبول السحابي (Cloudflare R2 PDF)',
+                          hintText: 'https://pub-xxxx.r2.dev/.../mohesr.pdf',
+                          prefixIcon: const Icon(Icons.menu_book_rounded, color: Color(0xFF4F46E5), size: 20),
+                          helperText: 'ملف الـ PDF الرسمي لضوابط القبول والتنافسي المعروض للطلاب',
+                          helperStyle: const TextStyle(fontFamily: 'Tajawal', fontSize: 11),
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
                         controller: _fcmServerKeyController,
                         keyboardType: TextInputType.text,
                         obscureText: true,
                         decoration: InputDecoration(
-                          labelText: 'مفتاح خادم الإشعارات السحابية (FCM Server Key)',
-                          hintText: 'AAAA... أو مفتاح FCM من Firebase Console',
-                          prefixIcon: const Icon(Icons.notifications_active_rounded, color: Color(0xFFD97706), size: 20),
-                          helperText: 'يسمح بوصول الإشعارات الفورية العامة لهواتف الطلاب والتطبيق مغلق تماماً',
+                          labelText: 'مفتاح خادم الإشعارات السحابية القديم (FCM Legacy Server Key)',
+                          hintText: 'AAAA... أو مفتاح FCM Legacy',
+                          prefixIcon: const Icon(Icons.key_rounded, color: Color(0xFFD97706), size: 20),
+                          helperText: 'مفتاح الخادم القديم (يبدأ بـ AAAA)',
+                          helperStyle: const TextStyle(fontFamily: 'Tajawal', fontSize: 11),
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _serviceAccountJsonController,
+                        keyboardType: TextInputType.multiline,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          labelText: 'مفتاح حساب خدمة فايربيس الحديث (Firebase Service Account JSON - FCM V1)',
+                          hintText: '{"type": "service_account", "project_id": "...", "private_key": "..."}',
+                          prefixIcon: const Icon(Icons.verified_user_rounded, color: Color(0xFF16A34A), size: 20),
+                          helperText: 'مفتاح حساب الخدمة الرسمي من Firebase Console -> Service accounts -> Generate new private key',
                           helperStyle: const TextStyle(fontFamily: 'Tajawal', fontSize: 11),
                           isDense: true,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),

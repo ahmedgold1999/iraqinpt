@@ -17,6 +17,11 @@ import 'exam_instructions_screen.dart';
 import 'home_screen.dart';
 import '../../widgets/luxury_exam_countdown_card.dart';
 import '../../routes.dart';
+import 'motivational_quotes_screen.dart';
+import 'study_materials_screen.dart';
+import 'exam_schedule_viewer_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -1155,6 +1160,20 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
     }
   }
 
+  Future<void> _openInstagramAccount() async {
+    final nativeUri = Uri.parse('instagram://user?username=a0g0a');
+    final webUri = Uri.parse('https://www.instagram.com/a0g0a');
+    try {
+      if (await canLaunchUrl(nativeUri)) {
+        await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   void _openCompetitiveExamsWebView() {
     showDialog(
       context: context,
@@ -2101,8 +2120,9 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -2527,11 +2547,11 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
               Row(
                 children: [
                   _buildIosToolCard(
-                    icon: Icons.menu_book_rounded,
-                    title: 'ضوابط القبول',
-                    subtitle: 'الدليل الوزاري الرسمي',
-                    color: const Color(0xFF4F46E5),
-                    onTap: _showAdmissionsWebView,
+                    icon: Icons.calculate_rounded,
+                    title: 'الحاسبة التنافسية',
+                    subtitle: 'حساب المعدل التفاضلي',
+                    color: const Color(0xFF10B981),
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.competitiveCalculator),
                   ),
                   const SizedBox(width: 12),
                   _buildIosToolCard(
@@ -2550,14 +2570,23 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
               Row(
                 children: [
                   _buildIosToolCard(
-                    icon: Icons.stars_rounded,
-                    title: 'درجة التأهيل',
-                    subtitle: 'حسب تخصصك الدراسي',
-                    color: const Color(0xFF2563EB),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const QualificationScoreScreen()),
-                    ),
+                    icon: Icons.menu_book_rounded,
+                    title: 'ضوابط القبول',
+                    subtitle: 'الدليل الوزاري الرسمي',
+                    color: const Color(0xFF4F46E5),
+                    onTap: () {
+                      final admissionsUrl = ConfigService().admissionsPdfUrl;
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => LuxuryPdfViewerScreen(
+                            title: 'ضوابط التقديم والقبول',
+                            fileOrUrl: admissionsUrl,
+                            isLocalFile: admissionsUrl.startsWith('assets/'),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(width: 12),
                   _buildIosToolCard(
@@ -2576,13 +2605,25 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
               Row(
                 children: [
                   _buildIosToolCard(
+                    icon: Icons.auto_awesome_rounded,
+                    title: 'تحفيز الدراسات',
+                    subtitle: 'ومضات وهمم القبول',
+                    color: const Color(0xFFF59E0B),
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.motivationalQuotes),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildIosToolCard(
                     icon: Icons.calendar_month_rounded,
                     title: 'جدول الامتحانات',
                     subtitle: 'عرض الجدول الرسمي',
                     color: const Color(0xFFF59E0B),
-                    onTap: _openZoomImage,
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.examScheduleViewer),
                   ),
-                  const SizedBox(width: 12),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
                   _buildIosToolCard(
                     icon: Icons.gavel_rounded,
                     title: 'تعليمات الامتحان',
@@ -2593,11 +2634,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                       MaterialPageRoute(builder: (context) => const ExamInstructionsScreen()),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
+                  const SizedBox(width: 12),
                   _buildIosToolCard(
                     icon: Icons.help_outline_rounded,
                     title: 'عن الامتحان',
@@ -2608,13 +2645,25 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                       MaterialPageRoute(builder: (context) => const AboutNationalExamScreen()),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
                   _buildIosToolCard(
                     icon: Icons.send_rounded,
                     title: 'قناة التليجرام',
                     subtitle: 'القناة الرسمية للتطبيق',
                     color: const Color(0xFF0088CC),
                     onTap: _openTelegramChannel,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildIosToolCard(
+                    icon: Icons.camera_alt_rounded,
+                    title: 'حساب الانستغرام',
+                    subtitle: '@a0g0a الرسمية',
+                    color: const Color(0xFFE1306C),
+                    onTap: _openInstagramAccount,
                   ),
                 ],
               ),

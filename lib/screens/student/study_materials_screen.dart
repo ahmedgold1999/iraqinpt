@@ -7,6 +7,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import '../../routes.dart';
@@ -250,6 +251,26 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
         _isLoading = false;
       });
       return;
+    }
+
+    // إذا كان الملف من أصول المشروع (Assets)
+    if (widget.fileOrUrl.startsWith('assets/')) {
+      try {
+        final byteData = await rootBundle.load(widget.fileOrUrl);
+        final dir = await getTemporaryDirectory();
+        final fileName = widget.fileOrUrl.split('/').last;
+        final tempFile = File('${dir.path}/asset_$fileName');
+        await tempFile.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+        if (mounted) {
+          setState(() {
+            _localFilePath = tempFile.path;
+            _isLoading = false;
+          });
+        }
+        return;
+      } catch (e) {
+        if (kDebugMode) print('Asset PDF loading error: $e');
+      }
     }
 
     // إذا كان الرابط عن بعد، نقوم بتنزيله مؤقتاً في الكاش لفتحه بسلاسة وبدون شاشة سوداء

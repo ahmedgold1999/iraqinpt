@@ -553,6 +553,29 @@ class _TrueFalseQuizScreenState extends State<TrueFalseQuizScreen> with SingleTi
         ),
         actions: [
           IconButton(
+            icon: Icon(
+              SoundEffectsService().isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              color: SoundEffectsService().isMuted ? Colors.grey : const Color(0xFF38BDF8),
+            ),
+            tooltip: SoundEffectsService().isMuted ? 'تفعيل المؤثرات الصوتية' : 'كتم المؤثرات الصوتية',
+            onPressed: () {
+              SoundEffectsService().toggleSound();
+              setState(() {});
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    SoundEffectsService().isMuted ? 'تم كتم المؤثرات الصوتية 🔇' : 'تم تفعيل المؤثرات الصوتية 🔊',
+                    style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                  ),
+                  duration: const Duration(seconds: 1),
+                  backgroundColor: SoundEffectsService().isMuted ? const Color(0xFF64748B) : const Color(0xFF2563EB),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'إعادة الاختبار',
             onPressed: _prepareQuiz,

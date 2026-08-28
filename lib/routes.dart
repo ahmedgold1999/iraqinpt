@@ -18,6 +18,9 @@ import 'screens/student/qualification_score_screen.dart';
 import 'screens/student/ai_tutor_screen.dart';
 import 'screens/admin/leaderboard_management_screen.dart';
 import 'screens/student/delete_account_screen.dart';
+import 'screens/student/motivational_quotes_screen.dart';
+import 'screens/student/competitive_calculator_screen.dart';
+import 'screens/student/exam_schedule_viewer_screen.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -40,6 +43,9 @@ class AppRoutes {
   static const String qualificationScore = '/qualification-score';
   static const String aiTutor = '/ai-tutor';
   static const String deleteAccount = '/delete-account';
+  static const String motivationalQuotes = '/motivational-quotes';
+  static const String competitiveCalculator = '/competitive-calculator';
+  static const String examScheduleViewer = '/exam-schedule-viewer';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -120,6 +126,15 @@ class AppRoutes {
 
       case deleteAccount:
         return MaterialPageRoute(builder: (_) => const DeleteAccountScreen());
+
+      case motivationalQuotes:
+        return MaterialPageRoute(builder: (_) => const MotivationalQuotesScreen());
+
+      case competitiveCalculator:
+        return MaterialPageRoute(builder: (_) => const CompetitiveCalculatorScreen());
+
+      case examScheduleViewer:
+        return MaterialPageRoute(builder: (_) => const ExamScheduleViewerScreen());
 
       default:
         return MaterialPageRoute(

@@ -22,6 +22,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   final _price1yController = TextEditingController();
 
   final _examEndDateController = TextEditingController();
+  final _admissionsUrlController = TextEditingController();
 
   bool _forceUpdate = false;
   bool _maintenanceMode = false;
@@ -65,6 +66,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
           _price1yController.text = (data['price_1y'] ?? '30,000').toString();
           
           _examEndDateController.text = data['exam_end_date'] ?? '2026-06-15';
+          _admissionsUrlController.text = data['admissions_pdf_url'] ?? data['mohesr_pdf_url'] ?? 'https://pub-c2719701c033412b8917a6722dcf93d2.r2.dev/inpt/mohesr.pdf';
 
           _isLoading = false;
         });
@@ -130,6 +132,21 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       }, SetOptions(merge: true));
       setState(() => _isLoading = false);
       _showSuccess('تم تحديث قائمة الأسعار وتاريخ الامتحان بنجاح');
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showError('خطأ في الحفظ: $e');
+    }
+  }
+
+  Future<void> _saveAdmissionsSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      await _db.collection('system_settings').doc('maintenance_and_updates').set({
+        'admissions_pdf_url': _admissionsUrlController.text.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      setState(() => _isLoading = false);
+      _showSuccess('تم حفظ وتحديث رابط ضوابط القبول بنجاح');
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('خطأ في الحفظ: $e');
@@ -354,6 +371,48 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                     ],
                   ),
                 ),
+
+                const SizedBox(height: 24),
+
+                _buildSectionTitle('ضوابط القبول السحابية (Cloudflare R2)', Icons.menu_book_rounded),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE5E5EA)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'رابط ملف PDF الرسمي لضوابط القبول (يتم تحميله وعرضه للطلاب):',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: _admissionsUrlController,
+                        style: const TextStyle(color: Color(0xFF1C1C1E), fontFamily: 'Tajawal', fontSize: 13),
+                        decoration: _inputDecoration('https://pub-xxxx.r2.dev/.../mohesr.pdf', Icons.link_rounded),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildMiniSaveButton(_saveAdmissionsSettings),
+                    ],
+                  ),
+                ),
+
                 const SizedBox(height: 40),
               ],
             ),

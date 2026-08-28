@@ -257,6 +257,53 @@ class AuthService {
     return result;
   }
 
+  /// تغيير اسم الطالب مع التحقق من عدم تكراره ومزامنته مع لوحة الشرف
+  Future<void> updateStudentName(String newName) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw 'يجب تسجيل الدخول أولاً';
+
+      final trimmedName = newName.trim();
+      if (trimmedName.isEmpty) throw 'يرجى إدخال اسم صحيح';
+      if (trimmedName.length < 3) throw 'الاسم قصير جداً، يرجى كتابة اسم ثلاثي أو ثنائي واضح';
+
+      // فحص هل الاسم مستخدم من قبل طالب آخر
+      final query = await _firestore
+          .collection(_usersCollection)
+          .where('name', isEqualTo: trimmedName)
+          .limit(2)
+          .get();
+
+      final isTakenByOther = query.docs.any((doc) => doc.id != user.uid);
+      if (isTakenByOther) {
+        throw 'عذراً، هذا الاسم مسجل مسبقاً لطالب آخر. يرجى كتابة اسم ثلاثي أو إضافة اللقب لتمييزه.';
+      }
+
+      // تحديث الاسم في وثيقة المستخدم
+      await _firestore.collection(_usersCollection).doc(user.uid).set({
+        'name': trimmedName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // تحديث الاسم في لوحة المتصدرين إن وجد
+      try {
+        await _firestore.collection('leaderboard').doc(user.uid).set({
+          'name': trimmedName,
+        }, SetOptions(merge: true));
+      } catch (_) {}
+
+      // تحديث الاسم في Firebase Auth profile
+      try {
+        await user.updateDisplayName(trimmedName);
+      } catch (_) {}
+
+      _cachedUser = null;
+    } catch (e) {
+      print('❌ خطأ في تحديث الاسم: $e');
+      rethrow;
+    }
+  }
+
   /// حذف الحساب (متطلب إجباري من أبل)
   Future<void> deleteAccount() async {
     try {
@@ -310,7 +357,6 @@ class AuthService {
 
       final userData = userModel.toMap();
       userData['username'] = username.toLowerCase().trim();
-      userData['password'] = password.trim();
       userData['createdAt'] = FieldValue.serverTimestamp();
 
       await _firestore.collection(_usersCollection).doc(user.uid).set(userData);

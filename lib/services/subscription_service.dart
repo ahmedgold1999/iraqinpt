@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'notification_service.dart';
 
 class SubscriptionService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -12,32 +11,56 @@ class SubscriptionService {
     return isPremium;
   }
 
-  // تفعيل الاشتراك (التفعيل أصبح يتم مباشرة عن طريق الإدمن)
+  // تفعيل الاشتراك مع حماية من السباق والتكرار (Atomic Transaction)
   Future<bool> activateSubscription(String code) async {
+    final cleanCode = code.trim();
+    if (cleanCode.isEmpty) return false;
+
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return false;
+
+    final codeRef = _db.collection('activation_codes').doc(cleanCode);
+    final userRef = _db.collection('users').doc(uid);
+
     try {
-      var codeDoc = await _db.collection('activation_codes').doc(code).get();
+      final result = await _db.runTransaction<bool>((transaction) async {
+        final codeSnapshot = await transaction.get(codeRef);
 
-      if (codeDoc.exists && codeDoc.data()?['isUsed'] == false) {
-        String uid = _auth.currentUser?.uid ?? '';
-        if (uid.isEmpty) return false;
-        
-        await _db.collection('users').doc(uid).update({
-          'isPremium': true,
-          'activationCode': code,
-          'expiryDate': DateTime.now().add(const Duration(days: 365)),
-        });
+        if (!codeSnapshot.exists) {
+          return false;
+        }
 
-        await _db.collection('activation_codes').doc(code).update({
+        final data = codeSnapshot.data();
+        if (data == null || data['isUsed'] == true) {
+          return false;
+        }
+
+        final int durationDays = (data['durationDays'] is int)
+            ? data['durationDays']
+            : (data['days'] is int ? data['days'] : 365);
+
+        final expiryDate = DateTime.now().add(Duration(days: durationDays));
+
+        // 1. قفل الكود فوراً
+        transaction.update(codeRef, {
           'isUsed': true,
           'usedBy': uid,
           'usedAt': FieldValue.serverTimestamp(),
         });
 
+        // 2. ترقية حساب المستخدم
+        transaction.update(userRef, {
+          'isPremium': true,
+          'activationCode': cleanCode,
+          'expiryDate': expiryDate,
+        });
+
         return true;
-      }
-      return false;
+      });
+
+      return result;
     } catch (e) {
-      print('Activation error: $e');
+      print('Activation transaction error: $e');
       return false;
     }
   }

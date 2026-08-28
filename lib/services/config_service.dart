@@ -68,6 +68,11 @@ class ConfigService {
         if (data.containsKey('exam_end_date') && data['exam_end_date'] != null && data['exam_end_date'].toString().trim().isNotEmpty) {
           _config['exam_end_date'] = data['exam_end_date'].toString().trim();
         }
+        if (data.containsKey('admissions_pdf_url') && data['admissions_pdf_url'] != null && data['admissions_pdf_url'].toString().trim().isNotEmpty) {
+          _config['admissions_pdf_url'] = data['admissions_pdf_url'].toString().trim();
+        } else if (data.containsKey('mohesr_pdf_url') && data['mohesr_pdf_url'] != null && data['mohesr_pdf_url'].toString().trim().isNotEmpty) {
+          _config['admissions_pdf_url'] = data['mohesr_pdf_url'].toString().trim();
+        }
         await prefs.setString('app_config_cache', json.encode(_config));
       }
     } catch (e) {
@@ -81,6 +86,14 @@ class ConfigService {
 
   bool get isMaintenanceOn => _config['is_maintenance_on'] ?? false;
   String get examEndDate => _config['exam_end_date'] ?? '2026-06-15';
+  
+  String get admissionsPdfUrl {
+    final url = _config['admissions_pdf_url'] ?? _config['mohesr_pdf_url'];
+    if (url != null && url.toString().trim().isNotEmpty) {
+      return url.toString().trim();
+    }
+    return 'https://pub-c2719701c033412b8917a6722dcf93d2.r2.dev/inpt/mohesr.pdf';
+  }
   
   String getPrice(String plan) {
     switch (plan) {

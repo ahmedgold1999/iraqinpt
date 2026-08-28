@@ -6,6 +6,7 @@ import '../../models/question_model.dart';
 import '../../services/question_service.dart';
 import '../../services/leaderboard_service.dart';
 import '../../services/mistake_vault_service.dart';
+import '../../services/sound_effects_service.dart';
 
 class SpeedQuizScreen extends StatefulWidget {
   const SpeedQuizScreen({super.key});
@@ -76,9 +77,14 @@ class _SpeedQuizScreenState extends State<SpeedQuizScreen> with SingleTickerProv
       final points = 10 + (_streak > 2 ? 5 : 0);
       _score += points;
       _feedbackColor = const Color(0xFF00C853);
+      SoundEffectsService.playCorrectSound();
+      if (_streak >= 3) {
+        SoundEffectsService.playStreakSound();
+      }
     } else {
       _streak = 0;
       _feedbackColor = const Color(0xFFEF4444);
+      SoundEffectsService.playWrongSound();
       // حفظ في بنك الأخطاء
       MistakeVaultService.saveMistake(
         question: q,
@@ -107,6 +113,7 @@ class _SpeedQuizScreenState extends State<SpeedQuizScreen> with SingleTickerProv
     _timer?.cancel();
     if (_isGameOver) return;
 
+    SoundEffectsService.playCompleteSound();
     setState(() => _isGameOver = true);
 
     // تحديث نقاط المتصدرين
@@ -235,8 +242,31 @@ class _SpeedQuizScreenState extends State<SpeedQuizScreen> with SingleTickerProv
           ],
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              SoundEffectsService().isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              color: SoundEffectsService().isMuted ? Colors.grey : const Color(0xFF38BDF8),
+            ),
+            tooltip: SoundEffectsService().isMuted ? 'تفعيل المؤثرات الصوتية' : 'كتم المؤثرات الصوتية',
+            onPressed: () {
+              SoundEffectsService().toggleSound();
+              setState(() {});
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    SoundEffectsService().isMuted ? 'تم كتم المؤثرات الصوتية 🔇' : 'تم تفعيل المؤثرات الصوتية 🔊',
+                    style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                  ),
+                  duration: const Duration(seconds: 1),
+                  backgroundColor: SoundEffectsService().isMuted ? const Color(0xFF64748B) : const Color(0xFF2563EB),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             decoration: BoxDecoration(
               color: _timeLeft <= 10 ? Colors.red : const Color(0xFF2563EB),

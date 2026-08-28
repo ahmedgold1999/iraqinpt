@@ -890,7 +890,7 @@ ahmeedgold1000@gmail.com
               _termsError!,
               textAlign: TextAlign.end,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 color: Color(0xFFEF4444),
                 fontFamily: 'Tajawal',
               ),
