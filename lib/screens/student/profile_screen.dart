@@ -380,7 +380,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         },
       );
     }
-  }
 
   // ===== نافذة سياسة الخصوصية وشروط الاستخدام (متطلب أبل) =====
   void _showPrivacyPolicyDialog(BuildContext context) {
