@@ -377,8 +377,90 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               ],
             ),
           ),
-        );
-      },
+  // ===== نافذة سياسة الخصوصية وشروط الاستخدام (متطلب أبل) =====
+  void _showPrivacyPolicyDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 520, maxWidth: 450),
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B82F6).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.privacy_tip_rounded, color: Color(0xFF3B82F6), size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'سياسة الخصوصية والشروط',
+                      style: GoogleFonts.notoKufiArabic(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Text(
+                    '''سياسة الخصوصية وشروط الاستخدام:
+
+نحن نحترم خصوصية مستخدمي تطبيق دليل الامتحان الوطني الموحد ونلتزم بحماية بياناتهم.
+
+1. جمع واستخدام المعلومات:
+تُستخدم البيانات المحفوظة حصراً لتقديم الخدمات التعليمية وإدارة الحسابات ومزامنة نتائج الاختبارات.
+
+2. حماية وسرية البيانات:
+لا نقوم بمشاركة أو بيع بيانات المستخدمين لأي جهة خارجية إطلاقاً، وتُحفظ البيانات بأمان عبر خدمات Firebase المشفرة.
+
+3. حذف الحساب والبيانات:
+يحق للمستخدم حذف حسابه وبياناته نهائياً في أي وقت مباشرة من شاشة الملف الشخصي عبر خيار (حذف الحساب نهائياً).
+
+4. إخلاء مسؤولية:
+هذا التطبيق تعليمي وتدريبي مستقل ولا يمثل أي جهة أو وزارة حكومية رسمية، ويستند في مناهجه وأدلته على المصادر والضوابط الأكاديمية العامة المتاحة للطلبة.''',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 13.5,
+                      height: 1.5,
+                      color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('إغلاق', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1006,6 +1088,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             subtitle: 'إرسال استفسار أو مشكلة وسيتم الرد عبر الواتساب',
                             isDark: isDark,
                             onTap: () => _showSupportTicketDialog(context, user),
+                          ),
+                          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+                          _buildActionTile(
+                            icon: Icons.privacy_tip_rounded,
+                            color: const Color(0xFF3B82F6),
+                            title: 'سياسة الخصوصية والشروط',
+                            subtitle: 'معلومات الخصوصية، حماية البيانات، وإخلاء المسؤولية',
+                            isDark: isDark,
+                            onTap: () => _showPrivacyPolicyDialog(context),
                           ),
                           Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
                           _buildActionTile(

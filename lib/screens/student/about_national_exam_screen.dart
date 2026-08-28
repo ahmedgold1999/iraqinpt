@@ -472,7 +472,48 @@ class AboutNationalExamScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
+
+            // إخلاء المسؤولية الحكومية ومصادر المعلومات (متطلب أبل 5.2.5)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFCBD5E1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.shield_outlined, size: 18, color: Color(0xFF64748B)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'إخلاء مسؤولية وتنويه قانوني',
+                        style: GoogleFonts.notoKufiArabic(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white70 : const Color(0xFF334155),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'هذا التطبيق هو أداة تعليمية وتدريبية مستقلة مخصصة لمساعدة الطلبة، ولا يتبع لأي جهة أو مؤسسة حكومية أو وزارة رسمية. يتم توفير كافة التعليمات والروابط استناداً إلى المنشورات الأكاديمية والضوابط العامة المتاحة للطلبة عبر البوابة الرسمية (inpt.rdd.edu.iq).',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 11.5,
+                      color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
 
             // Bottom CTA button
             SizedBox(
