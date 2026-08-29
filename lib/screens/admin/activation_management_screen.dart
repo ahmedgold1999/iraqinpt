@@ -383,8 +383,9 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
                                 ),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        );
+                      },
                       ),
           ),
         ],

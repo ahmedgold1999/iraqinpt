@@ -282,7 +282,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
   Future<bool> _checkInternetConnection() async {
     try {
       var connectivityResult = await Connectivity().checkConnectivity();
-      return connectivityResult != ConnectivityResult.none;
+      return !connectivityResult.contains(ConnectivityResult.none);
     } catch (e) {
       print('خطأ في التحقق من الاتصال: $e');
       return false;
