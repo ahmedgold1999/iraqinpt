@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'app_colors.dart';
 
 /// الظلال الناعمة جداً بنمط iOS
 class AppShadows {

@@ -445,7 +445,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     String? imageUrl,
     String? buttonText,
     String? buttonUrl,
-    Map<String, dynamic>? customData,
     required bool isRead,
     required bool isGlobal,
     required DateTime createdAt,
