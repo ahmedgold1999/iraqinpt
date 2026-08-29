@@ -3,15 +3,15 @@ workflows:
     name: iOS App Store & TestFlight Release
     instance_type: mac_mini_m2
     max_build_duration: 60
+    integrations:
+      app_store_connect: AB68RL5D4F
     environment:
       flutter: 3.27.4
       xcode: latest
       cocoapods: default
-      groups:
-        - app_store_credentials # Define this group in Codemagic UI for APP_STORE_CONNECT_PRIVATE_KEY, etc.
-      vars:
-        APP_ID: 6475000000 # Your Apple App ID in App Store Connect (optional)
-        BUNDLE_ID: "com.inpt.ahmeed.iraqinpt"
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.inpt.ahmeed.iraqinpt
     triggering:
       events:
         - push
@@ -37,7 +37,7 @@ workflows:
           flutter packages pub get
       - name: Install CocoaPods dependencies
         script: |
-          find . -name "Podfile" -execdir pod install \;
+          cd ios && pod install
       - name: Flutter build IPA
         script: |
           flutter build ipa --release \
