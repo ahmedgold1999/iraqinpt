@@ -357,23 +357,31 @@ class _MotivationalStoryDialogState extends State<MotivationalStoryDialog> {
 
           const SizedBox(height: 16),
 
-          // 6. شارات متجري App Store & Google Play
+          // 6. شارة المتجر
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildStoreBadge(
-                icon: FontAwesomeIcons.googlePlay,
-                line1: 'متوفر على',
-                line2: 'Google Play',
-                iconColor: const Color(0xFF00E676),
-              ),
-              const SizedBox(width: 10),
-              _buildStoreBadge(
-                icon: FontAwesomeIcons.apple,
-                line1: 'متوفر على',
-                line2: 'App Store',
-                iconColor: Colors.white,
-              ),
+              if (!kIsWeb && Platform.isAndroid)
+                _buildStoreBadge(
+                  icon: FontAwesomeIcons.googlePlay,
+                  line1: 'متوفر على',
+                  line2: 'Google Play',
+                  iconColor: const Color(0xFF00E676),
+                ),
+              if (!kIsWeb && Platform.isIOS)
+                _buildStoreBadge(
+                  icon: FontAwesomeIcons.apple,
+                  line1: 'متوفر على',
+                  line2: 'App Store',
+                  iconColor: Colors.white,
+                ),
+              if (kIsWeb)
+                _buildStoreBadge(
+                  icon: Icons.language,
+                  line1: 'المنصة التعليمية',
+                  line2: 'Web App',
+                  iconColor: Colors.white,
+                ),
             ],
           ),
         ],
