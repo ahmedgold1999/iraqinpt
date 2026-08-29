@@ -32,8 +32,9 @@ workflows:
       - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
-      - name: Get Flutter packages
+      - name: Configure Flutter & Get packages
         script: |
+          flutter config --no-enable-swift-package-manager
           flutter packages pub get
       - name: Install CocoaPods dependencies
         script: |
