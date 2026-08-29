@@ -30,8 +30,11 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Install dependencies & CocoaPods
+        run: |
+          flutter config --no-enable-swift-package-manager
+          flutter pub get
+          cd ios && pod install --repo-update
 
       - name: Build iOS Archive (No Codesign for validation)
         if: ${{ !inputs.upload_to_testflight }}
