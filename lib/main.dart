@@ -152,7 +152,17 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     );
   }
 
+  // 🔒 خاصية فحص الـ VPN (معطلة مؤقتاً، يمكن تغييرها إلى true لإعادة التفعيل مستقبلاً)
+  static const bool _enableVpnCheck = false;
+
   Future<void> _checkVpnStatus() async {
+    if (!_enableVpnCheck) {
+      if (mounted) {
+        setState(() => _isVpnActive = false);
+      }
+      return;
+    }
+
     bool vpnEnabled = false;
     try {
       final connectivityResult = await (Connectivity().checkConnectivity());
@@ -259,7 +269,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
 
   // ✅ منطق اختيار الشاشة المناسبة (VPN, صيانة، أو الواجهة الرئيسية)
   Widget _buildHomeLogic() {
-    if (_isVpnActive) {
+    if (_enableVpnCheck && _isVpnActive) {
       return VpnBlockScreen(onRefresh: _checkVpnStatus);
     }
 
