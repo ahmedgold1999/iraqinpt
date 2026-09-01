@@ -1336,11 +1336,13 @@ ahmeedgold1000@gmail.com
                                 ],
                                 const SizedBox(height: 24),
                                 _buildLuxuryButton(),
-                                const SizedBox(height: 14),
-                                _buildGoogleButton(),
-                                if (_isAppleUI()) ...[
-                                  const SizedBox(height: 12),
-                                  _buildAppleButton(),
+                                if (defaultTargetPlatform != TargetPlatform.iOS) ...[
+                                  const SizedBox(height: 14),
+                                  _buildGoogleButton(),
+                                  if (_isAppleUI()) ...[
+                                    const SizedBox(height: 12),
+                                    _buildAppleButton(),
+                                  ],
                                 ],
                                 const SizedBox(height: 14),
                                 SizedBox(
