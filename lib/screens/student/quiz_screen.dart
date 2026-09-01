@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -525,7 +527,7 @@ class _ResultsActions extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'نحن نقدّر وجودك معنا 🤍\nإذا وجدت في تطبيقنا ما يستحق التقدير،\nتشرفنا بدعمك بتقييم 5 نجوم على متجر Google Play',
+                      'نحن نقدّر وجودك معنا 🤍\nإذا وجدت في تطبيقنا ما يستحق التقدير،\nتشرفنا بدعمك بتقييم 5 نجوم على المتجر',
                       style: TextStyle(
                         fontFamily: 'Tajawal',
                         fontSize: 16,
@@ -576,8 +578,11 @@ class _ResultsActions extends StatelessWidget {
                             ),
                             onPressed: () async {
                               await prefs.setBool(key, true);
-                              final url = Uri.parse(
-                                  'https://play.google.com/store/apps/details?id=com.inpt.ahmeed.iraqinpt');
+                              final url = (!kIsWeb && Platform.isIOS)
+                                  ? Uri.parse(
+                                      'https://apps.apple.com/app/id6742571778')
+                                  : Uri.parse(
+                                      'https://play.google.com/store/apps/details?id=com.inpt.ahmeed.iraqinpt');
                               if (await canLaunchUrl(url)) {
                                 await launchUrl(url,
                                     mode: LaunchMode.externalApplication);

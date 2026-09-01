@@ -1,19 +1,10 @@
-// lib/services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/app_models.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static const String _webClientId = '527094263196-em54nrkgk7bbll25anr1drkegv7f36h6.apps.googleusercontent.com';
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: kIsWeb ? _webClientId : null,
-    serverClientId: _webClientId,
-  );
   final String _usersCollection = 'users';
   
   // ذاكرة مؤقتة للمستخدم لتوفير قراءات Firestore
@@ -79,119 +70,6 @@ class AuthService {
       return userModel;
     } catch (e) {
       print('❌ خطأ في تسجيل الدخول: $e');
-      rethrow;
-    }
-  }
-
-  /// تسجيل الدخول عبر جوجل
-  Future<UserModel?> signInWithGoogle() async {
-    try {
-      UserCredential userCredential;
-
-      if (kIsWeb) {
-        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        googleProvider.addScope('email');
-        googleProvider.setCustomParameters({'prompt': 'select_account'});
-        
-        userCredential = await _auth.signInWithPopup(googleProvider);
-      } else {
-        // تنظيف أي جلسة سابقة معلقة لضمان عرض نافذة اختيار الحساب
-        try {
-          await _googleSignIn.signOut();
-        } catch (e) {
-          print('⚠️ تنبيه أثناء الخروج المسبق من GoogleSignIn: $e');
-        }
-
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) return null;
-
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        userCredential = await _auth.signInWithCredential(credential);
-      }
-
-      final User? user = userCredential.user;
-      if (user == null) return null;
-
-      UserModel? userModel = await _getUserFromFirestore(user.uid);
-      if (userModel == null) {
-        String displayName = user.displayName ?? '';
-        if (displayName.trim().isEmpty) {
-          displayName = (user.email ?? user.uid).split('@').first;
-        }
-
-        userModel = UserModel(
-          uid: user.uid,
-          name: displayName,
-          email: user.email ?? '',
-          role: UserRole.student,
-          isPremium: false,
-          activationCode: '',
-          expiryDate: null,
-        );
-        final userData = userModel.toMap();
-        String rawUsername = (user.email ?? user.uid).split('@').first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
-        if (rawUsername.isEmpty) {
-          rawUsername = 'user_${user.uid.substring(0, 6)}';
-        }
-        userData['username'] = rawUsername;
-        userData['createdAt'] = FieldValue.serverTimestamp();
-        userData['authMethod'] = 'google';
-        await _firestore.collection(_usersCollection).doc(user.uid).set(userData);
-      }
-      return userModel;
-    } catch (e) {
-      print('❌ خطأ في تسجيل الدخول عبر جوجل: $e');
-      rethrow;
-    }
-  }
-
-  /// تسجيل الدخول عبر آبل (Apple Sign In)
-  Future<UserModel?> signInWithApple() async {
-    try {
-      final appleCredential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-      );
-
-      final OAuthProvider oAuthProvider = OAuthProvider('apple.com');
-      final AuthCredential credential = oAuthProvider.credential(
-        idToken: appleCredential.identityToken,
-        accessToken: appleCredential.authorizationCode,
-      );
-
-      final userCredential = await _auth.signInWithCredential(credential);
-      final User? user = userCredential.user;
-      if (user == null) return null;
-
-      UserModel? userModel = await _getUserFromFirestore(user.uid);
-      if (userModel == null) {
-        UserModel newUser = UserModel(
-          uid: user.uid,
-          name: '${appleCredential.givenName ?? ""} ${appleCredential.familyName ?? ""}'.trim(),
-          email: user.email ?? '',
-          role: UserRole.student,
-          isPremium: false,
-          activationCode: '',
-          expiryDate: null,
-        );
-        if (newUser.name.isEmpty) newUser = newUser.copyWith(name: 'مستخدم Apple');
-
-        final userData = newUser.toMap();
-        userData['username'] = (user.email ?? user.uid).split('@').first;
-        userData['createdAt'] = FieldValue.serverTimestamp();
-        userData['authMethod'] = 'apple';
-        await _firestore.collection(_usersCollection).doc(user.uid).set(userData);
-        userModel = newUser;
-      }
-      return userModel;
-    } catch (e) {
-      print('❌ خطأ في تسجيل الدخول عبر Apple: $e');
       rethrow;
     }
   }
@@ -442,9 +320,6 @@ class AuthService {
   /// تسجيل الخروج
   Future<void> signOut() async {
     try {
-      try {
-        await _googleSignIn.signOut();
-      } catch (_) {}
       await _auth.signOut();
       _cachedUser = null; // تنظيف الذاكرة المؤقتة
       print('👋 تم تسجيل الخروج بنجاح');
