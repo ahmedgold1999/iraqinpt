@@ -50,6 +50,9 @@ class ConfigService {
       final doc = await FirebaseFirestore.instance.collection('system_settings').doc('maintenance_and_updates').get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
+        if (data.containsKey('ios_review_mode')) {
+          _config['ios_review_mode'] = data['ios_review_mode'] == true;
+        }
         if (data.containsKey('is_maintenance_on')) {
           _config['is_maintenance_on'] = data['is_maintenance_on'] == true;
         }
@@ -85,6 +88,7 @@ class ConfigService {
   }
 
   bool get isMaintenanceOn => _config['is_maintenance_on'] ?? false;
+  bool get isIosReviewMode => _config['ios_review_mode'] ?? true;
   String get examEndDate => _config['exam_end_date'] ?? '2026-06-15';
   
   String get admissionsPdfUrl {

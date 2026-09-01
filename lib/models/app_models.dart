@@ -1,5 +1,7 @@
 // lib/models/app_models.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import '../services/config_service.dart';
 
 enum UserRole { student, admin }
 
@@ -8,7 +10,7 @@ class UserModel {
   final String name;
   final String email;
   final UserRole role;
-  final bool isPremium;
+  final bool _rawPremium;
   final String activationCode;
   final DateTime? expiryDate;
   final List<String> deviceIds; // ✅ إضافة قائمة معرفات الأجهزة
@@ -20,13 +22,21 @@ class UserModel {
     required this.name,
     required this.email,
     required this.role,
-    required this.isPremium,
+    required bool isPremium,
     required this.activationCode,
     this.expiryDate,
     this.deviceIds = const [], // ✅ افتراضي فارغ
     this.gender = 'male',
     this.avatarId = 'boy_1',
-  });
+  }) : _rawPremium = isPremium;
+
+  /// 🍏 النسخة المميزة: يتم تفعيلها تلقائياً على iOS أثناء وضع مراجعة أبل
+  bool get isPremium {
+    if (ConfigService().isIosReviewMode && defaultTargetPlatform == TargetPlatform.iOS) {
+      return true;
+    }
+    return _rawPremium;
+  }
 
   String get roleName => role.name;
 
@@ -47,7 +57,7 @@ class UserModel {
       name: name ?? this.name,
       email: email ?? this.email,
       role: role ?? this.role,
-      isPremium: isPremium ?? this.isPremium,
+      isPremium: isPremium ?? _rawPremium,
       activationCode: activationCode ?? this.activationCode,
       expiryDate: expiryDate ?? this.expiryDate,
       deviceIds: deviceIds ?? this.deviceIds,
@@ -60,9 +70,9 @@ class UserModel {
     return {
       'uid': uid,
       'name': name,
-      'username': email.split('@').first,
+      'email': email,
       'role': role.name,
-      'isPremium': isPremium,
+      'isPremium': _rawPremium,
       'activationCode': activationCode,
       'expiryDate': expiryDate,
       'deviceIds': deviceIds, // ✅ حفظ الأجهزة
