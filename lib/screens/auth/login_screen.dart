@@ -497,6 +497,22 @@ ahmeedgold1000@gmail.com
     }
   }
 
+  void _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final userModel = await _auth.signInWithGoogle();
+      if (userModel != null) {
+        await NotificationService.enableNotifications();
+        _navigateBasedOnRole(userModel.role);
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      _showError('فشل الدخول عبر جوجل: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
   void _navigateBasedOnRole(UserRole role) {
     switch (role) {
       case UserRole.admin:
@@ -901,6 +917,48 @@ ahmeedgold1000@gmail.com
     );
   }
 
+  Widget _buildGoogleButton() {
+    return Container(
+      width: double.infinity,
+      height: 52,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        border: Border.all(color: _kIosBorder, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: (_isLoading || _checkingUpdate) ? null : _signInWithGoogle,
+          borderRadius: BorderRadius.circular(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const FaIcon(FontAwesomeIcons.google, color: Color(0xFFDB4437), size: 18),
+              const SizedBox(width: 10),
+              Text(
+                _isLogin ? 'الدخول عبر جوجل' : 'إنشاء حساب عبر جوجل',
+                style: const TextStyle(
+                  color: _kIosTextDark,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Tajawal',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ✅ شريط تحكم متناسق ينتمي إلى نمط أبل (iOS Segmented Control)
   Widget _buildTopSwitchButtons() {
     return Container(
@@ -1199,6 +1257,11 @@ ahmeedgold1000@gmail.com
                                 ],
                                 const SizedBox(height: 24),
                                 _buildLuxuryButton(),
+                                // ✅ زر جوجل متاح للويب والأندرويد فقط ومحذوف تماماً من الآيفون (iOS)
+                                if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) ...[
+                                  const SizedBox(height: 14),
+                                  _buildGoogleButton(),
+                                ],
                                 const SizedBox(height: 14),
                                 SizedBox(
                                   width: double.infinity,

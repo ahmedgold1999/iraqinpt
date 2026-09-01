@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/app_models.dart';
 
 class AuthService {
@@ -32,6 +34,56 @@ class AuthService {
         print('🟢 مستخدم مسجل: ${user.uid}');
       }
     });
+  }
+
+  /// تسجيل الدخول عبر جوجل (متاح للويب والأندرويد)
+  Future<UserModel?> signInWithGoogle() async {
+    try {
+      UserCredential userCredential;
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        userCredential = await _auth.signInWithPopup(googleProvider);
+      } else {
+        await GoogleSignIn.instance.initialize();
+        final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          idToken: googleUser.authentication.idToken,
+        );
+        userCredential = await _auth.signInWithCredential(credential);
+      }
+
+      final User? user = userCredential.user;
+      if (user == null) return null;
+
+      // فحص هل المستخدم موجود بالفايرستور، إذا غير موجود ننشئه
+      UserModel? userModel = await _getUserFromFirestore(user.uid);
+      if (userModel == null) {
+        final rawName = (user.displayName != null && user.displayName!.trim().isNotEmpty)
+            ? user.displayName!.trim()
+            : 'طالب';
+        
+        final username = user.email != null && user.email!.contains('@')
+            ? user.email!.split('@').first.toLowerCase()
+            : 'user_${user.uid.substring(0, 6)}';
+
+        userModel = UserModel(
+          uid: user.uid,
+          name: rawName,
+          email: user.email ?? '$username@ahmeed.inpt',
+          role: UserRole.student,
+          isPremium: false,
+          activationCode: '',
+        );
+
+        await _firestore.collection(_usersCollection).doc(user.uid).set(userModel.toMap());
+      }
+
+      _cachedUser = userModel;
+      return userModel;
+    } catch (e) {
+      print('❌ خطأ في الدخول عبر جوجل: $e');
+      rethrow;
+    }
   }
 
   /// الحصول على المستخدم الحالي
