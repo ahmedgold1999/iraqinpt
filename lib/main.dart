@@ -37,7 +37,7 @@ void main() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
-    );
+    ).timeout(const Duration(seconds: 4));
 
     // ✅ تهيئة مراقبة الأعطال (Firebase Crashlytics) بدون أي استهلاك للفايربيس
     if (!kIsWeb) {
@@ -48,10 +48,14 @@ void main() async {
       };
     }
 
-    await NotificationService.initialize();
-    await DailyReminderService.initialize();
-    await ConfigService().initialize();
-    await SoundEffectsService().init();
+    // ✅ تهيئة الخدمات بالتوازي وسلاسة مع حماية ضد التعليق
+    await Future.wait([
+      NotificationService.initialize().catchError((_) => null),
+      DailyReminderService.initialize().catchError((_) => null),
+      ConfigService().initialize().timeout(const Duration(seconds: 3)).catchError((_) => null),
+      SoundEffectsService().init().catchError((_) => null),
+    ]);
+    
     NotificationService.setupListeners();
     NotificationService.enableNotifications();
 
@@ -139,6 +143,13 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     _initAnimations();
     _initializeApp();
     _checkVpnStatus();
+
+    // 🛡️ صمام أمان فوري: إنهاء شاشة التحميل والدخول للتطبيق فوراً بعد 2.5 ثانية كحد أقصى مهما كانت سرعة الإنترنت
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (mounted && !_isInitialized) {
+        setState(() => _isInitialized = true);
+      }
+    });
   }
 
   void _initAnimations() {
@@ -192,19 +203,32 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
 
   Future<void> _initializeApp() async {
     try {
-      await NotificationService.enableNotifications();
-      final isLoggedIn = await _authService.isLoggedIn();
+      NotificationService.enableNotifications().catchError((_) => null);
+
+      final isLoggedIn = await _authService.isLoggedIn().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => false,
+      );
+
       if (isLoggedIn) {
-        _currentUser = await _authService.getCurrentUser();
+        _currentUser = await _authService.getCurrentUser().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => null,
+        );
+
         if (_currentUser != null) {
-          final allowed = await DeviceService.checkDeviceLimit();
-          if (!allowed) {
-            setState(() => _isDeviceLimitReached = true);
-          }
+          DeviceService.checkDeviceLimit().timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => true,
+          ).then((allowed) {
+            if (!allowed && mounted) {
+              setState(() => _isDeviceLimitReached = true);
+            }
+          }).catchError((_) => null);
         }
       }
     } catch (e) {
-      print('App Init Error: $e');
+      debugPrint('App Init Error: $e');
     } finally {
       if (mounted) {
         setState(() => _isInitialized = true);
