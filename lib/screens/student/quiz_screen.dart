@@ -1,13 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/question_model.dart';
 import '../../services/question_service.dart';
+import '../../services/tts_service.dart';
+import '../../services/mistake_vault_service.dart';
+import '../../services/ai_explainer_service.dart';
+import '../../services/sound_effects_service.dart';
+import '../../widgets/luxury_score_certificate.dart';
 
 // ==================== نموذج نتيجة الاختبار للتخزين المحلي ====================
 class LocalQuizResult {
@@ -127,8 +136,9 @@ class QuizResultsScreen extends StatelessWidget {
   final List<Question> questions;
   final Map<int, int> userAnswers;
   final String subject;
-  final String subjectKey; // ✅ جديد
-  final int durationInSeconds; // ✅ جديد
+  final String subjectKey;
+  final int durationInSeconds;
+  final int maxStreak;
 
   const QuizResultsScreen({
     super.key,
@@ -138,13 +148,13 @@ class QuizResultsScreen extends StatelessWidget {
     required this.questions,
     required this.userAnswers,
     required this.subject,
-    required this.subjectKey, // ✅ جديد
-    required this.durationInSeconds, // ✅ جديد
+    required this.subjectKey,
+    required this.durationInSeconds,
+    this.maxStreak = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    // ✅ يجب تمرير كافة المتغيرات المطلوبة للدالة هنا
     _saveResultToLocal(
       questions: questions,
       userAnswers: userAnswers,
@@ -182,6 +192,68 @@ class QuizResultsScreen extends StatelessWidget {
                     totalQuestions: totalQuestions,
                     correctAnswers: correctAnswers,
                     scorePercentage: scorePercentage,
+                    durationInSeconds: durationInSeconds,
+                    maxStreak: maxStreak,
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: const Color(0xFFFACC15).withOpacity(0.4), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFACC15).withOpacity(0.1),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () {
+                          final user = FirebaseAuth.instance.currentUser;
+                          final name = user?.displayName != null && user!.displayName!.isNotEmpty
+                              ? user.displayName!
+                              : (user?.email?.split('@').first ?? 'طالب متميز');
+                          showDialog(
+                            context: context,
+                            builder: (_) => LuxuryScoreCertificateDialog(
+                              studentName: name,
+                              subject: subject,
+                              scorePercentage: scorePercentage,
+                              correctAnswers: correctAnswers,
+                              totalQuestions: totalQuestions,
+                              durationInSeconds: durationInSeconds,
+                            ),
+                          );
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 14, horizontal: 18),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.workspace_premium_rounded, color: Color(0xFFFACC15), size: 22),
+                              SizedBox(width: 8),
+                              Text(
+                                'مشاركة بطاقة النتيجة الفخمة 📸',
+                                style: TextStyle(
+                                  fontFamily: _QuizUI.font,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFFACC15),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 18),
                   _ResultsActions(
@@ -251,6 +323,17 @@ void _saveResultToLocal({
       isCorrect = userSelected.trim() == correct.trim();
     }
 
+    if (!isCorrect) {
+      MistakeVaultService.saveMistake(
+        question: questions[i],
+        subjectKey: subjectKey,
+        subjectName: subject,
+        selectedWrongAnswer: userSelected,
+      );
+    } else {
+      MistakeVaultService.removeMistake(questions[i].question);
+    }
+
     // نحفظ كل سؤال سواء كان صح أو خطأ مع التفسير
     questionsHistory.add({
       'question': questions[i].question,
@@ -293,6 +376,7 @@ class _ResultsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final icon = isPassed
         ? Icons.workspace_premium_rounded
         : Icons.sentiment_dissatisfied_rounded;
@@ -303,7 +387,7 @@ class _ResultsHeader extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 50, 16, 12),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: accentColor.withOpacity(0.3), width: 1.5),
         boxShadow: [
@@ -332,17 +416,17 @@ class _ResultsHeader extends StatelessWidget {
               fontFamily: _QuizUI.font,
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1C1C1E),
+              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 6),
           Text(
             subject,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: _QuizUI.font,
               fontSize: 15,
-              color: Color(0xFF8E8E93),
+              color: isDark ? Colors.white60 : const Color(0xFF8E8E93),
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
@@ -443,7 +527,7 @@ class _ResultsActions extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'نحن نقدّر وجودك معنا 🤍\nإذا وجدت في تطبيقنا ما يستحق التقدير،\nتشرفنا بدعمك بتقييم 5 نجوم على متجر Google Play',
+                      'نحن نقدّر وجودك معنا 🤍\nإذا وجدت في تطبيقنا ما يستحق التقدير،\nتشرفنا بدعمك بتقييم 5 نجوم على المتجر',
                       style: TextStyle(
                         fontFamily: 'Tajawal',
                         fontSize: 16,
@@ -494,8 +578,11 @@ class _ResultsActions extends StatelessWidget {
                             ),
                             onPressed: () async {
                               await prefs.setBool(key, true);
-                              final url = Uri.parse(
-                                  'https://play.google.com/store/apps/details?id=com.inpt.ahmeed.iraqinpt');
+                              final url = (!kIsWeb && Platform.isIOS)
+                                  ? Uri.parse(
+                                      'https://apps.apple.com/app/id6742571778')
+                                  : Uri.parse(
+                                      'https://play.google.com/store/apps/details?id=com.inpt.ahmeed.iraqinpt');
                               if (await canLaunchUrl(url)) {
                                 await launchUrl(url,
                                     mode: LaunchMode.externalApplication);
@@ -538,33 +625,65 @@ class _ResultsActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // استخراج قائمة الأسئلة التي أخطأ بها الطالب
+    final List<Question> wrongQuestionsList = [];
+    for (int i = 0; i < questions.length; i++) {
+      final int? ans = userAnswers[i];
+      final q = questions[i];
+      if (ans == null || q.options[ans].trim() != q.originalAnswer.trim()) {
+        wrongQuestionsList.add(q);
+      }
+    }
+
     return Column(
       children: [
+        if (wrongQuestionsList.isNotEmpty) ...[
+          _FancyButton(
+            color: const Color(0xFFEA580C),
+            icon: Icons.track_changes_rounded,
+            text: '🎯 إعادة تدريب الأسئلة الخاطئة فقط (${wrongQuestionsList.length})',
+            onTap: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => QuizScreen(
+                    subject: 'إعادة الأخطاء والتدريب',
+                    questionsUrl: '',
+                    initialQuestions: wrongQuestionsList,
+                    questionsCount: wrongQuestionsList.length,
+                    showAnswersDuringExam: true,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+        ],
         _FancyButton(
           color: mainColor,
           icon: Icons.refresh_rounded,
-          text: 'إعادة الاختبار',
+          text: 'إعادة الاختبار كاملاً',
           onTap: onRetry,
         ),
         const SizedBox(height: 12),
         _FancyButton(
           color: Colors.orange,
           icon: Icons.error_outline_rounded,
-          text: 'عرض الإجابات الخاطئة',
+          text: 'عرض الإجابات الخاطئة وتفسيرها',
           onTap: onWrongAnswers,
         ),
         const SizedBox(height: 12),
         _FancyButton(
           color: Colors.blue,
           icon: Icons.quiz_rounded,
-          text: 'عرض كل الأسئلة',
+          text: 'عرض ومراجعة كافة الأسئلة',
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => AllQuestionsScreen(
-                  questions: questions, // ✅ تمرير questions
-                  userAnswers: userAnswers, // ✅ تمرير userAnswers
+                  questions: questions,
+                  userAnswers: userAnswers,
                 ),
               ),
             );
@@ -587,20 +706,42 @@ class _ResultsStatsCard extends StatelessWidget {
   final int totalQuestions;
   final int correctAnswers;
   final double scorePercentage;
+  final int durationInSeconds;
+  final int maxStreak;
 
   const _ResultsStatsCard({
     required this.mainColor,
     required this.totalQuestions,
     required this.correctAnswers,
     required this.scorePercentage,
+    this.durationInSeconds = 0,
+    this.maxStreak = 0,
   });
+
+  String _getDiagnosisText() {
+    if (scorePercentage >= 90) {
+      return 'أداء أسطوري استثنائي! 👑 أنت جاهز تماماً للاختبار الوزاري والدرجات العليا.';
+    } else if (scorePercentage >= 75) {
+      return 'أداء ممتاز ومتقدم جداً! 🌟 لمسات تدريبية بسيطة وتصل للدرجة الكاملة.';
+    } else if (scorePercentage >= 50) {
+      return 'مستوى جيد وناجح! ✨ أعد تدريب الأسئلة الخاطئة لترفع نتيجتك لأعلى درجة.';
+    } else {
+      return 'فرصة رائعة للتعلم والتفوق! 💡 ننصح بإعادة تدريب الأخطاء ومراجعة الشرح.';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final wrong = totalQuestions - correctAnswers;
+    final double avgSeconds = durationInSeconds > 0 && totalQuestions > 0
+        ? (durationInSeconds / totalQuestions)
+        : 0;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Card(
       elevation: 0,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_QuizUI.radiusXL)),
       child: Container(
@@ -610,12 +751,12 @@ class _ResultsStatsCard extends StatelessWidget {
           gradient: LinearGradient(
             colors: [
               mainColor.withOpacity(.10),
-              Colors.white,
+              isDark ? const Color(0xFF1E293B) : Colors.white,
             ],
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
           ),
-          border: Border.all(color: Colors.black.withOpacity(.06)),
+          border: Border.all(color: isDark ? Colors.white10 : Colors.black.withOpacity(.06)),
           boxShadow: [_QuizUI.softShadow(Colors.black)],
         ),
         child: Column(
@@ -632,11 +773,21 @@ class _ResultsStatsCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('ملخّص النتيجة', style: _QuizUI.title),
+                      Text(
+                        'تقرير الأداء والتشخيص الذكي 📊',
+                        style: _QuizUI.title.copyWith(
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Text(
-                        'تابع الإجابات الخاطئة لمعرفة نقاط الضعف وتحسين مستواك بسرعة.',
-                        style: _QuizUI.body.copyWith(color: Colors.black54),
+                        _getDiagnosisText(),
+                        style: _QuizUI.body.copyWith(
+                          color: isDark ? Colors.white70 : const Color(0xFF334155),
+                          fontSize: 13,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -644,6 +795,8 @@ class _ResultsStatsCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
+
+            // Basic Numbers
             Row(
               children: [
                 Expanded(
@@ -670,6 +823,31 @@ class _ResultsStatsCard extends StatelessWidget {
                     value: '$totalQuestions',
                     icon: Icons.quiz_rounded,
                     color: Colors.indigo,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Advanced Analytics (Speed & Streak)
+            Row(
+              children: [
+                Expanded(
+                  child: _MiniStat(
+                    title: 'متوسط السرعة',
+                    value: '${avgSeconds.toStringAsFixed(1)} ث/سؤال',
+                    icon: Icons.speed_rounded,
+                    color: const Color(0xFF2563EB),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _MiniStat(
+                    title: 'أعلى تتابع',
+                    value: '$maxStreak 🔥',
+                    icon: Icons.local_fire_department_rounded,
+                    color: const Color(0xFFEA580C),
                   ),
                 ),
               ],
@@ -736,6 +914,7 @@ class _MiniStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
@@ -761,7 +940,7 @@ class _MiniStat extends StatelessWidget {
             style: TextStyle(
               fontFamily: _QuizUI.font,
               fontSize: 12,
-              color: Colors.black54,
+              color: isDark ? Colors.white70 : Colors.black54,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -837,12 +1016,14 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
       });
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('جميع الأسئلة والنتائج',
             style: TextStyle(fontFamily: _QuizUI.font, fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
@@ -900,15 +1081,16 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
 
           return Card(
             elevation: 0,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: borderColor, width: 1.5),
+              side: BorderSide(color: borderColor.withOpacity(0.4), width: 1.5),
             ),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -977,6 +1159,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                       fontFamily: _QuizUI.font,
                       fontSize: _fontSize + 2,
                       fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF1C1C1E),
                       height: 1.4,
                     ),
                   ),
@@ -987,8 +1170,8 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isCorrect
-                          ? Colors.green.withOpacity(0.08)
-                          : Colors.red.withOpacity(0.08),
+                          ? (isDark ? const Color(0xFF064E3B).withOpacity(0.3) : Colors.green.withOpacity(0.08))
+                          : (isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : Colors.red.withOpacity(0.08)),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -1011,7 +1194,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                                     fontFamily: _QuizUI.font,
                                     fontSize: _fontSize,
                                     fontWeight: FontWeight.w600,
-                                    color: isCorrect ? Colors.green : Colors.red,
+                                    color: isCorrect ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
                                   ),
                                   children: [
                                     const TextSpan(
@@ -1041,7 +1224,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                                     fontFamily: _QuizUI.font,
                                     fontSize: _fontSize,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.green,
+                                    color: const Color(0xFF22C55E),
                                   ),
                                   children: [
                                     const TextSpan(
@@ -1065,14 +1248,14 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.05),
+                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : Colors.blue.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                        border: Border.all(color: isDark ? const Color(0xFF2563EB).withOpacity(0.3) : Colors.blue.withOpacity(0.2)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.lightbulb_outline, color: Colors.blue, size: _fontSize),
+                          Icon(Icons.lightbulb_outline, color: const Color(0xFF38BDF8), size: _fontSize),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
@@ -1084,7 +1267,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                                     fontFamily: _QuizUI.font,
                                     fontSize: _fontSize - 2,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                                    color: const Color(0xFF38BDF8),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -1094,7 +1277,7 @@ class _AllQuestionsScreenState extends State<AllQuestionsScreen> {
                                     fontFamily: _QuizUI.font,
                                     fontSize: _fontSize - 2,
                                     fontWeight: FontWeight.w500,
-                                    color: Colors.blue.shade800,
+                                    color: isDark ? const Color(0xFF93C5FD) : Colors.blue.shade800,
                                     height: 1.5,
                                   ),
                                 ),
@@ -1170,6 +1353,7 @@ class WrongAnswersScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final wrongItems = <_WrongItem>[];
 
     for (int i = 0; i < questions.length; i++) {
@@ -1184,11 +1368,11 @@ class WrongAnswersScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8F9FA),
       appBar: AppBar(
         title: const Text('الإجابات الخاطئة والمراجعة',
             style: TextStyle(fontFamily: _QuizUI.font, fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
@@ -1238,19 +1422,21 @@ class _WrongCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final q = item.question;
 
     return Card(
       elevation: 0,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(_QuizUI.radiusXL)),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(_QuizUI.radiusXL),
-          border: Border.all(color: Colors.black.withOpacity(.06)),
+          border: Border.all(color: isDark ? Colors.white10 : Colors.black.withOpacity(.06)),
           boxShadow: [_QuizUI.softShadow(Colors.black)],
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1276,7 +1462,13 @@ class _WrongCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text(q.question, style: _QuizUI.title.copyWith(fontSize: 18)),
+            Text(
+              q.question,
+              style: _QuizUI.title.copyWith(
+                fontSize: 18,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
             const SizedBox(height: 14),
             _AnswerBox(
               label: 'اختيارك:',
@@ -1311,10 +1503,11 @@ class _ExplanationBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(.05),
+        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : Colors.blue.withOpacity(.05),
         borderRadius: BorderRadius.circular(_QuizUI.radiusL),
         border: Border.all(color: Colors.blue.withOpacity(.25)),
       ),
@@ -1409,6 +1602,8 @@ class QuizScreen extends StatefulWidget {
   final String questionsUrl;
   final int questionsCount;
   final bool showAnswersDuringExam; // ⭐ أضف هذا
+  final List<Question>? initialQuestions;
+  final bool updateLeaderboard; // ⭐ إضافة هذا
 
   const QuizScreen({
     super.key,
@@ -1416,6 +1611,8 @@ class QuizScreen extends StatefulWidget {
     required this.questionsUrl,
     this.questionsCount = 100,
     this.showAnswersDuringExam = false, // ⭐ افتراضي false
+    this.initialQuestions,
+    this.updateLeaderboard = true, // ⭐ افتراضي true
   });
 
   @override
@@ -1433,8 +1630,13 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   late final AnimationController _shakeController;
   late final Animation<double> _shakeAnimation;
 
-  // ⭐ التحكم في حجم الخط
+  // ⭐ أدوات الراحة والتركيز (الخط والمفضلة)
   double _fontSize = 18.0;
+  Set<String> _bookmarkedQuestions = {};
+
+  // 🔥 نظام الحماس والتتابع (Combo Streak)
+  int _streak = 0;
+  int _maxStreak = 0;
 
   // ⭐ المتغيرات الجديدة
   bool _showFeedback = false;
@@ -1453,11 +1655,99 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         .chain(CurveTween(curve: Curves.elasticIn))
         .animate(_shakeController);
 
+    _loadStudentPreferences();
     _loadQuestions();
   }
 
+  Future<void> _loadStudentPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedSize = prefs.getDouble('student_quiz_font_size');
+      final savedBookmarks = prefs.getStringList('bookmarked_questions_set');
+      if (mounted) {
+        setState(() {
+          if (savedSize != null) _fontSize = savedSize;
+          if (savedBookmarks != null) _bookmarkedQuestions = savedBookmarks.toSet();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _updateFontSize(double newSize) async {
+    final clamped = newSize.clamp(14.0, 28.0);
+    setState(() => _fontSize = clamped);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('student_quiz_font_size', clamped);
+  }
+
+  Future<void> _toggleBookmark(Question q) async {
+    HapticFeedback.selectionClick();
+    final prefs = await SharedPreferences.getInstance();
+    final isBookmarked = _bookmarkedQuestions.contains(q.question);
+
+    setState(() {
+      if (isBookmarked) {
+        _bookmarkedQuestions.remove(q.question);
+      } else {
+        _bookmarkedQuestions.add(q.question);
+      }
+    });
+
+    await prefs.setStringList('bookmarked_questions_set', _bookmarkedQuestions.toList());
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isBookmarked ? 'تمت إزالة السؤال من المفضلة' : 'تم حفظ السؤال في المفضلة ⭐',
+            style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+          ),
+          duration: const Duration(milliseconds: 1400),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: isBookmarked ? Colors.grey.shade800 : const Color(0xFFD97706),
+        ),
+      );
+    }
+  }
+
+  void _triggerStreakCelebration(int streakCount) {
+    String message = '🔥 3 إجابات صحيحة متتالية! ممتاز!';
+    if (streakCount == 5) message = '⚡ 5 إجابات متتالية! أداء خرافي!';
+    if (streakCount == 10) message = '👑 10 إجابات متتالية أسطورية! أنت بطل حقيقي!';
+    if (streakCount > 10) message = '🔥 تتابع لا يُقهر: $streakCount إجابة متتالية!';
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Text('🔥', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFFEA580C),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
+  }
+
   // ⭐ دالة عرض التغذية الراجعة
-  // ⭐ دالة عرض التغذية الراجعة (تبقى ظاهرة)
   void _showAnswerFeedback() {
     if (mounted && !_showFeedback) {
       setState(() {
@@ -1595,8 +1885,12 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
 
   Future<void> _loadQuestions() async {
     try {
-      final questions =
-      await QuestionService.loadQuestions(widget.questionsUrl);
+      List<Question> questions = [];
+      if (widget.initialQuestions != null && widget.initialQuestions!.isNotEmpty) {
+        questions = List.from(widget.initialQuestions!);
+      } else {
+        questions = await QuestionService.loadQuestions(widget.questionsUrl);
+      }
       final random = Random();
       questions.shuffle(random);
 
@@ -1699,8 +1993,25 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     // ✅ حفظ النتيجة
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
+      String userName = user.displayName ?? '';
+      try {
+        final uDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (uDoc.exists) {
+          final dName = uDoc.data()?['name'] ?? uDoc.data()?['displayName'];
+          if (dName != null && dName.toString().trim().isNotEmpty) {
+            userName = dName.toString().trim();
+          }
+        }
+      } catch (_) {}
+      if (userName.isEmpty) {
+        userName = user.displayName != null && user.displayName!.isNotEmpty
+            ? user.displayName!
+            : (user.email?.split('@').first ?? 'طالب متميز');
+      }
+
       await QuestionService.saveQuizResult(
         userId: user.uid,
+        userName: userName,
         subjectKey: _getSubjectKey(widget.subject),
         subjectName: widget.subject,
         scorePercentage: scorePercentage,
@@ -1709,6 +2020,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         totalQuestions: _randomQuestions.length,
         durationInSeconds: durationUsed,
         wrongQuestions: wrongQuestionsData,
+        updateLeaderboard: widget.updateLeaderboard,
       );
     }
 
@@ -1732,17 +2044,18 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
           subject: widget.subject,
           subjectKey: _getSubjectKey(widget.subject),
           durationInSeconds: durationUsed,
+          maxStreak: _maxStreak,
         ),
       ),
     );
   }
 
-// دالة مساعدة لتحويل اسم المادة إلى مفتاح
   String _getSubjectKey(String subject) {
-    if (subject.contains('عربية')) return 'arabic';
-    if (subject.contains('حاسوب')) return 'computer';
-    if (subject.contains('إنجليزي')) return 'english';
-    return 'arabic';
+    final s = subject.toLowerCase();
+    if (s.contains('عرب') || s.contains('arab')) return 'arabic';
+    if (s.contains('حاس') || s.contains('comp')) return 'computer';
+    if (s.contains('إنج') || s.contains('انج') || s.contains('eng')) return 'english';
+    return 'general';
   }
 
   String _formatTime(int seconds) {
@@ -1755,6 +2068,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   void dispose() {
     _timer?.cancel();
     _shakeController.dispose();
+    TtsService().stop();
     super.dispose();
   }
 
@@ -1792,14 +2106,15 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     }
 
     final q = _randomQuestions[_currentQuestionIndex];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8F9FA),
         appBar: AppBar(
           title: Text(widget.subject, style: const TextStyle(fontFamily: _QuizUI.font, fontWeight: FontWeight.bold)),
-          backgroundColor: const Color(0xFF0F172A),
+          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
           foregroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
@@ -1812,14 +2127,26 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.text_increase, size: 20),
-              onPressed: () => setState(() => _fontSize = (_fontSize < 30) ? _fontSize + 2 : _fontSize),
-              tooltip: 'تكبير الخط',
+              icon: Icon(
+                SoundEffectsService().isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                size: 20,
+                color: SoundEffectsService().isMuted ? Colors.white54 : const Color(0xFF38BDF8),
+              ),
+              onPressed: () {
+                SoundEffectsService().toggleSound();
+                setState(() {});
+              },
+              tooltip: SoundEffectsService().isMuted ? 'تفعيل المؤثرات الصوتية' : 'كتم المؤثرات الصوتية',
             ),
             IconButton(
-              icon: const Icon(Icons.text_decrease, size: 20),
-              onPressed: () => setState(() => _fontSize = (_fontSize > 14) ? _fontSize - 2 : _fontSize),
-              tooltip: 'تصغير الخط',
+              icon: const Icon(Icons.text_increase_rounded, size: 20),
+              onPressed: () => _updateFontSize(_fontSize + 2),
+              tooltip: 'تكبير الخط A+',
+            ),
+            IconButton(
+              icon: const Icon(Icons.text_decrease_rounded, size: 20),
+              onPressed: () => _updateFontSize(_fontSize - 2),
+              tooltip: 'تصغير الخط A-',
             ),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -1863,12 +2190,12 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                   final current = index == _currentQuestionIndex;
 
                   final Color bg = current
-                      ? const Color(0xFF0F172A)
+                      ? (isDark ? const Color(0xFF2563EB) : const Color(0xFF0F172A))
                       : answered
                       ? const Color(0xFF00C853)
-                      : const Color(0xFFE5E5EA);
+                      : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE5E5EA));
 
-                  final Color fg = current || answered ? Colors.white : const Color(0xFF8E8E93);
+                  final Color fg = current || answered ? Colors.white : (isDark ? Colors.white60 : const Color(0xFF8E8E93));
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -1879,10 +2206,11 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                       decoration: BoxDecoration(
                         color: bg,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
                         boxShadow: current
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFF0F172A).withOpacity(0.2),
+                                  color: const Color(0xFF2563EB).withOpacity(0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 3),
                                 ),
@@ -1915,8 +2243,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                 child: LinearProgressIndicator(
                   value: (_currentQuestionIndex + 1) / _randomQuestions.length,
                   minHeight: 6,
-                  backgroundColor: const Color(0xFFE5E5EA),
-                  color: const Color(0xFF0F172A),
+                  backgroundColor: isDark ? Colors.white12 : const Color(0xFFE5E5EA),
+                  color: const Color(0xFF2563EB),
                 ),
               ),
             ),
@@ -1936,11 +2264,11 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
-                      color: Colors.white,
-                      border: Border.all(color: const Color(0xFFE5E5EA), width: 1),
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE5E5EA), width: 1),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -1955,21 +2283,139 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF2F2F7),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'السؤال ${_currentQuestionIndex + 1} من ${_randomQuestions.length}',
-                                  style: const TextStyle(
-                                    fontFamily: _QuizUI.font,
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF8E8E93),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF2F2F7),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'السؤال ${_currentQuestionIndex + 1} من ${_randomQuestions.length}',
+                                      style: TextStyle(
+                                        fontFamily: _QuizUI.font,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Colors.white70 : const Color(0xFF8E8E93),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  if (_streak >= 2) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(0xFFEA580C).withOpacity(0.3),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Text('🔥', style: TextStyle(fontSize: 11)),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '$_streak متتالية',
+                                            style: const TextStyle(
+                                              fontFamily: 'Tajawal',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    icon: Icon(
+                                      _bookmarkedQuestions.contains(q.question)
+                                          ? Icons.star_rounded
+                                          : Icons.star_outline_rounded,
+                                      color: _bookmarkedQuestions.contains(q.question)
+                                          ? const Color(0xFFF59E0B)
+                                          : (isDark ? Colors.white38 : Colors.grey.shade400),
+                                      size: 22,
+                                    ),
+                                    onPressed: () => _toggleBookmark(q),
+                                    tooltip: 'حفظ السؤال في المفضلة',
+                                  ),
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: () => AiExplainerService.showExplanationModal(
+                                      context,
+                                      question: q,
+                                      subject: widget.subject,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF6366F1).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.auto_awesome_rounded, size: 14, color: Color(0xFF6366F1)),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'شرح ذكي',
+                                            style: TextStyle(
+                                              fontFamily: _QuizUI.font,
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF6366F1),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  InkWell(
+                                    onTap: () => TtsService().speak(q.question),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFF0F172A).withOpacity(0.06),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.volume_up_rounded, size: 15, color: isDark ? Colors.white70 : const Color(0xFF0F172A)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'استماع',
+                                            style: TextStyle(
+                                              fontFamily: _QuizUI.font,
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark ? Colors.white70 : const Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -1980,7 +2426,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                               fontFamily: _QuizUI.font,
                               fontWeight: FontWeight.bold,
                               fontSize: _fontSize + 1,
-                              color: const Color(0xFF1C1C1E),
+                              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
                               height: 1.5,
                             ),
                           ),
@@ -1996,8 +2442,21 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(16),
                                 onTap: () {
+                                  final bool isCorrect = option.trim() == q.originalAnswer.trim();
                                   setState(() {
                                     _userAnswers[_currentQuestionIndex] = index;
+                                    if (isCorrect) {
+                                      _streak++;
+                                      if (_streak > _maxStreak) _maxStreak = _streak;
+                                      SoundEffectsService().playCorrect();
+                                      if (_streak == 3 || _streak == 5 || _streak == 10 || (_streak > 10 && _streak % 5 == 0)) {
+                                        SoundEffectsService().playStreakFanfare();
+                                        _triggerStreakCelebration(_streak);
+                                      }
+                                    } else {
+                                      _streak = 0;
+                                      SoundEffectsService().playWrong();
+                                    }
                                     if (widget.showAnswersDuringExam) {
                                       _showAnswerFeedback();
                                     }
@@ -2007,10 +2466,12 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                   duration: const Duration(milliseconds: 200),
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFFF0FDF4) : const Color(0xFFF2F2F7),
+                                    color: isSelected
+                                        ? (isDark ? const Color(0xFF064E3B).withOpacity(0.4) : const Color(0xFFF0FDF4))
+                                        : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF2F2F7)),
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: isSelected ? const Color(0xFF00C853) : const Color(0xFFE5E5EA),
+                                      color: isSelected ? const Color(0xFF00C853) : (isDark ? Colors.white10 : const Color(0xFFE5E5EA)),
                                       width: isSelected ? 1.8 : 1,
                                     ),
                                   ),
@@ -2020,7 +2481,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                         width: 32,
                                         height: 32,
                                         decoration: BoxDecoration(
-                                          color: isSelected ? const Color(0xFF00C853) : Colors.white,
+                                          color: isSelected
+                                              ? const Color(0xFF00C853)
+                                              : (isDark ? const Color(0xFF1E293B) : Colors.white),
                                           shape: BoxShape.circle,
                                         ),
                                         alignment: Alignment.center,
@@ -2030,7 +2493,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                             fontFamily: _QuizUI.font,
                                             fontSize: 14,
                                             fontWeight: FontWeight.bold,
-                                            color: isSelected ? Colors.white : const Color(0xFF1C1C1E),
+                                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF1C1C1E)),
                                           ),
                                         ),
                                       ),
@@ -2042,7 +2505,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                             fontFamily: _QuizUI.font,
                                             fontSize: _fontSize,
                                             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                            color: const Color(0xFF1C1C1E),
+                                            color: isDark ? Colors.white : const Color(0xFF1C1C1E),
                                             height: 1.3,
                                           ),
                                         ),
@@ -2065,8 +2528,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                 color: _userAnswers[_currentQuestionIndex] != null &&
                                     _randomQuestions[_currentQuestionIndex].options[_userAnswers[_currentQuestionIndex]!].trim() ==
                                         _randomQuestions[_currentQuestionIndex].originalAnswer.trim()
-                                    ? const Color(0xFFF0FDF4)
-                                    : const Color(0xFFFEF2F2),
+                                    ? (isDark ? const Color(0xFF064E3B).withOpacity(0.3) : const Color(0xFFF0FDF4))
+                                    : (isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : const Color(0xFFFEF2F2)),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: _userAnswers[_currentQuestionIndex] != null &&
@@ -2121,8 +2584,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                   Container(
                                     padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: isDark ? const Color(0xFF0F172A) : Colors.white,
                                       borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
                                     ),
                                     child: Row(
                                       children: [
@@ -2144,11 +2608,11 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                               const SizedBox(height: 4),
                                               Text(
                                                 _randomQuestions[_currentQuestionIndex].originalAnswer,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontFamily: 'Tajawal',
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF1C1C1E),
+                                                  color: isDark ? Colors.white : const Color(0xFF1C1C1E),
                                                 ),
                                               ),
                                             ],
@@ -2164,13 +2628,14 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                     Container(
                                       padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFEFF6FF),
+                                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : const Color(0xFFEFF6FF),
                                         borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: isDark ? const Color(0xFF2563EB).withOpacity(0.3) : Colors.transparent),
                                       ),
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF2563EB), size: 18),
+                                          const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF38BDF8), size: 18),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Column(
@@ -2182,17 +2647,17 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                                     fontFamily: 'Tajawal',
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.bold,
-                                                    color: Color(0xFF2563EB),
+                                                    color: Color(0xFF38BDF8),
                                                   ),
                                                 ),
                                                 const SizedBox(height: 4),
                                                 Text(
                                                   _randomQuestions[_currentQuestionIndex].explanation!,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontFamily: 'Tajawal',
                                                     fontSize: 13,
                                                     fontWeight: FontWeight.w500,
-                                                    color: Color(0xFF1E3A8A),
+                                                    color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E3A8A),
                                                     height: 1.4,
                                                   ),
                                                 ),
@@ -2215,9 +2680,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFEF2F2),
+                                color: isDark ? const Color(0xFF7F1D1D).withOpacity(0.3) : const Color(0xFFFEF2F2),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFFCA5A5)),
+                                border: Border.all(color: isDark ? const Color(0xFFEF4444).withOpacity(0.4) : const Color(0xFFFCA5A5)),
                               ),
                               child: Text(
                                 'الوقت الإجمالي المتبقي: ${_formatTime(_totalTimeLeft)}',
@@ -2255,8 +2720,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                   })
                               : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE5E5EA),
-                            foregroundColor: const Color(0xFF1C1C1E),
+                            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFE5E5EA),
+                            foregroundColor: isDark ? Colors.white70 : const Color(0xFF1C1C1E),
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
@@ -2278,7 +2743,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                         child: ElevatedButton(
                           onPressed: _nextQuestionOrFinish,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0F172A),
+                            backgroundColor: const Color(0xFF2563EB),
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(

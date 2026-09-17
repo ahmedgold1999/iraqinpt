@@ -14,6 +14,7 @@ import '../common/maintenance_screen.dart';
 import '../../routes.dart';
 import '../../services/auth_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/app_update_service.dart';
 import '../../models/app_models.dart';
 
 // ✅ ألوان زاهية وفاخرة بنمط تطبيقات الآيفون (iOS Vibrant Luxury Colors)
@@ -223,25 +224,7 @@ ahmeedgold1000@gmail.com
 
   Future<void> _checkForUpdate() async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('app_config')
-          .doc('version')
-          .get();
-
-      if (doc.exists) {
-        final data = doc.data();
-        if (data != null) {
-          final packageInfo = await PackageInfo.fromPlatform();
-          final currentVersion = packageInfo.version;
-          final latestVersion = data['version'] ?? '1.0.0';
-          final forceUpdate = data['forceUpdate'] ?? false;
-          final updateUrl = data['url'] ?? '';
-
-          if (_isVersionLower(currentVersion, latestVersion)) {
-            _showUpdateDialog(updateUrl, forceUpdate);
-          }
-        }
-      }
+      await AppUpdateService.checkAppUpdate(context);
     } catch (e) {
       debugPrint('Error checking update: $e');
     } finally {
@@ -515,47 +498,9 @@ ahmeedgold1000@gmail.com
   }
 
   void _signInWithGoogle() async {
-    if (_isLoading) return;
     setState(() => _isLoading = true);
-
     try {
       final userModel = await _auth.signInWithGoogle();
-      if (userModel != null) {
-        await NotificationService.enableNotifications();
-        if (mounted) {
-          _navigateBasedOnRole(userModel.role);
-        }
-      } else {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-      }
-    } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        _showError(_getFirebaseErrorMessage(e));
-        setState(() => _isLoading = false);
-      }
-    } catch (e) {
-      if (mounted) {
-        final errStr = e.toString();
-        if (!errStr.contains('canceled') && !errStr.contains('cancelled') && !errStr.contains('sign_in_canceled')) {
-          _showError('فشل تسجيل الدخول عبر جوجل: ${e.toString()}');
-        }
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  bool _isAppleUI() {
-    return defaultTargetPlatform == TargetPlatform.iOS;
-  }
-
-  void _signInWithApple() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-
-    try {
-      final userModel = await _auth.signInWithApple();
       if (userModel != null) {
         await NotificationService.enableNotifications();
         _navigateBasedOnRole(userModel.role);
@@ -563,7 +508,7 @@ ahmeedgold1000@gmail.com
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      _showError('فشل تسجيل الدخول عبر آبل: ${e.toString()}');
+      _showError('فشل الدخول عبر جوجل: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -747,7 +692,7 @@ ahmeedgold1000@gmail.com
 
   void _showPrivacyPolicyDialog() {
     _showTextDialog(
-      title: 'سياسة الخصوصية',
+      title: 'سياسة الخصـوصية',
       content: _privacyPolicyText,
       accentColor: _kIosAccent,
       icon: Icons.policy_rounded,
@@ -907,7 +852,7 @@ ahmeedgold1000@gmail.com
               _termsError!,
               textAlign: TextAlign.end,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 13,
                 color: Color(0xFFEF4444),
                 fontFamily: 'Tajawal',
               ),
@@ -966,47 +911,6 @@ ahmeedgold1000@gmail.com
                       letterSpacing: 0.3,
                     ),
                   ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAppleButton() {
-    return Container(
-      width: double.infinity,
-      height: 52,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.black,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: (_isLoading || _checkingUpdate) ? null : _signInWithApple,
-          borderRadius: BorderRadius.circular(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.apple, color: Colors.white, size: 22),
-              SizedBox(width: 10),
-              Text(
-                'الدخول عبر آبل',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Tajawal',
-                ),
-              ),
-            ],
           ),
         ),
       ),
@@ -1353,11 +1257,10 @@ ahmeedgold1000@gmail.com
                                 ],
                                 const SizedBox(height: 24),
                                 _buildLuxuryButton(),
-                                const SizedBox(height: 14),
-                                _buildGoogleButton(),
-                                if (_isAppleUI()) ...[
-                                  const SizedBox(height: 12),
-                                  _buildAppleButton(),
+                                // ✅ زر جوجل متاح للويب والأندرويد فقط ومحذوف تماماً من الآيفون (iOS)
+                                if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) ...[
+                                  const SizedBox(height: 14),
+                                  _buildGoogleButton(),
                                 ],
                                 const SizedBox(height: 14),
                                 SizedBox(

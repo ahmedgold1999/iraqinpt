@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isOwner(userId)
+                    && request.resource.data.role == 'student'
+                    && request.resource.data.isPremium == false;
+      
+      allow update: if isAdmin() || (
+        isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isPremium', 'expiryDate'])
+      );
+      
+      allow delete: if isOwner(userId) || isAdmin();
+
+      match /fcm_tokens/{tokenId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+
+      match /notifications/{notifId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+
+      match /mistakes/{mistakeId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    match /fcm_tokens/{tokenId} {
+      allow read, write: if true;
+    }
+
+    match /system_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /app_config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /activation_codes/{code} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() && resource.data.isUsed == false
+      );
+    }
+
+    match /all_notifications/{notifId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /leaderboard/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /questions/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /announcements/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

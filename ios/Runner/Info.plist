@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Iraqinpt</string>
+	<string>الامتحان الوطني INPT</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,10 +46,10 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>نحتاج للوصول للكاميرا لالتقاط صور الملف الشخصي أو مسح رموز QR الخاصة بتفعيل الاشتراكات.</string>
+	<string>نحتاج للوصول إلى الكاميرا لالتقاط وتعيين صورة الملف الشخصي.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>نحتاج للوصول لمكتبة الصور لاختيار صورة للملف الشخصي.</string>
+	<string>نحتاج للوصول لمكتبة الصور لاختيار وتعيين صورة للملف الشخصي.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>نحتاج للوصول للميكروفون في حال استخدام ميزات الصوت داخل التطبيق.</string>
+	<string>نحتاج للوصول للميكروفون لتشغيل الميزات الصوتية والتفاعلية.</string>
 </dict>
 </plist>

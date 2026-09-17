@@ -7,8 +7,13 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'quiz_screen.dart';
+import 'smart_vault_screen.dart';
+import 'notifications_screen.dart';
+import 'subscription_screen.dart';
 import '../../services/auth_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/subscription_service.dart';
+import '../../services/announcement_service.dart';
 import '../../models/app_models.dart';
 import '../../widgets/luxury_loading.dart';
 import '../../routes.dart';
@@ -55,6 +60,151 @@ class StudentHomeScreen extends StatelessWidget {
       offset: const Offset(0, 2),
     ),
   ];
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+  }
+
+  Widget _buildNotificationBell(BuildContext context, bool isDark) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.notifications_active_rounded,
+                size: 22,
+                color: isDark ? const Color(0xFFFACC15) : const Color(0xFF2563EB),
+              ),
+              tooltip: 'الإشعارات والمنبه اليومي',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                );
+              },
+            ),
+          ),
+          if (userId != null)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: StreamBuilder<int>(
+                stream: NotificationService.getUnreadCount(userId),
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? 0;
+                  if (count == 0) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                    child: Text(
+                      count > 9 ? '9+' : '$count',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Tajawal',
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnnouncementBanner(BuildContext context) {
+    return StreamBuilder<AppAnnouncement>(
+      stream: AnnouncementService.getAnnouncementStream(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || !snapshot.data!.isEnabled || snapshot.data!.text.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final ann = snapshot.data!;
+        Color bg = const Color(0xFF2563EB);
+        IconData icon = Icons.campaign_rounded;
+        if (ann.type == 'warning') {
+          bg = const Color(0xFFD97706);
+          icon = Icons.warning_amber_rounded;
+        } else if (ann.type == 'success') {
+          bg = const Color(0xFF16A34A);
+          icon = Icons.check_circle_outline_rounded;
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: bg.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: bg.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: bg.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: bg, size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: InkWell(
+                  onTap: ann.link != null && ann.link!.isNotEmpty
+                      ? () => _launchUrl(ann.link!)
+                      : null,
+                  child: MarqueeAnnouncementText(
+                    text: ann.text,
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: bg,
+                    ),
+                  ),
+                ),
+              ),
+              if (ann.link != null && ann.link!.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: Icon(Icons.open_in_new_rounded, color: bg, size: 18),
+                  onPressed: () => _launchUrl(ann.link!),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'فتح الرابط',
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildPremiumBanner(BuildContext context, UserModel user) {
     final bool isPremium = user.isPremium;
@@ -201,16 +351,20 @@ class StudentHomeScreen extends StatelessWidget {
       UserModel user,
       ) {
     final Color base = subject['color'] as Color;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF131C31) : Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -278,7 +432,7 @@ class StudentHomeScreen extends StatelessWidget {
                         style: GoogleFonts.notoKufiArabic(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF0F172A),
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -344,6 +498,203 @@ class StudentHomeScreen extends StatelessWidget {
     return isLocked ? const Color(0xFFB91C1C) : const Color(0xFF15803D);
   }
 
+  void _navigateToSubscriptionWithSlide(BuildContext context) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const SubscriptionScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOutCubic;
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          return SlideTransition(position: animation.drive(tween), child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 380),
+      ),
+    );
+  }
+
+  void _showLuxurySubscriptionDialog(BuildContext context, {
+    String? title,
+    String? subtitle,
+  }) {
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+    final dialogTitle = title ?? (isIos ? 'عضوية الحساب المميز 👑' : 'فتح الباقة الملكية VIP 👑');
+    final dialogSubtitle = subtitle ?? (isIos
+        ? 'الوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي والملازم واجتياز الامتحان بتفوق!'
+        : 'اشترك الآن للوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي واجتياز الامتحان الوطني بتفوق!');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        backgroundColor: Colors.transparent,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF0F172A)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFFACC15).withOpacity(0.35), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFACC15).withOpacity(0.15),
+                    blurRadius: 30,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFACC15), Color(0xFFD97706)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFACC15).withOpacity(0.4),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF0F172A), size: 36),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    dialogTitle,
+                    style: GoogleFonts.notoKufiArabic(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    dialogSubtitle,
+                    style: const TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 13,
+                      color: Color(0xFFCBD5E1),
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildVipBenefitRow('بنوك الأسئلة الشاملة (100 سؤال كامل) لكل مادة'),
+                        const SizedBox(height: 8),
+                        _buildVipBenefitRow('استخدام غير محدود لـ "الأستاذ الذكي AI" على مدار الساعة'),
+                        const SizedBox(height: 8),
+                        _buildVipBenefitRow('كافة الملازم ونماذج الفورمات الوزارية المعتمدة'),
+                        const SizedBox(height: 8),
+                        _buildVipBenefitRow(isIos ? 'إحصائيات متقدمة ودعم فني وإرشادات أكاديمية' : 'إحصائيات متقدمة ودعم فني مباشر عبر الواتساب'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('لاحقاً', style: TextStyle(fontFamily: 'Tajawal', color: Colors.white70)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFACC15),
+                            foregroundColor: const Color(0xFF0F172A),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 4,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _navigateToSubscriptionWithSlide(context);
+                          },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.workspace_premium_rounded, size: 18),
+                              const SizedBox(width: 6),
+                              Text(
+                                isIos ? 'تفاصيل العضوية 👑' : 'الترقية والاشتراك 👑',
+                                style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVipBenefitRow(String text) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(3),
+          decoration: const BoxDecoration(
+            color: Color(0xFF22C55E),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.check_rounded, color: Colors.white, size: 12),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showFreeArabicDialog(
       BuildContext context, String subjectName, String subjectKey) async {
     final prefs = await SharedPreferences.getInstance();
@@ -351,73 +702,10 @@ class StudentHomeScreen extends StatelessWidget {
 
     if (hasTakenFree) {
       if (!context.mounted) return;
-      showDialog(
-        context: context,
-        builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-          backgroundColor: Colors.transparent,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                padding: const EdgeInsets.all(26),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0B1220).withOpacity(0.92),
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.stars_rounded, color: Colors.amber, size: 44),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لقد استهلكت تجربتك المجانية',
-                      style: _t(20, w: FontWeight.w900, c: Colors.white, ls: 0.5),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'نأمل أن تكون التجربة قد نالت إعجابك. للاستمرار في إجراء الاختبارات والوصول إلى كافة الميزات، يرجى الاشتراك في النسخة المميزة.',
-                      style: TextStyle(color: Colors.white70, height: 1.5, fontFamily: 'Tajawal'),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.pushNamed(context, AppRoutes.subscription);
-                        },
-                        child: const Text('اشترك الآن', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('إغلاق', style: TextStyle(color: Colors.white54)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+      _showLuxurySubscriptionDialog(
+        context,
+        title: 'لقد استهلكت تجربتك المجانية ✨',
+        subtitle: 'نأمل أن تكون التجربة قد نالت إعجابك! للاستمرار في إجراء الاختبارات والوصول إلى كافة المواد والميزات، اشترك الآن في باقة VIP.',
       );
       return;
     }
@@ -574,138 +862,10 @@ class StudentHomeScreen extends StatelessWidget {
   }
 
   void _showNonPremiumDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-        backgroundColor: Colors.transparent,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(26),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B1220).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.45),
-                    blurRadius: 40,
-                    offset: const Offset(0, 16),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFFFACC15),
-                          Color(0xFFFB7185),
-                          Color(0xFFEF4444)
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(Icons.lock_outline_rounded,
-                        color: Colors.white, size: 40),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'اشتراك مطلوب!',
-                    style: _t(24, w: FontWeight.w900, c: _gold, ls: 0.5),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'هذه المادة تتطلب اشتراكاً مميزاً',
-                    style: _t(16, w: FontWeight.w700, c: Colors.white70),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'قم بالاشتراك للوصول إلى جميع المواد والامتحانات الكاملة',
-                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white54),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  if (defaultTargetPlatform == TargetPlatform.iOS)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _gold,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('فهمت', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
-                      ),
-                    )
-                  else
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
-                              side: BorderSide(
-                                  color: Colors.white.withOpacity(0.18),
-                                  width: 1.2),
-                            ),
-                            onPressed: () => Navigator.pop(context),
-                            child: Text('إلغاء',
-                                style: _t(14,
-                                    w: FontWeight.w800, c: Colors.white70)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _gold,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
-                              elevation: 0,
-                            ),
-                            onPressed: () {
-                              Navigator.pop(context);
-                              Navigator.pushNamed(
-                                  context, AppRoutes.subscription);
-                            },
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.workspace_premium_rounded,
-                                    size: 18),
-                                const SizedBox(width: 6),
-                                Text('الاشتراك',
-                                    style: _t(14,
-                                        w: FontWeight.w900, c: Colors.black)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    _showLuxurySubscriptionDialog(
+      context,
+      title: 'باقة VIP الملكية مطلوبة 👑',
+      subtitle: 'هذه المادة والامتحان الكامل مخصص لمشتركي باقة VIP. اشترك الآن وافتح كافة المواد والميزات فوراً!',
     );
   }
 
@@ -1193,11 +1353,122 @@ class StudentHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _luxuryBackground({required Widget child}) {
+  Widget _buildAiTutorBanner(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF818CF8).withOpacity(0.3), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4338CA).withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () {
+            Navigator.pushNamed(context, AppRoutes.aiTutor);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFA855F7).withOpacity(0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.psychology_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Flexible(
+                            child: Text(
+                              'الأستاذ الذكي المساعد (AI) 🤖',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFACC15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'جديد ✨',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'اسأل الأستاذ الذكي عن أي سؤال أو قاعدة وافهمها فوراً!',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFFC7D2FE),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF818CF8), size: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _luxuryBackground(BuildContext context, {required Widget child}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [_bgTop, _bgMid, _bgBottom],
+          colors: isDark
+              ? const [Color(0xFF0A0F1D), Color(0xFF131C31), Color(0xFF0A0F1D)]
+              : const [_bgTop, _bgMid, _bgBottom],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -1214,7 +1485,7 @@ class StudentHomeScreen extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF60A5FA).withOpacity(0.12),
+                    const Color(0xFF60A5FA).withOpacity(isDark ? 0.06 : 0.12),
                     Colors.transparent,
                   ],
                 ),
@@ -1231,7 +1502,7 @@ class StudentHomeScreen extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFFFACC15).withOpacity(0.10),
+                    const Color(0xFFFACC15).withOpacity(isDark ? 0.05 : 0.10),
                     Colors.transparent,
                   ],
                 ),
@@ -1248,23 +1519,22 @@ class StudentHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final AuthService authService = AuthService();
     final SubscriptionService subService = SubscriptionService();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return StreamBuilder<UserModel?>(
       stream: authService.userData,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            backgroundColor: _bgTop,
             body: LuxuryLoading(message: 'جاري جلب البيانات...'),
           );
         }
 
         if (!snapshot.hasData || snapshot.data == null) {
           return Scaffold(
-            backgroundColor: _bgTop,
             body: Center(
               child: Text('جاري جلب البيانات',
-                  style: _t(15, w: FontWeight.w800, c: _ink)),
+                  style: _t(15, w: FontWeight.w800, c: isDark ? Colors.white : _ink)),
             ),
           );
         }
@@ -1298,11 +1568,11 @@ class StudentHomeScreen extends StatelessWidget {
           appBar: AppBar(
             elevation: 0,
             scrolledUnderElevation: 0,
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.white,
+            backgroundColor: isDark ? const Color(0xFF0A0F1D) : Colors.white,
+            surfaceTintColor: isDark ? const Color(0xFF0A0F1D) : Colors.white,
             titleSpacing: 16,
             centerTitle: false,
-            iconTheme: const IconThemeData(color: _ink),
+            iconTheme: IconThemeData(color: isDark ? Colors.white : _ink),
             title: Row(
               children: [
                 Container(
@@ -1327,10 +1597,12 @@ class StudentHomeScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('مرحباً بك،',
-                        style: _t(13, w: FontWeight.w700, c: _muted)),
+                        style: _t(13, w: FontWeight.w700, c: isDark ? Colors.white60 : _muted)),
                     ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        colors: [Color(0xFF1E293B), Color(0xFF2563EB)],
+                      shaderCallback: (bounds) => LinearGradient(
+                        colors: isDark
+                            ? const [Colors.white, Color(0xFF60A5FA)]
+                            : const [Color(0xFF1E293B), Color(0xFF2563EB)],
                       ).createShader(bounds),
                       child: Text(
                         user.name,
@@ -1347,10 +1619,27 @@ class StudentHomeScreen extends StatelessWidget {
                 ),
               ],
             ),
-            actions: const [],
+            actions: [
+              Container(
+                margin: const EdgeInsets.only(left: 4),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.psychology_rounded, color: Colors.white, size: 20),
+                  tooltip: 'الأستاذ الذكي AI',
+                  onPressed: () => Navigator.pushNamed(context, AppRoutes.aiTutor),
+                ),
+              ),
+              _buildNotificationBell(context, isDark),
+            ],
           ),
 
           body: _luxuryBackground(
+            context,
             child: SafeArea(
               child: Padding(
                 padding:
@@ -1358,6 +1647,7 @@ class StudentHomeScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildAnnouncementBanner(context),
                     _buildPremiumBanner(context, user),
                     const SizedBox(height: 10),
                     Text('اختر المادة لتبدأ الامتحان:',
@@ -1373,10 +1663,10 @@ class StudentHomeScreen extends StatelessWidget {
                                 subject['name'] as String, user.isPremium);
                             return _buildSubjectCard(
                                 context, subject, isLocked, user);
-                          }).toList(),
+                          }),
                           
-                          const SizedBox(height: 12),
-                          _buildPreviousExamsCard(context),
+                          const SizedBox(height: 14),
+                          _buildAiTutorBanner(context),
                         ],
                       ),
                     ),
@@ -1463,23 +1753,25 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'اختباراتك السابقة',
           style: TextStyle(
             fontFamily: 'Tajawal',
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF1E293B),
+            color: isDark ? Colors.white : const Color(0xFF1E293B),
           ),
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1E293B)),
+          icon: Icon(Icons.arrow_back_ios, color: isDark ? Colors.white : const Color(0xFF1E293B)),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -1488,19 +1780,19 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
         child: CircularProgressIndicator(color: Color(0xFF3B82F6)),
       )
           : _results.isEmpty
-          ? _buildEmptyState()
+          ? _buildEmptyState(isDark)
           : ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _results.length,
         itemBuilder: (context, index) {
           final result = _results[index];
-          return _buildResultCard(result);
+          return _buildResultCard(result, isDark);
         },
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1518,13 +1810,13 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'لا توجد اختبارات سابقة',
             style: TextStyle(
               fontFamily: 'Tajawal',
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF64748B),
+              color: isDark ? Colors.white70 : const Color(0xFF64748B),
             ),
           ),
           const SizedBox(height: 8),
@@ -1533,7 +1825,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
             style: TextStyle(
               fontFamily: 'Tajawal',
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: isDark ? Colors.white38 : Colors.grey.shade500,
             ),
           ),
         ],
@@ -1541,17 +1833,18 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
     );
   }
 
-  Widget _buildResultCard(LocalQuizResult result) {
+  Widget _buildResultCard(LocalQuizResult result, bool isDark) {
     final scoreColor = _getScoreColor(result.scorePercentage);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black.withOpacity(0.04)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -1562,7 +1855,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           onTap: () {
-            _showResultDetails(result);
+            _showResultDetails(result, isDark);
           },
           borderRadius: BorderRadius.circular(24),
           child: Padding(
@@ -1608,11 +1901,11 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
                         children: [
                           Text(
                             result.subjectName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               fontFamily: 'Tajawal',
-                              color: Color(0xFF1E293B),
+                              color: isDark ? Colors.white : const Color(0xFF1E293B),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -1620,7 +1913,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
                             '${_formatDate(result.date)} • ${_formatDuration(result.durationInSeconds)}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade500,
+                              color: isDark ? Colors.white60 : Colors.grey.shade500,
                               fontFamily: 'Tajawal',
                             ),
                           ),
@@ -1686,7 +1979,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
                   borderRadius: BorderRadius.circular(10),
                   child: LinearProgressIndicator(
                     value: result.scorePercentage / 100,
-                    backgroundColor: Colors.grey.shade200,
+                    backgroundColor: isDark ? Colors.white12 : Colors.grey.shade200,
                     color: scoreColor,
                     minHeight: 8,
                   ),
@@ -1743,12 +2036,12 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-  void _showResultDetails(LocalQuizResult result) {
+  void _showResultDetails(LocalQuizResult result, bool isDark) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -1770,11 +2063,15 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(result.subjectName,
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Tajawal')),
+              Text(
+                result.subjectName,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Tajawal',
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
               Text(
                 'النتيجة: ${result.scorePercentage.round()}%',
                 style: TextStyle(
@@ -1787,20 +2084,20 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(16)),
                 child: Column(
                   children: [
                     _buildDetailRow('الإجابات الصحيحة',
-                        '${result.correctAnswers}', Colors.green),
-                    const Divider(),
+                        '${result.correctAnswers}', Colors.green, isDark),
+                    Divider(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
                     _buildDetailRow('الإجابات الخاطئة',
-                        '${result.wrongAnswers}', Colors.red),
-                    const Divider(),
+                        '${result.wrongAnswers}', Colors.red, isDark),
+                    Divider(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
                     _buildDetailRow(
                         'المدة',
                         _formatDuration(result.durationInSeconds),
-                        Colors.orange),
+                        Colors.orange, isDark),
                   ],
                 ),
               ),
@@ -1836,9 +2133,9 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
               const SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('إغلاق',
+                child: Text('إغلاق',
                     style:
-                    TextStyle(fontFamily: 'Tajawal', color: Colors.grey)),
+                    TextStyle(fontFamily: 'Tajawal', color: isDark ? Colors.white60 : Colors.grey)),
               ),
             ],
           ),
@@ -1847,7 +2144,7 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, Color color) {
+  Widget _buildDetailRow(String label, String value, Color color, bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -1855,9 +2152,9 @@ class _PreviousExamsScreenState extends State<PreviousExamsScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF64748B),
+              color: isDark ? Colors.white70 : const Color(0xFF64748B),
               fontFamily: 'Tajawal',
             ),
           ),
@@ -1883,26 +2180,29 @@ class PreviousExamReviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           'مراجعة: ${result.subjectName}',
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Tajawal',
             fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
         elevation: 0,
         centerTitle: true,
       ),
       body: result.wrongQuestions.isEmpty
-          ? const Center(
+          ? Center(
         child: Text(
           'لا توجد بيانات متاحة لهذا الاختبار',
-          style: TextStyle(fontFamily: 'Tajawal', fontSize: 16),
+          style: TextStyle(fontFamily: 'Tajawal', fontSize: 16, color: isDark ? Colors.white70 : Colors.black87),
         ),
       )
           : ListView.builder(
@@ -1917,12 +2217,12 @@ class PreviousExamReviewScreen extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: statusColor.withOpacity(0.2), width: 1.5),
+              border: Border.all(color: statusColor.withOpacity(0.3), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 )
@@ -1964,10 +2264,11 @@ class PreviousExamReviewScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   item['question'] ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'Tajawal',
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                     height: 1.4,
                   ),
                 ),
@@ -1975,9 +2276,9 @@ class PreviousExamReviewScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.05),
+                    color: statusColor.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: statusColor.withOpacity(0.1)),
+                    border: Border.all(color: statusColor.withOpacity(0.2)),
                   ),
                   child: Row(
                     children: [
@@ -2010,9 +2311,9 @@ class PreviousExamReviewScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.05),
+                      color: Colors.green.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: Colors.green.withOpacity(0.1)),
+                      border: Border.all(color: Colors.green.withOpacity(0.2)),
                     ),
                     child: Row(
                       children: [
@@ -2052,14 +2353,14 @@ class PreviousExamReviewScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.05),
+                        color: isDark ? const Color(0xFF1E3A8A).withOpacity(0.2) : Colors.blue.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                        border: Border.all(color: isDark ? const Color(0xFF2563EB).withOpacity(0.3) : Colors.blue.withOpacity(0.2)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.lightbulb_outline, color: Colors.blue, size: 18),
+                          const Icon(Icons.lightbulb_outline, color: Color(0xFF38BDF8), size: 18),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
@@ -2100,3 +2401,129 @@ class PreviousExamReviewScreen extends StatelessWidget {
     );
   }
 }
+
+class MarqueeAnnouncementText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+
+  const MarqueeAnnouncementText({
+    super.key,
+    required this.text,
+    required this.style,
+  });
+
+  @override
+  State<MarqueeAnnouncementText> createState() => _MarqueeAnnouncementTextState();
+}
+
+class _MarqueeAnnouncementTextState extends State<MarqueeAnnouncementText>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  double _textWidth = 0.0;
+  double _textHeight = 24.0;
+  double _containerWidth = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+    _measureText();
+  }
+
+  void _measureText() {
+    if (widget.text.isEmpty) return;
+    final textPainter = TextPainter(
+      text: TextSpan(text: widget.text, style: widget.style),
+      maxLines: 1,
+      textDirection: TextDirection.rtl,
+    )..layout();
+
+    _textWidth = textPainter.width;
+    _textHeight = textPainter.height > 0 ? textPainter.height : 24.0;
+  }
+
+  void _setupAnimation(double containerWidth) {
+    if (containerWidth <= 0 || widget.text.isEmpty) return;
+
+    _measureText();
+    _containerWidth = containerWidth;
+
+    // المسافة الإجمالية التي يقطعها النص: يبدأ من أقصى اليمين (عرض الحاوية) حتى يختفي تماماً في أقصى اليسار (-عرض النص)
+    final double totalDistance = _containerWidth + _textWidth;
+    
+    // سرعة متناسقة ومريحة للقراءة (~45 بكسل بالثانية)
+    final double durationSeconds = (totalDistance / 45.0).clamp(6.0, 60.0);
+
+    _controller.duration = Duration(milliseconds: (durationSeconds * 1000).round());
+    _controller.reset();
+    _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(MarqueeAnnouncementText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text || oldWidget.style != widget.style) {
+      _measureText();
+      _setupAnimation(_containerWidth);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double safeHeight = _textHeight.clamp(20.0, 36.0);
+
+    return SizedBox(
+      height: safeHeight,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth != _containerWidth && constraints.maxWidth > 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _setupAnimation(constraints.maxWidth);
+                });
+              }
+            });
+          }
+
+          return ClipRect(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                // التحرك المعكوس: يبدأ من أقصى اليسار إلى أقصى اليمين
+                final double dx = -_textWidth + _controller.value * (_containerWidth + _textWidth);
+
+                return Transform.translate(
+                  offset: Offset(dx, 0),
+                  child: child,
+                );
+              },
+              child: OverflowBox(
+                minWidth: 0.0,
+                maxWidth: double.infinity,
+                minHeight: safeHeight,
+                maxHeight: safeHeight,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  widget.text,
+                  maxLines: 1,
+                  softWrap: false,
+                  textDirection: TextDirection.rtl,
+                  style: widget.style,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+

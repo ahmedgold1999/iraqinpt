@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../widgets/luxury_loading.dart';
 import '../../services/notification_service.dart';
+import '../../services/daily_reminder_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -168,8 +169,199 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             );
           },
         ),
+        IconButton(
+          icon: const Icon(Icons.alarm_on_rounded, color: Color(0xFFFACC15), size: 22),
+          tooltip: 'إعدادات المنبه والتحدي اليومي',
+          onPressed: _showDailyReminderSettingsDialog,
+        ),
         const SizedBox(width: 8),
       ],
+    );
+  }
+
+  Future<void> _showDailyReminderSettingsDialog() async {
+    bool isEnabled = await DailyReminderService.isEnabled();
+    TimeOfDay scheduledTime = await DailyReminderService.getScheduledTime();
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final formattedTime = '${scheduledTime.hourOfPeriod}:${scheduledTime.minute.toString().padLeft(2, '0')} ${scheduledTime.period == DayPeriod.pm ? 'مساءً' : 'صباحاً'}';
+            return Container(
+              padding: const EdgeInsets.all(22),
+              decoration: const BoxDecoration(
+                color: Color(0xFF0F172A),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4.5,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFACC15).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.alarm_rounded, color: Color(0xFFFACC15), size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'منبه وسؤال التحدي اليومي ⏰',
+                              style: TextStyle(fontFamily: 'Tajawal', fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                            Text(
+                              'تنبيه يومي بأسئلة وزارية نموذجية وتحفيز دراسي',
+                              style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'تفعيل الإشعار اليومي',
+                              style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                            ),
+                            Text(
+                              'يصلك إشعار بسؤال مسائي جديد',
+                              style: TextStyle(fontFamily: 'Tajawal', color: Colors.white60, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        Switch(
+                          value: isEnabled,
+                          activeColor: const Color(0xFF00C853),
+                          onChanged: (val) async {
+                            await DailyReminderService.setEnabled(val);
+                            setModalState(() => isEnabled = val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (isEnabled) ...[
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: scheduledTime,
+                        );
+                        if (picked != null) {
+                          await DailyReminderService.setScheduledTime(picked.hour, picked.minute);
+                          setModalState(() => scheduledTime = picked);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.schedule_rounded, color: Color(0xFF38BDF8), size: 20),
+                                SizedBox(width: 10),
+                                Text(
+                                  'وقت التنبيه اليومي:',
+                                  style: TextStyle(fontFamily: 'Tajawal', color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF38BDF8).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                formattedTime,
+                                style: const TextStyle(fontFamily: 'Tajawal', color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  // Send Test Notification Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await DailyReminderService.triggerDailyNotificationNow();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('🔔 تم إرسال إشعار التحدي بنجاح إلى شريط الإشعارات!'),
+                              backgroundColor: Color(0xFF00C853),
+                            ),
+                          );
+                        }
+                        Navigator.pop(ctx);
+                      },
+                      icon: const Icon(Icons.send_rounded, color: Color(0xFFFACC15), size: 18),
+                      label: const Text(
+                        'إرسال إشعار تجريبي الآن 🚀',
+                        style: TextStyle(fontFamily: 'Tajawal', color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFFACC15)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -253,7 +445,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     String? imageUrl,
     String? buttonText,
     String? buttonUrl,
-    Map<String, dynamic>? customData,
     required bool isRead,
     required bool isGlobal,
     required DateTime createdAt,

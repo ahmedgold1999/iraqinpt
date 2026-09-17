@@ -1,16 +1,12 @@
-// lib/screens/student/subscription_screen.dart
-import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/config_service.dart';
-import '../../services/subscription_service.dart';
-import '../../routes.dart';
 
 const Color _kIosBg = Color(0xFFF8F9FA);
-const Color _kIosCardBg = Colors.white;
 const Color _kIosTextDark = Color(0xFF1C1C1E);
 const Color _kIosTextMuted = Color(0xFF8E8E93);
 const Color _kIosPrimary = Color(0xFF0F172A);
@@ -36,6 +32,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   String _price1y = '30,000';
 
   String _selectedPlan = '1m';
+
+  StreamSubscription<DocumentSnapshot>? _pricesSubscription;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -75,6 +73,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     _animationController.forward();
     _loadUserName();
     _loadPrices();
+    _listenToFirestorePrices();
+  }
+
+  void _listenToFirestorePrices() {
+    _pricesSubscription = FirebaseFirestore.instance
+        .collection('system_settings')
+        .doc('maintenance_and_updates')
+        .snapshots()
+        .listen((doc) {
+      if (doc.exists && doc.data() != null && mounted) {
+        final data = doc.data()!;
+        setState(() {
+          if (data['price_1m'] != null && data['price_1m'].toString().trim().isNotEmpty) {
+            _price1m = data['price_1m'].toString().trim();
+          }
+          if (data['price_2m'] != null && data['price_2m'].toString().trim().isNotEmpty) {
+            _price2m = data['price_2m'].toString().trim();
+          }
+          if (data['price_3m'] != null && data['price_3m'].toString().trim().isNotEmpty) {
+            _price3m = data['price_3m'].toString().trim();
+          }
+          if (data['price_1y'] != null && data['price_1y'].toString().trim().isNotEmpty) {
+            _price1y = data['price_1y'].toString().trim();
+          }
+        });
+      }
+    }, onError: (e) => debugPrint('⚠️ Error listening to prices: $e'));
   }
 
   Future<void> _loadPrices() async {
@@ -88,6 +113,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
   @override
   void dispose() {
+    _pricesSubscription?.cancel();
     _animationController.dispose();
     _codeController.dispose();
     super.dispose();
@@ -189,21 +215,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     );
   }
 
-  Widget _buildStepItem(String text, int index) {
+  Widget _buildStepItem(String text, int index, bool isDark) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F7),
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF2F2F7),
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.transparent),
       ),
       child: Row(
         children: [
           Container(
             width: 32,
             height: 32,
-            decoration: const BoxDecoration(
-              color: _kIosPrimary,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2563EB) : _kIosPrimary,
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -222,9 +249,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: _kIosTextDark,
+                color: isDark ? Colors.white70 : _kIosTextDark,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Tajawal',
               ),
@@ -255,7 +282,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     }
   }
 
-  Widget _buildPlanCard(String id, String label, String price) {
+  Widget _buildPlanCard(String id, String label, String price, bool isDark) {
     bool isSelected = _selectedPlan == id;
     return GestureDetector(
       onTap: () => setState(() => _selectedPlan = id),
@@ -264,10 +291,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFFBEB) : Colors.white,
+          color: isSelected
+              ? (isDark ? const Color(0xFF1E1B4B) : const Color(0xFFFFFBEB))
+              : (isDark ? const Color(0xFF0F172A) : Colors.white),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? _kIosGold : _kIosBorder,
+            color: isSelected ? _kIosGold : (isDark ? Colors.white10 : _kIosBorder),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
@@ -289,7 +318,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? _kIosGold : _kIosTextMuted,
+                  color: isSelected ? _kIosGold : (isDark ? Colors.white38 : _kIosTextMuted),
                   width: 2,
                 ),
                 color: isSelected ? _kIosGold : Colors.transparent,
@@ -300,11 +329,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Tajawal',
-                  color: _kIosTextDark,
+                  color: isDark ? Colors.white : _kIosTextDark,
                 ),
               ),
             ),
@@ -314,7 +343,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Tajawal',
-                color: isSelected ? _kIosGold : _kIosTextMuted,
+                color: isSelected ? _kIosGold : (isDark ? Colors.white60 : _kIosTextMuted),
               ),
             ),
           ],
@@ -323,21 +352,280 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     );
   }
 
-  bool _isAppleUI() {
-    return defaultTargetPlatform == TargetPlatform.iOS;
+  Future<void> _launchSupportForIos() async {
+    String username = 'XG0LDX';
+    String message = _userName.isNotEmpty
+        ? 'السلام عليكم، أحتاج مساعدة أو استفسار بخصوص حسابي في تطبيق دليل الامتحان الوطني واسمي داخل التطبيق هو $_userName'
+        : 'السلام عليكم، أحتاج مساعدة أو استفسار بخصوص حسابي في تطبيق دليل الامتحان الوطني';
+
+    String encodedMessage = Uri.encodeComponent(message);
+    String telegramUrl = 'https://t.me/$username?text=$encodedMessage';
+
+    final Uri uri = Uri.parse(telegramUrl);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(
+          Uri.parse('https://t.me/$username'),
+          mode: LaunchMode.externalApplication,
+        );
+      }
+    } catch (e) {
+      _showSnackBar('⚠️ تعذر فتح قناة الدعم الفني', Colors.red);
+    }
+  }
+
+  Widget _buildIosFeatureItem(IconData icon, String title, String subtitle, Color color, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Tajawal',
+                    color: isDark ? Colors.white : _kIosTextDark,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontFamily: 'Tajawal',
+                    color: isDark ? Colors.white60 : _kIosTextMuted,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIosFeaturesCard(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isDark ? Colors.white10 : _kIosBorder, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.stars_rounded, color: _kIosGold, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'مميزات العضوية الكاملة',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : _kIosTextDark,
+                  fontFamily: 'Tajawal',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _buildIosFeatureItem(
+            Icons.quiz_rounded,
+            'بنك الأسئلة الشامل (3000+ سؤال)',
+            'الوصول لجميع بنوك الأسئلة الوزارية لمواد العربي والإنكليزي والحاسوب مع التوضيحات.',
+            const Color(0xFF3B82F6),
+            isDark,
+          ),
+          _buildIosFeatureItem(
+            Icons.menu_book_rounded,
+            'الملازم والضوابط الرسمية',
+            'تصفح الملازم المعتمدة وضوابط القبول التنافسي الوزارية مباشرة بصيغة PDF.',
+            const Color(0xFF10B981),
+            isDark,
+          ),
+          _buildIosFeatureItem(
+            Icons.smart_toy_rounded,
+            'الأستاذ الذكي المساعد (AI)',
+            'إجابات وشروحات فورية ذكية على أسئلة ونماذج الامتحانات على مدار الساعة.',
+            const Color(0xFF8B5CF6),
+            isDark,
+          ),
+          _buildIosFeatureItem(
+            Icons.leaderboard_rounded,
+            'إحصائيات التقدم ولوحة الشرف',
+            'تحليل مستواك الدراسي ونقاط القوة والضعف ومقارنة نتيجتك مع زملائك المتقدمين.',
+            const Color(0xFFF59E0B),
+            isDark,
+          ),
+          _buildIosFeatureItem(
+            Icons.bolt_rounded,
+            'بنك الأخطاء الذكي واختبارات السرعة',
+            'مراجعة مكثفة ومركزة لكافة الأخطاء السابقة لتثبيت المعلومة وتحقيق أعلى معدل.',
+            const Color(0xFFEC4899),
+            isDark,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIosAccessInfoCard(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isDark ? Colors.white10 : _kIosBorder, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: Color(0xFF38BDF8), size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'معلومات الوصول للعضوية',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : _kIosTextDark,
+                  fontFamily: 'Tajawal',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'إذا كان لديك حساب مفعل مسبقاً عبر منصة الامتحان الوطني أو مركز التدريب، يرجى تسجيل الدخول بنفس الحساب للوصول الفوري لكافة الميزات.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'Tajawal',
+                          color: isDark ? Colors.white70 : const Color(0xFF475569),
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.sync_rounded, color: Color(0xFF3B82F6), size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'تتم مزامنة حالة وصلاحية الحساب تلقائياً عبر السحابة لجميع أجهزتك المسجلة.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'Tajawal',
+                          color: isDark ? Colors.white70 : const Color(0xFF475569),
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton.icon(
+              onPressed: _launchSupportForIos,
+              icon: const Icon(Icons.support_agent_rounded, size: 22),
+              label: const Text(
+                'تواصل مع الدعم الفني والاستفسارات',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Tajawal',
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F172A),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+
     return Scaffold(
-      backgroundColor: _kIosBg,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : _kIosBg,
       appBar: AppBar(
-        title: const Text('الاشتراك المميز'),
+        title: Text(isIos ? 'عضوية الحساب المميز 👑' : 'الاشتراك المميز 👑'),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFF0F172A),
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -356,14 +644,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [_kIosPrimary, Color(0xFF1E293B)],
+                          colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF2563EB)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: _kIosPrimary.withOpacity(0.2),
+                            color: const Color(0xFF2563EB).withOpacity(0.25),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -384,9 +672,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                             ),
                           ),
                           const SizedBox(height: 14),
-                          const Text(
-                            'ترقية الحساب المميز',
-                            style: TextStyle(
+                          Text(
+                            isIos ? 'عضوية الحساب المميز' : 'ترقية الحساب المميز',
+                            style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -394,10 +682,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                             ),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'احصل على الوصول الكامل لجميع الامتحانات والملازم',
+                          Text(
+                            isIos
+                                ? 'الوصول الشامل لبنك الأسئلة والملازم والاختبارات التفاعلية'
+                                : 'احصل على الوصول الكامل لجميع الامتحانات والملازم',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 13.5,
                               color: Color(0xFF94A3B8),
                               fontFamily: 'Tajawal',
@@ -412,134 +702,142 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
               const SizedBox(height: 20),
 
-              // Plans Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: _kIosBorder, width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 15,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'اختر مدة الاشتراك',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: _kIosTextDark,
-                        fontFamily: 'Tajawal',
+              // ================= iOS ONLY VIEW =================
+              if (isIos) ...[
+                _buildIosFeaturesCard(isDark),
+                const SizedBox(height: 16),
+                _buildIosAccessInfoCard(isDark),
+              ] else ...[
+                // ================= ANDROID / WEB VIEW =================
+                // Plans Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: isDark ? Colors.white10 : _kIosBorder, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                        blurRadius: 15,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildPlanCard('1m', 'شهر واحد', '$_price1m د.ع'),
-                    _buildPlanCard('2m', 'شهرين', '$_price2m د.ع'),
-                    _buildPlanCard('3m', '3 أشهر', '$_price3m د.ع'),
-                    _buildPlanCard('1y', 'سنة كاملة', '$_price1y د.ع'),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // How to Activate & Contact Buttons
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: _kIosBorder, width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 15,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'خطوات التفعيل الفوري',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: _kIosTextDark,
-                        fontFamily: 'Tajawal',
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildStepItem('اختر مدة الاشتراك المناسبة من الأعلى', 1),
-                    _buildStepItem('اضغط على رابط الدعم (واتساب أو تليجرام)', 2),
-                    _buildStepItem('سيقوم الأدمن بتفعيل حسابك فوراً', 3),
-
-                    const SizedBox(height: 20),
-
-                    // WhatsApp & Telegram Buttons
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: _launchWhatsAppWithMessage,
-                        icon: const Icon(Icons.chat_bubble_rounded, size: 20),
-                        label: const Text(
-                          'تواصل عبر الواتساب للتفعيل',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Tajawal',
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 0,
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'اختر مدة الاشتراك',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : _kIosTextDark,
+                          fontFamily: 'Tajawal',
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 14),
+                      _buildPlanCard('1m', 'شهر واحد', '$_price1m د.ع', isDark),
+                      _buildPlanCard('2m', 'شهرين', '$_price2m د.ع', isDark),
+                      _buildPlanCard('3m', '3 أشهر', '$_price3m د.ع', isDark),
+                      _buildPlanCard('1y', 'سنة كاملة', '$_price1y د.ع', isDark),
+                    ],
+                  ),
+                ),
 
-                    const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        onPressed: _launchTelegramWithMessage,
-                        icon: const Icon(Icons.send_rounded, size: 20),
-                        label: const Text(
-                          'تواصل عبر التليجرام للتفعيل',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Tajawal',
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0088CC),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 0,
+                // How to Activate & Contact Buttons
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: isDark ? Colors.white10 : _kIosBorder, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                        blurRadius: 15,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'خطوات التفعيل الفوري',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : _kIosTextDark,
+                          fontFamily: 'Tajawal',
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      _buildStepItem('اختر مدة الاشتراك المناسبة من الأعلى', 1, isDark),
+                      _buildStepItem('اضغط على رابط الدعم (واتساب أو تليجرام)', 2, isDark),
+                      _buildStepItem('سيقوم الأدمن بتفعيل حسابك فوراً', 3, isDark),
+
+                      const SizedBox(height: 20),
+
+                      // WhatsApp & Telegram Buttons
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _launchWhatsAppWithMessage,
+                          icon: const Icon(Icons.chat_bubble_rounded, size: 20),
+                          label: const Text(
+                            'تواصل عبر الواتساب للتفعيل',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Tajawal',
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF25D366),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _launchTelegramWithMessage,
+                          icon: const Icon(Icons.send_rounded, size: 20),
+                          label: const Text(
+                            'تواصل عبر التليجرام للتفعيل',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Tajawal',
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0088CC),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
 
               const SizedBox(height: 30),
             ],

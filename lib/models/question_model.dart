@@ -19,8 +19,18 @@ class Question {
       question: map['question'] as String,
       options: List<String>.from(map['options'] as List),
       answer: map['answer'] as String,
-      originalAnswer: map['answer'] as String,
+      originalAnswer: map['originalAnswer'] ?? map['answer'] as String,
       explanation: map['explanation'], // ⭐ اقرأ حقل التفسير
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'question': question,
+      'options': options,
+      'answer': answer,
+      'originalAnswer': originalAnswer,
+      'explanation': explanation,
+    };
   }
 }

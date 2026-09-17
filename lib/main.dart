@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, FlutterError, PlatformDispatcher;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' as firestore;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -18,7 +19,9 @@ import 'theme/app_theme.dart';
 import 'services/config_service.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
+import 'services/daily_reminder_service.dart';
 import 'services/device_service.dart';
+import 'services/sound_effects_service.dart';
 import 'utils/web_helper.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/common/vpn_block_screen.dart';
@@ -34,11 +37,27 @@ void main() async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
-    );
+    ).timeout(const Duration(seconds: 4));
 
-    await NotificationService.initialize();
-    await ConfigService().initialize();
+    // ✅ تهيئة مراقبة الأعطال (Firebase Crashlytics) بدون أي استهلاك للفايربيس
+    if (!kIsWeb) {
+      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+    }
+
+    // ✅ تهيئة الخدمات بالتوازي وسلاسة مع حماية ضد التعليق
+    await Future.wait([
+      NotificationService.initialize().catchError((_) => null),
+      DailyReminderService.initialize().catchError((_) => null),
+      ConfigService().initialize().timeout(const Duration(seconds: 3)).catchError((_) => null),
+      SoundEffectsService().init().catchError((_) => null),
+    ]);
+    
     NotificationService.setupListeners();
+    NotificationService.enableNotifications();
 
     if (kIsWeb) {
       await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
@@ -124,6 +143,13 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     _initAnimations();
     _initializeApp();
     _checkVpnStatus();
+
+    // 🛡️ صمام أمان فوري: إنهاء شاشة التحميل والدخول للتطبيق فوراً بعد 2.5 ثانية كحد أقصى مهما كانت سرعة الإنترنت
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (mounted && !_isInitialized) {
+        setState(() => _isInitialized = true);
+      }
+    });
   }
 
   void _initAnimations() {
@@ -137,7 +163,17 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     );
   }
 
+  // 🔒 خاصية فحص الـ VPN (معطلة مؤقتاً، يمكن تغييرها إلى true لإعادة التفعيل مستقبلاً)
+  static const bool _enableVpnCheck = false;
+
   Future<void> _checkVpnStatus() async {
+    if (!_enableVpnCheck) {
+      if (mounted) {
+        setState(() => _isVpnActive = false);
+      }
+      return;
+    }
+
     bool vpnEnabled = false;
     try {
       final connectivityResult = await (Connectivity().checkConnectivity());
@@ -167,19 +203,32 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
 
   Future<void> _initializeApp() async {
     try {
-      await NotificationService.enableNotifications();
-      final isLoggedIn = await _authService.isLoggedIn();
+      NotificationService.enableNotifications().catchError((_) => null);
+
+      final isLoggedIn = await _authService.isLoggedIn().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => false,
+      );
+
       if (isLoggedIn) {
-        _currentUser = await _authService.getCurrentUser();
+        _currentUser = await _authService.getCurrentUser().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => null,
+        );
+
         if (_currentUser != null) {
-          final allowed = await DeviceService.checkDeviceLimit();
-          if (!allowed) {
-            setState(() => _isDeviceLimitReached = true);
-          }
+          DeviceService.checkDeviceLimit().timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => true,
+          ).then((allowed) {
+            if (!allowed && mounted) {
+              setState(() => _isDeviceLimitReached = true);
+            }
+          }).catchError((_) => null);
         }
       }
     } catch (e) {
-      print('App Init Error: $e');
+      debugPrint('App Init Error: $e');
     } finally {
       if (mounted) {
         setState(() => _isInitialized = true);
@@ -201,6 +250,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
         if (!_isInitialized) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
+            theme: AppTheme.luxuryTheme,
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
@@ -216,11 +266,13 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
           );
         }
 
-        // ✅ 2. التطبيق الرئيسي (مع دعم RTL الشامل)
+        // ✅ 2. التطبيق الرئيسي (مع دعم RTL الشامل والوضع الليلي)
         return MaterialApp(
           title: 'الاختبار الوطني الموحد',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.luxuryTheme,
+          darkTheme: AppTheme.luxuryDarkTheme,
+          themeMode: settings.themeMode,
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
@@ -241,7 +293,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
 
   // ✅ منطق اختيار الشاشة المناسبة (VPN, صيانة، أو الواجهة الرئيسية)
   Widget _buildHomeLogic() {
-    if (_isVpnActive) {
+    if (_enableVpnCheck && _isVpnActive) {
       return VpnBlockScreen(onRefresh: _checkVpnStatus);
     }
 

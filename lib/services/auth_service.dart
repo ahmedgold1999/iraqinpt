@@ -1,18 +1,12 @@
-// lib/services/auth_service.dart
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/app_models.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static const String _webClientId = '527094263196-em54nrkgk7bbll25anr1drkegv7f36h6.apps.googleusercontent.com';
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: _webClientId,
-  );
   final String _usersCollection = 'users';
   
   // ذاكرة مؤقتة للمستخدم لتوفير قراءات Firestore
@@ -40,6 +34,56 @@ class AuthService {
         print('🟢 مستخدم مسجل: ${user.uid}');
       }
     });
+  }
+
+  /// تسجيل الدخول عبر جوجل (متاح للويب والأندرويد)
+  Future<UserModel?> signInWithGoogle() async {
+    try {
+      UserCredential userCredential;
+      if (kIsWeb) {
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        userCredential = await _auth.signInWithPopup(googleProvider);
+      } else {
+        await GoogleSignIn.instance.initialize();
+        final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          idToken: googleUser.authentication.idToken,
+        );
+        userCredential = await _auth.signInWithCredential(credential);
+      }
+
+      final User? user = userCredential.user;
+      if (user == null) return null;
+
+      // فحص هل المستخدم موجود بالفايرستور، إذا غير موجود ننشئه
+      UserModel? userModel = await _getUserFromFirestore(user.uid);
+      if (userModel == null) {
+        final rawName = (user.displayName != null && user.displayName!.trim().isNotEmpty)
+            ? user.displayName!.trim()
+            : 'طالب';
+        
+        final username = user.email != null && user.email!.contains('@')
+            ? user.email!.split('@').first.toLowerCase()
+            : 'user_${user.uid.substring(0, 6)}';
+
+        userModel = UserModel(
+          uid: user.uid,
+          name: rawName,
+          email: user.email ?? '$username@ahmeed.inpt',
+          role: UserRole.student,
+          isPremium: false,
+          activationCode: '',
+        );
+
+        await _firestore.collection(_usersCollection).doc(user.uid).set(userModel.toMap());
+      }
+
+      _cachedUser = userModel;
+      return userModel;
+    } catch (e) {
+      print('❌ خطأ في الدخول عبر جوجل: $e');
+      rethrow;
+    }
   }
 
   /// الحصول على المستخدم الحالي
@@ -78,119 +122,6 @@ class AuthService {
       return userModel;
     } catch (e) {
       print('❌ خطأ في تسجيل الدخول: $e');
-      rethrow;
-    }
-  }
-
-  /// تسجيل الدخول عبر جوجل
-  Future<UserModel?> signInWithGoogle() async {
-    try {
-      UserCredential userCredential;
-
-      if (kIsWeb) {
-        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        googleProvider.addScope('email');
-        googleProvider.setCustomParameters({'prompt': 'select_account'});
-        
-        userCredential = await _auth.signInWithPopup(googleProvider);
-      } else {
-        // تنظيف أي جلسة سابقة معلقة لضمان عرض نافذة اختيار الحساب
-        try {
-          await _googleSignIn.signOut();
-        } catch (e) {
-          print('⚠️ تنبيه أثناء الخروج المسبق من GoogleSignIn: $e');
-        }
-
-        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-        if (googleUser == null) return null;
-
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        userCredential = await _auth.signInWithCredential(credential);
-      }
-
-      final User? user = userCredential.user;
-      if (user == null) return null;
-
-      UserModel? userModel = await _getUserFromFirestore(user.uid);
-      if (userModel == null) {
-        String displayName = user.displayName ?? '';
-        if (displayName.trim().isEmpty) {
-          displayName = (user.email ?? user.uid).split('@').first;
-        }
-
-        userModel = UserModel(
-          uid: user.uid,
-          name: displayName,
-          email: user.email ?? '',
-          role: UserRole.student,
-          isPremium: false,
-          activationCode: '',
-          expiryDate: null,
-        );
-        final userData = userModel.toMap();
-        String rawUsername = (user.email ?? user.uid).split('@').first.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '');
-        if (rawUsername.isEmpty) {
-          rawUsername = 'user_${user.uid.substring(0, 6)}';
-        }
-        userData['username'] = rawUsername;
-        userData['createdAt'] = FieldValue.serverTimestamp();
-        userData['authMethod'] = 'google';
-        await _firestore.collection(_usersCollection).doc(user.uid).set(userData);
-      }
-      return userModel;
-    } catch (e) {
-      print('❌ خطأ في تسجيل الدخول عبر جوجل: $e');
-      rethrow;
-    }
-  }
-
-  /// تسجيل الدخول عبر آبل (Apple Sign In)
-  Future<UserModel?> signInWithApple() async {
-    try {
-      final appleCredential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-      );
-
-      final OAuthProvider oAuthProvider = OAuthProvider('apple.com');
-      final AuthCredential credential = oAuthProvider.credential(
-        idToken: appleCredential.identityToken,
-        accessToken: appleCredential.authorizationCode,
-      );
-
-      final userCredential = await _auth.signInWithCredential(credential);
-      final User? user = userCredential.user;
-      if (user == null) return null;
-
-      UserModel? userModel = await _getUserFromFirestore(user.uid);
-      if (userModel == null) {
-        UserModel newUser = UserModel(
-          uid: user.uid,
-          name: '${appleCredential.givenName ?? ""} ${appleCredential.familyName ?? ""}'.trim(),
-          email: user.email ?? '',
-          role: UserRole.student,
-          isPremium: false,
-          activationCode: '',
-          expiryDate: null,
-        );
-        if (newUser.name.isEmpty) newUser = newUser.copyWith(name: 'مستخدم Apple');
-
-        final userData = newUser.toMap();
-        userData['username'] = (user.email ?? user.uid).split('@').first;
-        userData['createdAt'] = FieldValue.serverTimestamp();
-        userData['authMethod'] = 'apple';
-        await _firestore.collection(_usersCollection).doc(user.uid).set(userData);
-        userModel = newUser;
-      }
-      return userModel;
-    } catch (e) {
-      print('❌ خطأ في تسجيل الدخول عبر Apple: $e');
       rethrow;
     }
   }
@@ -254,6 +185,53 @@ class AuthService {
     }
 
     return result;
+  }
+
+  /// تغيير اسم الطالب مع التحقق من عدم تكراره ومزامنته مع لوحة الشرف
+  Future<void> updateStudentName(String newName) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw 'يجب تسجيل الدخول أولاً';
+
+      final trimmedName = newName.trim();
+      if (trimmedName.isEmpty) throw 'يرجى إدخال اسم صحيح';
+      if (trimmedName.length < 3) throw 'الاسم قصير جداً، يرجى كتابة اسم ثلاثي أو ثنائي واضح';
+
+      // فحص هل الاسم مستخدم من قبل طالب آخر
+      final query = await _firestore
+          .collection(_usersCollection)
+          .where('name', isEqualTo: trimmedName)
+          .limit(2)
+          .get();
+
+      final isTakenByOther = query.docs.any((doc) => doc.id != user.uid);
+      if (isTakenByOther) {
+        throw 'عذراً، هذا الاسم مسجل مسبقاً لطالب آخر. يرجى كتابة اسم ثلاثي أو إضافة اللقب لتمييزه.';
+      }
+
+      // تحديث الاسم في وثيقة المستخدم
+      await _firestore.collection(_usersCollection).doc(user.uid).set({
+        'name': trimmedName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // تحديث الاسم في لوحة المتصدرين إن وجد
+      try {
+        await _firestore.collection('leaderboard').doc(user.uid).set({
+          'name': trimmedName,
+        }, SetOptions(merge: true));
+      } catch (_) {}
+
+      // تحديث الاسم في Firebase Auth profile
+      try {
+        await user.updateDisplayName(trimmedName);
+      } catch (_) {}
+
+      _cachedUser = null;
+    } catch (e) {
+      print('❌ خطأ في تحديث الاسم: $e');
+      rethrow;
+    }
   }
 
   /// حذف الحساب (متطلب إجباري من أبل)
@@ -324,35 +302,85 @@ class AuthService {
   Future<UserModel?> _getUserFromFirestore(String uid) async {
     try {
       final doc = await _firestore.collection(_usersCollection).doc(uid).get();
-      if (!doc.exists) {
+      if (!doc.exists || doc.data() == null) {
         print('⚠️ لا يوجد مستخدم في Firestore: $uid');
         return null;
       }
-      return UserModel.fromMap(doc.data()!);
+      final data = doc.data()!;
+      final userModel = UserModel.fromMap(data);
+      // إذا كان مسجلاً بالداتابيز كـ Premium ولكن انتهت الصلاحية، نحدث الداتابيز
+      if (data['isPremium'] == true && !userModel.isPremium) {
+        _firestore.collection(_usersCollection).doc(uid).update({'isPremium': false}).catchError((_) => null);
+      }
+      return userModel;
     } catch (e) {
       print('❌ خطأ في جلب بيانات المستخدم من Firestore: $e');
       rethrow;
     }
   }
 
-  /// تيار بيانات المستخدم
+  /// تحديث جنس وأفاتار المستخدم وحفظهما بالسيرفر ولوحة الشرف
+  Future<void> updateGenderAndAvatar(String gender, String avatarId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      final updateData = {
+        'gender': gender,
+        'avatarId': avatarId,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection(_usersCollection).doc(user.uid).set(updateData, SetOptions(merge: true));
+
+      // مزامنة فورية مع لوحة الشرف
+      try {
+        await _firestore.collection('leaderboard').doc(user.uid).set({
+          'gender': gender,
+          'avatarId': avatarId,
+        }, SetOptions(merge: true));
+      } catch (_) {}
+
+      _cachedUser = null;
+    } catch (e) {
+      print('❌ خطأ في تحديث الأفاتار: $e');
+      rethrow;
+    }
+  }
+
+  /// تيار بيانات المستخدم المباشر والمتزامن لحظياً مع التغييرات
   Stream<UserModel?> get userData {
-    return _auth.authStateChanges().asyncMap((User? firebaseUser) async {
-      if (firebaseUser == null) return null;
-      return await _getUserFromFirestore(firebaseUser.uid);
+    return _auth.authStateChanges().asyncExpand((User? firebaseUser) {
+      if (firebaseUser == null) return Stream.value(null);
+      return _firestore
+          .collection(_usersCollection)
+          .doc(firebaseUser.uid)
+          .snapshots()
+          .map((doc) {
+        if (!doc.exists || doc.data() == null) return null;
+        final data = doc.data()!;
+        final userModel = UserModel.fromMap(data);
+        if (data['isPremium'] == true && !userModel.isPremium) {
+          _firestore.collection(_usersCollection).doc(firebaseUser.uid).update({'isPremium': false}).catchError((_) => null);
+        }
+        _cachedUser = userModel;
+        return userModel;
+      });
     });
   }
 
   /// تسجيل الخروج
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
       await _auth.signOut();
       _cachedUser = null; // تنظيف الذاكرة المؤقتة
       print('👋 تم تسجيل الخروج بنجاح');
     } catch (e) {
       print('❌ خطأ في تسجيل الخروج: $e');
-      rethrow;
+      try {
+        await _auth.signOut();
+      } catch (_) {}
+      _cachedUser = null;
     }
   }
 
