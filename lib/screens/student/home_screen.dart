@@ -605,7 +605,7 @@ class StudentHomeScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        _buildVipBenefitRow('بنوك الأسئلة الشاملة (100 سؤال كامل) لكل مادة'),
+                        _buildVipBenefitRow('بنوك الأسئلة الشاملة (1000 سؤال كامل) لكل مادة'),
                         const SizedBox(height: 8),
                         _buildVipBenefitRow('استخدام غير محدود لـ "الأستاذ الذكي AI" على مدار الساعة'),
                         const SizedBox(height: 8),
