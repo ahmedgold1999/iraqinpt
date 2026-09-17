@@ -1,5 +1,5 @@
 buildscript {
-    ext.kotlin_version = '2.2.20'
+    ext.kotlin_version = '2.0.21'
     repositories {
         google()
         mavenCentral()
@@ -29,16 +29,21 @@ subprojects {
 }
 
 subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
+    def configureNamespace = { p ->
+        if (p.hasProperty('android')) {
             try {
-                if (project.android.namespace == null) {
-                    project.android.namespace = "com.iraqinpt.plugins." + project.name.replace("-", "_")
+                if (p.android.namespace == null) {
+                    p.android.namespace = "com.iraqinpt.plugins." + p.name.replace("-", "_")
                 }
             } catch (Exception e) {
                 // ignore
             }
         }
+    }
+    if (project.state.executed) {
+        configureNamespace(project)
+    } else {
+        project.afterEvaluate { configureNamespace(project) }
     }
 }
 
