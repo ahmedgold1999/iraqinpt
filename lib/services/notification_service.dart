@@ -1,4 +1,3 @@
-```dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
@@ -1050,4 +1049,4 @@ this.data,
 this.isGlobal = false,
 });
 }
-```
+
