@@ -28,6 +28,20 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            try {
+                if (project.android.namespace == null) {
+                    project.android.namespace = "com.iraqinpt.plugins." + project.name.replace("-", "_")
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+    }
+}
+
 tasks.register('clean', Delete) {
     delete rootProject.buildDir
 }
