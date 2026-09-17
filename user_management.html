@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام إدارة المستخدمين والاشتراكات الحقيقي | Iraqi INPT Firebase Admin</title>
+  
+  <!-- الخطوط العربية القياسية -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome للإيقونات -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    :root {
+      --bg-main: #0B0F19;
+      --bg-card: rgba(17, 24, 39, 0.85);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-gold: rgba(245, 158, 11, 0.35);
+      
+      --primary-gold: #F59E0B;
+      --primary-gold-dark: #D97706;
+      --gold-glow: rgba(245, 158, 11, 0.25);
+      
+      --accent-blue: #3B82F6;
+      --accent-green: #10B981;
+      --accent-red: #EF4444;
+      --accent-purple: #8B5CF6;
+
+      --text-main: #F9FAFB;
+      --text-muted: #9CA3AF;
+      --text-dim: #6B7280;
+
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 8px;
+
+      --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 20px rgba(245, 158, 11, 0.05);
+      --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Cairo', 'Tajawal', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(245, 158, 11, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.05) 0%, transparent 40%);
+      background-attachment: fixed;
+    }
+
+    /* Header */
+    header {
+      background: rgba(11, 15, 25, 0.85);
+      backdrop-filter: blur(15px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 16px 32px;
+    }
+
+    .header-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      width: 46px;
+      height: 46px;
+      background: linear-gradient(135deg, var(--primary-gold), var(--primary-gold-dark));
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #000;
+      box-shadow: 0 0 15px var(--gold-glow);
+    }
+
+    .brand-text h1 {
+      font-size: 20px;
+      font-weight: 800;
+      background: linear-gradient(90deg, #FFFFFF, #F3F4F6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .source-badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-text p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, var(--primary-gold), var(--primary-gold-dark));
+      color: #000;
+      box-shadow: 0 4px 15px var(--gold-glow);
+    }
+
+    .btn-gold:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      border-color: var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1400px;
+      width: 100%;
+      margin: 32px auto;
+      padding: 0 24px;
+      flex: 1;
+    }
+
+    /* Banners */
+    .loading-banner {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid var(--border-gold);
+      border-radius: var(--radius-md);
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--primary-gold);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .error-banner {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      margin-bottom: 32px;
+      color: #F87171;
+    }
+
+    .error-banner h3 {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .error-banner p {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #FCA5A5;
+      margin-bottom: 14px;
+    }
+
+    .code-box {
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #F59E0B;
+      direction: ltr;
+      text-align: left;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      background-color: var(--accent-green);
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 10px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow-premium);
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition-smooth);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--border-gold);
+    }
+
+    .stat-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .stat-icon.total { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+    .stat-icon.active { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); }
+    .stat-icon.expired { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+    .stat-icon.admins { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
+
+    .stat-info h3 {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-info .stat-value {
+      font-size: 28px;
+      font-weight: 900;
+      color: #FFF;
+    }
+
+    /* Controls Bar */
+    .controls-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(10px);
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .search-box i {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 12px 48px 12px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      transition: var(--transition-smooth);
+    }
+
+    .search-box input:focus {
+      border-color: var(--primary-gold);
+      box-shadow: 0 0 10px var(--gold-glow);
+    }
+
+    .filters-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .select-style {
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .select-style option {
+      background: #111827;
+      color: #FFF;
+    }
+
+    /* Users Table */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-premium);
+      backdrop-filter: blur(10px);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: right;
+    }
+
+    thead {
+      background: rgba(0, 0, 0, 0.4);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      padding: 18px 24px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border-color);
+      transition: var(--transition-smooth);
+    }
+
+    tbody tr:hover {
+      background: var(--bg-card-hover);
+    }
+
+    td {
+      padding: 18px 24px;
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    .user-avatar-cell {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(59, 130, 246, 0.2));
+      border: 1px solid var(--border-gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: var(--primary-gold);
+      font-size: 16px;
+    }
+
+    .user-meta .user-name {
+      font-weight: 700;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .user-meta .user-email {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Badges */
+    .badge {
+      padding: 6px 12px;
+      border-radius: 30px;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-active {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-expired {
+      background: rgba(239, 68, 68, 0.15);
+      color: #F87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .badge-free {
+      background: rgba(156, 163, 175, 0.15);
+      color: #D1D5DB;
+      border: 1px solid rgba(156, 163, 175, 0.3);
+    }
+
+    .badge-admin {
+      background: rgba(139, 92, 246, 0.2);
+      color: #C084FC;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+    }
+
+    .badge-student {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60A5FA;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .action-btns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition-smooth);
+    }
+
+    .icon-btn:hover {
+      color: #FFF;
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .icon-btn.edit:hover { color: var(--primary-gold); border-color: var(--border-gold); }
+    .icon-btn.delete:hover { color: var(--accent-red); border-color: rgba(239, 68, 68, 0.5); }
+    .icon-btn.extend:hover { color: var(--accent-green); border-color: rgba(16, 185, 129, 0.5); }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: var(--transition-smooth);
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-box {
+      background: #111827;
+      border: 1px solid var(--border-gold);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 520px;
+      padding: 28px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px var(--gold-glow);
+      transform: scale(0.9);
+      transition: var(--transition-smooth);
+    }
+
+    .modal-overlay.active .modal-box {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--primary-gold);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 18px;
+      cursor: pointer;
+    }
+
+    .modal-close:hover { color: #FFF; }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--primary-gold);
+    }
+
+    .quick-days-btns {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      background: #1F2937;
+      border: 1px solid var(--border-gold);
+      border-radius: var(--radius-md);
+      padding: 14px 20px;
+      color: #FFF;
+      font-weight: 700;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: var(--transition-smooth);
+      z-index: 2000;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header / Navigation -->
+  <header>
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-fire"></i>
+        </div>
+        <div class="brand-text">
+          <h1>
+            إدارة المستخدمين والاشتراكات
+            <span class="source-badge">
+              <span class="pulse-dot"></span> متصل مباشرة بـ Firebase Firestore
+            </span>
+          </h1>
+          <p>Iraqi INPT | مشروع inpt-app-20260108022659</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn-secondary" onclick="openLoginModal()" id="btnLoginNav">
+          <i class="fa-solid fa-right-to-bracket"></i> تسجيل دخول المشرف
+        </button>
+        <button class="btn btn-secondary" onclick="exportDataJSON()">
+          <i class="fa-solid fa-download"></i> تصدير JSON
+        </button>
+        <button class="btn btn-secondary" onclick="exportDataCSV()">
+          <i class="fa-solid fa-file-excel"></i> تصدير CSV
+        </button>
+        <button class="btn btn-gold" onclick="openAddUserModal()">
+          <i class="fa-solid fa-user-plus"></i> إضافة مستخدم لـ Firestore
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <!-- Connection Banner -->
+    <div class="loading-banner" id="statusBanner">
+      <span><i class="fa-solid fa-cloud-arrow-down fa-spin"></i> جاري الاتصال بقاعدة بيانات Firebase Firestore وجلب جميع المستخدمين...</span>
+      <span style="font-size: 12px; opacity: 0.8;" id="usersCountStatus">0 مستخدم</span>
+    </div>
+
+    <!-- Permission Error Box (hidden by default) -->
+    <div class="error-banner" id="permissionErrorBox" style="display: none;">
+      <h3><i class="fa-solid fa-triangle-exclamation"></i> تنبيه صلاحيات القراءة في Firebase Firestore</h3>
+      <p id="errorMsgText">
+        تتطلب قواعد حماية فايربيس (Firestore Rules) تسجيل الدخول كـ <b>المشرف</b>، أو السماح بالقراءة لجميع المشرفين والطلاب.
+      </p>
+      
+      <div style="margin-bottom: 14px;">
+        <b style="color: #FFF;">خيار 1 (الأسرع والأسهل):</b> اضغط على زر 
+        <button class="btn btn-gold" style="padding: 4px 12px; font-size: 12px;" onclick="openLoginModal()">تسجيل دخول المشرف</button>
+        وسجل دخول بحسابك الأدمن في التطبيق.
+      </div>
+
+      <div>
+        <b style="color: #FFF;">خيار 2 (إتاحة القراءة المباشرة من Firestore Rules):</b>
+        <p style="margin-top: 6px;">افتح <a href="https://console.firebase.google.com/project/inpt-app-20260108022659/firestore/rules" target="_blank" style="color: #F59E0B; text-decoration: underline;">لوحة قواعد Firestore بـ Firebase Console</a> واجعل سطر <code>match /users/{userId}</code> يتيح القراءة كالتالي:</p>
+      </div>
+
+      <div class="code-box">
+match /users/{userId} {
+  allow read: if true;
+  allow write: if isAdmin();
+}
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon total"><i class="fa-solid fa-users"></i></div>
+        <div class="stat-info">
+          <h3>إجمالي المستخدمين المسجلين</h3>
+          <div class="stat-value" id="statTotalUsers">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon active"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="stat-info">
+          <h3>الاشتراكات النشطة</h3>
+          <div class="stat-value" id="statActiveUsers">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon expired"><i class="fa-solid fa-clock-rotate-left"></i></div>
+        <div class="stat-info">
+          <h3>الاشتراكات المنتهية</h3>
+          <div class="stat-value" id="statExpiredUsers">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon admins"><i class="fa-solid fa-user-shield"></i></div>
+        <div class="stat-info">
+          <h3>المشرفون والمدراء</h3>
+          <div class="stat-value" id="statAdmins">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-card">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="searchInput" placeholder="ابحث بالاسم، البريد الإلكتروني، أو كود التفعيل..." oninput="renderTable()">
+      </div>
+
+      <div class="filters-group">
+        <select class="select-style" id="filterRole" onchange="renderTable()">
+          <option value="all">كل الأدوار</option>
+          <option value="student">طالب (Student)</option>
+          <option value="admin">مشرف (Admin)</option>
+        </select>
+
+        <select class="select-style" id="filterSubscription" onchange="renderTable()">
+          <option value="all">كل الاشتراكات</option>
+          <option value="active">نشط (Premium Active)</option>
+          <option value="expired">منتهي (Expired)</option>
+          <option value="free">مجاني (Free)</option>
+        </select>
+
+        <button class="btn btn-secondary" onclick="fetchUsersFromFirestore()">
+          <i class="fa-solid fa-arrows-rotate"></i> إعادة التحديث والتحميل
+        </button>
+      </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>المستخدم</th>
+            <th>الدور</th>
+            <th>حالة الاشتراك</th>
+            <th>تاريخ الانتهاء</th>
+            <th>رمز التفعيل</th>
+            <th>طريقة التسجيل</th>
+            <th>الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody">
+          <!-- JS dynamic row insertion -->
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Login Admin Modal -->
+  <div class="modal-overlay" id="loginModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-right-to-bracket"></i> تسجيل دخول المشرف في Firebase</h2>
+        <button class="modal-close" onclick="closeLoginModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="loginForm" onsubmit="handleAdminLogin(event)">
+        <div class="form-group">
+          <label>البريد الإلكتروني للمشرف</label>
+          <input type="email" id="loginEmail" class="form-control" placeholder="ahmed.gold1999@gmail.com" required>
+        </div>
+        <div class="form-group">
+          <label>كلمة المرور</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeLoginModal()">إلغاء</button>
+          <button type="submit" class="btn btn-gold" id="btnLoginSubmit">تسجيل الدخول</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add User Modal -->
+  <div class="modal-overlay" id="addUserModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-user-plus"></i> إضافة مستخدم جديد في Firebase</h2>
+        <button class="modal-close" onclick="closeAddUserModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="addUserForm" onsubmit="handleAddUser(event)">
+        <div class="form-group">
+          <label>الاسم الكامل</label>
+          <input type="text" id="addName" class="form-control" placeholder="مثال: علي محمد" required>
+        </div>
+        <div class="form-group">
+          <label>البريد الإلكتروني</label>
+          <input type="email" id="addEmail" class="form-control" placeholder="user@example.com" required>
+        </div>
+        <div class="form-group">
+          <label>الدور في النظام</label>
+          <select id="addRole" class="form-control">
+            <option value="student">طالب (Student)</option>
+            <option value="admin">مشرف (Admin)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>مدّة الاشتراك الأولي</label>
+          <select id="addSubDays" class="form-control">
+            <option value="0">حساب مجاني (بدون اشتراك)</option>
+            <option value="30">30 يوم (شهر)</option>
+            <option value="90">90 يوم (3 أشهر)</option>
+            <option value="365">365 يوم (سنة)</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeAddUserModal()">إلغاء</button>
+          <button type="submit" class="btn btn-gold" id="btnAddSubmit">حفظ إلى Firebase</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit User & Extend Subscription Modal -->
+  <div class="modal-overlay" id="editUserModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-user-pen"></i> تعديل بيانات المستخدم في Firebase</h2>
+        <button class="modal-close" onclick="closeEditUserModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="editUserForm" onsubmit="handleSaveEditUser(event)">
+        <input type="hidden" id="editUserId">
+        <div class="form-group">
+          <label>الاسم الكامل</label>
+          <input type="text" id="editName" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>البريد الإلكتروني</label>
+          <input type="email" id="editEmail" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>الدور في النظام</label>
+          <select id="editRole" class="form-control">
+            <option value="student">طالب (Student)</option>
+            <option value="admin">مشرف (Admin)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>تاريخ انتهاء الاشتراك الحالي</label>
+          <input type="date" id="editExpiryDate" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>إضافة تمديد سريع لعدد الأيام:</label>
+          <div class="quick-days-btns">
+            <button type="button" class="btn btn-secondary" onclick="addDaysToEditExpiry(30)">+30 يوم</button>
+            <button type="button" class="btn btn-secondary" onclick="addDaysToEditExpiry(90)">+90 يوم</button>
+            <button type="button" class="btn btn-secondary" onclick="addDaysToEditExpiry(365)">+سنة</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>كود التفعيل (اختياري)</label>
+          <input type="text" id="editActivationCode" class="form-control" placeholder="مثال: INPT-2026-X89">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">إلغاء</button>
+          <button type="submit" class="btn btn-gold" id="btnEditSubmit">تحديث في Firebase</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Message -->
+  <div class="toast" id="toast">
+    <i class="fa-solid fa-circle-check" style="color: var(--accent-green);"></i>
+    <span id="toastText">تم العملية بنجاح</span>
+  </div>
+
+  <!-- Firebase Web SDK v10 Scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      signOut, 
+      onAuthStateChanged,
+      setPersistence,
+      browserLocalPersistence
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      getDocs,
+      doc, 
+      setDoc, 
+      updateDoc, 
+      deleteDoc, 
+      Timestamp 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // إعدادات مشروعك الحقيقي بـ Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDy8Av3HcsiX-ZY5suKmpbyuZOX8q4HDC0",
+      authDomain: "inptiq.web.app",
+      projectId: "inpt-app-20260108022659",
+      storageBucket: "inpt-app-20260108022659.firebasestorage.app",
+      messagingSenderId: "527094263196",
+      appId: "1:527094263196:web:82b37722b7c66bd8a4ec59"
+    };
+
+    // تهيئة Firebase & Auth & Firestore
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+    } catch (e) {
+      console.warn("Persistence setting error:", e);
+    }
+
+    let users = [];
+
+    // مراقبة حالة تسجيل دخول المشرف
+    onAuthStateChanged(auth, (user) => {
+      const btn = document.getElementById('btnLoginNav');
+      if (user) {
+        btn.innerHTML = `<i class="fa-solid fa-right-from-bracket"></i> خروج (${user.email.split('@')[0]})`;
+        btn.onclick = () => {
+          signOut(auth).then(() => {
+            showToast('تم تسجيل الخروج بنجاح');
+            fetchUsersFromFirestore();
+          });
+        };
+      } else {
+        btn.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> تسجيل دخول المشرف`;
+        btn.onclick = () => openLoginModal();
+      }
+      
+      // إعادة جلب البيانات فور تغير الجلسة
+      fetchUsersFromFirestore();
+    });
+
+    // جلب جميع المستندات من مجموعة users بـ Firestore (حتى 3000 مستخدم)
+    window.fetchUsersFromFirestore = async function() {
+      const statusBanner = document.getElementById('statusBanner');
+      statusBanner.innerHTML = `<span><i class="fa-solid fa-cloud-arrow-down fa-spin"></i> جاري جلب جميع المستخدمين من Firebase Firestore...</span>`;
+
+      try {
+        const usersRef = collection(db, "users");
+        const snapshot = await getDocs(usersRef);
+
+        users = [];
+        snapshot.forEach((docSnapshot) => {
+          const data = docSnapshot.data() || {};
+          const docId = docSnapshot.id;
+
+          // معالجة التاريخ بأمان تام
+          let expiryDateStr = null;
+          if (data.expiryDate) {
+            if (data.expiryDate.toDate && typeof data.expiryDate.toDate === 'function') {
+              expiryDateStr = data.expiryDate.toDate().toISOString();
+            } else if (typeof data.expiryDate === 'string') {
+              expiryDateStr = data.expiryDate;
+            }
+          }
+
+          // معالجة الدور
+          let userRole = 'student';
+          if (data.role === 'admin' || data.role === 2 || String(data.role).toLowerCase() === 'admin') {
+            userRole = 'admin';
+          }
+
+          // معالجة الاسم والبريد بأمان من أية قيم null أو undefined
+          const nameVal = (data.name || data.displayName || data.username || 'مستخدم بدون اسم').toString();
+          const emailVal = (data.email || (data.username ? `${data.username}@ahmeed.inpt` : 'بدون بريد')).toString();
+          const codeVal = (data.activationCode || '').toString();
+          const authVal = (data.authMethod || 'google').toString();
+
+          users.push({
+            uid: docId,
+            name: nameVal,
+            email: emailVal,
+            role: userRole,
+            isPremium: data.isPremium === true,
+            expiryDate: expiryDateStr,
+            activationCode: codeVal,
+            authMethod: authVal,
+            raw: data
+          });
+        });
+
+        document.getElementById('permissionErrorBox').style.display = 'none';
+        statusBanner.innerHTML = `
+          <span><i class="fa-solid fa-circle-check" style="color: var(--accent-green);"></i> تم جلب جميع مستخدمي Firebase بنجاح 🔥</span>
+          <span style="font-size: 13px; opacity: 0.9;">عدد المستخدمين الجاهزين: ${users.length}</span>
+        `;
+
+        window.usersList = users;
+        renderTable();
+        updateStats();
+      } catch (error) {
+        console.error("خطأ الاتصال بـ Firebase:", error);
+        document.getElementById('permissionErrorBox').style.display = 'block';
+        document.getElementById('errorMsgText').innerText = 'خطأ من فايربيس: ' + error.message;
+        statusBanner.innerHTML = `
+          <span style="color: var(--accent-red);"><i class="fa-solid fa-triangle-exclamation"></i> تعذر جلب البيانات من Firebase (${error.code || error.message})</span>
+        `;
+      }
+    };
+
+    // تسجيل دخول المشرف عبر Auth
+    window.handleAdminLogin = async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnLoginSubmit');
+      btn.innerText = 'جاري التحقق...';
+      btn.disabled = true;
+
+      try {
+        const email = document.getElementById('loginEmail').value.trim();
+        const pass = document.getElementById('loginPassword').value.trim();
+        await signInWithEmailAndPassword(auth, email, pass);
+        closeLoginModal();
+        showToast('تم تسجيل دخول المشرف بنجاح 🔥');
+        fetchUsersFromFirestore();
+      } catch (err) {
+        alert('خطأ في تسجيل الدخول: ' + err.message);
+      } finally {
+        btn.innerText = 'تسجيل الدخول';
+        btn.disabled = false;
+      }
+    };
+
+    // إتاحة الدوال للنافذة العالمية
+    window.db = db;
+    window.auth = auth;
+    window.Timestamp = Timestamp;
+    window.setDoc = setDoc;
+    window.updateDoc = updateDoc;
+    window.deleteDoc = deleteDoc;
+    window.doc = doc;
+    window.collection = collection;
+  </script>
+
+  <script>
+    // حساب حالة الاشتراك
+    function getSubscriptionStatus(user) {
+      if (!user.isPremium || !user.expiryDate) {
+        return { status: 'free', label: 'مجاني', badgeClass: 'badge-free', icon: 'fa-user' };
+      }
+      const expiry = new Date(user.expiryDate);
+      const now = new Date();
+      if (expiry > now) {
+        const diffDays = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+        return { status: 'active', label: `نشط (متبقي ${diffDays} يوم)`, badgeClass: 'badge-active', icon: 'fa-circle-check' };
+      } else {
+        return { status: 'expired', label: 'منتهي الصلاحية', badgeClass: 'badge-expired', icon: 'fa-circle-xmark' };
+      }
+    }
+
+    // تحديث الإحصائيات
+    function updateStats() {
+      const users = window.usersList || [];
+      const total = users.length;
+      let activeCount = 0;
+      let expiredCount = 0;
+      let adminCount = 0;
+
+      const now = new Date();
+
+      users.forEach(u => {
+        if (u.role === 'admin') adminCount++;
+        if (u.isPremium && u.expiryDate) {
+          const exp = new Date(u.expiryDate);
+          if (exp > now) activeCount++;
+          else expiredCount++;
+        }
+      });
+
+      document.getElementById('statTotalUsers').innerText = total;
+      document.getElementById('statActiveUsers').innerText = activeCount;
+      document.getElementById('statExpiredUsers').innerText = expiredCount;
+      document.getElementById('statAdmins').innerText = adminCount;
+    }
+
+    // رسم الجدول مع التعامل الآمن مع كل الحقول
+    function renderTable() {
+      const tbody = document.getElementById('usersTableBody');
+      const searchQuery = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+      const roleFilter = document.getElementById('filterRole').value;
+      const subFilter = document.getElementById('filterSubscription').value;
+
+      const users = window.usersList || [];
+
+      tbody.innerHTML = '';
+
+      const filtered = users.filter(user => {
+        const nameStr = (user.name || '').toLowerCase();
+        const emailStr = (user.email || '').toLowerCase();
+        const codeStr = (user.activationCode || '').toLowerCase();
+
+        const matchSearch = !searchQuery || 
+          nameStr.includes(searchQuery) || 
+          emailStr.includes(searchQuery) || 
+          codeStr.includes(searchQuery);
+        
+        const matchRole = roleFilter === 'all' || user.role === roleFilter;
+
+        const subInfo = getSubscriptionStatus(user);
+        const matchSub = subFilter === 'all' || subInfo.status === subFilter;
+
+        return matchSearch && matchRole && matchSub;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7">
+              <div class="empty-state">
+                <i class="fa-solid fa-users-slash"></i>
+                <p>لا يوجد أي مستخدم مطابق لنتائج الفلترة الحالية (${users.length} مستخدم في السيرفر).</p>
+              </div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      filtered.forEach(user => {
+        const subInfo = getSubscriptionStatus(user);
+        const roleLabel = user.role === 'admin' ? 'مشرف (Admin)' : 'طالب (Student)';
+        const roleClass = user.role === 'admin' ? 'badge-admin' : 'badge-student';
+        
+        const firstLetter = user.name ? user.name.trim().charAt(0).toUpperCase() : 'U';
+
+        let formattedExpiry = 'غير محدد';
+        if (user.expiryDate) {
+          const d = new Date(user.expiryDate);
+          formattedExpiry = d.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div class="user-avatar-cell">
+              <div class="avatar">${firstLetter}</div>
+              <div class="user-meta">
+                <div class="user-name">${user.name}</div>
+                <div class="user-email">${user.email}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge ${roleClass}">${roleLabel}</span></td>
+          <td><span class="badge ${subInfo.badgeClass}"><i class="fa-solid ${subInfo.icon}"></i> ${subInfo.label}</span></td>
+          <td style="direction: ltr; text-align: right;">${formattedExpiry}</td>
+          <td><code>${user.activationCode || '—'}</code></td>
+          <td><span style="text-transform: capitalize;">${user.authMethod || 'google'}</span></td>
+          <td>
+            <div class="action-btns">
+              <button class="icon-btn extend" title="تمديد 30 يوم سريع" onclick="quickExtend30Days('${user.uid}')">
+                <i class="fa-solid fa-calendar-plus"></i>
+              </button>
+              <button class="icon-btn edit" title="تعديل في Firestore" onclick="openEditUserModal('${user.uid}')">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button class="icon-btn delete" title="حذف من Firestore" onclick="deleteUserFromFirestore('${user.uid}')">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Modal Login
+    function openLoginModal() {
+      document.getElementById('loginModal').classList.add('active');
+    }
+    function closeLoginModal() {
+      document.getElementById('loginModal').classList.remove('active');
+    }
+
+    // Modal Add
+    function openAddUserModal() {
+      document.getElementById('addUserForm').reset();
+      document.getElementById('addUserModal').classList.add('active');
+    }
+
+    function closeAddUserModal() {
+      document.getElementById('addUserModal').classList.remove('active');
+    }
+
+    // إضافة مستخدم حقيقي في Firestore
+    async function handleAddUser(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnAddSubmit');
+      btn.innerText = 'جاري الحفظ في Firebase...';
+      btn.disabled = true;
+
+      try {
+        const name = document.getElementById('addName').value.trim();
+        const email = document.getElementById('addEmail').value.trim();
+        const role = document.getElementById('addRole').value;
+        const subDays = parseInt(document.getElementById('addSubDays').value);
+
+        const newUid = 'user_' + Date.now();
+        let isPremium = false;
+        let expiryDateObj = null;
+        let activationCode = '';
+
+        if (subDays > 0) {
+          isPremium = true;
+          const d = new Date();
+          d.setDate(d.getDate() + subDays);
+          expiryDateObj = window.Timestamp.fromDate(d);
+          activationCode = 'INPT-' + Math.floor(1000 + Math.random() * 9000);
+        }
+
+        const userDocRef = window.doc(window.db, "users", newUid);
+        await window.setDoc(userDocRef, {
+          uid: newUid,
+          name: name,
+          email: email,
+          role: role,
+          isPremium: isPremium,
+          expiryDate: expiryDateObj,
+          activationCode: activationCode,
+          authMethod: 'admin_panel',
+          createdAt: window.Timestamp.now()
+        });
+
+        closeAddUserModal();
+        showToast('تمت إضافة المستخدم بنجاح إلى Firebase 🔥');
+        window.fetchUsersFromFirestore();
+      } catch (err) {
+        console.error(err);
+        alert('حدث خطأ أثناء الحفظ في فايربيس: ' + err.message);
+      } finally {
+        btn.innerText = 'حفظ إلى Firebase';
+        btn.disabled = false;
+      }
+    }
+
+    // فتح نافذة التعديل
+    function openEditUserModal(uid) {
+      const users = window.usersList || [];
+      const u = users.find(x => x.uid === uid);
+      if (!u) return;
+
+      document.getElementById('editUserId').value = u.uid;
+      document.getElementById('editName').value = u.name;
+      document.getElementById('editEmail').value = u.email;
+      document.getElementById('editRole').value = u.role;
+      document.getElementById('editActivationCode').value = u.activationCode || '';
+
+      if (u.expiryDate) {
+        const d = new Date(u.expiryDate);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        document.getElementById('editExpiryDate').value = `${yyyy}-${mm}-${dd}`;
+      } else {
+        document.getElementById('editExpiryDate').value = '';
+      }
+
+      document.getElementById('editUserModal').classList.add('active');
+    }
+
+    function closeEditUserModal() {
+      document.getElementById('editUserModal').classList.remove('active');
+    }
+
+    function addDaysToEditExpiry(days) {
+      const field = document.getElementById('editExpiryDate');
+      let baseDate = field.value ? new Date(field.value) : new Date();
+      baseDate.setDate(baseDate.getDate() + days);
+
+      const yyyy = baseDate.getFullYear();
+      const mm = String(baseDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(baseDate.getDate()).padStart(2, '0');
+      field.value = `${yyyy}-${mm}-${dd}`;
+    }
+
+    // حفظ التعديل في Firestore
+    async function handleSaveEditUser(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnEditSubmit');
+      btn.innerText = 'جاري التحديث...';
+      btn.disabled = true;
+
+      try {
+        const uid = document.getElementById('editUserId').value;
+        const name = document.getElementById('editName').value.trim();
+        const email = document.getElementById('editEmail').value.trim();
+        const role = document.getElementById('editRole').value;
+        const activationCode = document.getElementById('editActivationCode').value.trim();
+        const expVal = document.getElementById('editExpiryDate').value;
+
+        let isPremium = false;
+        let expiryDateObj = null;
+
+        if (expVal) {
+          isPremium = true;
+          const d = new Date(expVal + 'T23:59:59.000Z');
+          expiryDateObj = window.Timestamp.fromDate(d);
+        }
+
+        const userDocRef = window.doc(window.db, "users", uid);
+        await window.updateDoc(userDocRef, {
+          name: name,
+          email: email,
+          role: role,
+          activationCode: activationCode,
+          isPremium: isPremium,
+          expiryDate: expiryDateObj
+        });
+
+        closeEditUserModal();
+        showToast('تم تحديث بيانات المستخدم في Firebase 🔥');
+        window.fetchUsersFromFirestore();
+      } catch (err) {
+        console.error(err);
+        alert('حدث خطأ أثناء التحديث بـ Firebase: ' + err.message);
+      } finally {
+        btn.innerText = 'تحديث في Firebase';
+        btn.disabled = false;
+      }
+    }
+
+    // تمديد سريع 30 يوم بـ Firestore
+    async function quickExtend30Days(uid) {
+      const users = window.usersList || [];
+      const u = users.find(x => x.uid === uid);
+      if (!u) return;
+
+      let base = (u.expiryDate && new Date(u.expiryDate) > new Date()) ? new Date(u.expiryDate) : new Date();
+      base.setDate(base.getDate() + 30);
+
+      try {
+        const userDocRef = window.doc(window.db, "users", uid);
+        await window.updateDoc(userDocRef, {
+          isPremium: true,
+          expiryDate: window.Timestamp.fromDate(base),
+          activationCode: u.activationCode || ('EXT-' + Math.floor(1000 + Math.random() * 9000))
+        });
+
+        showToast(`تم تمديد اشتراك ${u.name} 30 يوماً في Firebase 🚀`);
+        window.fetchUsersFromFirestore();
+      } catch (err) {
+        alert('خطأ في التمديد: ' + err.message);
+      }
+    }
+
+    // حذف مستخدم من Firestore
+    async function deleteUserFromFirestore(uid) {
+      const users = window.usersList || [];
+      const u = users.find(x => x.uid === uid);
+      if (!u) return;
+
+      if (confirm(`هل أنت متأكد من حذف المستخدم (${u.name}) نهائياً من قاعدة بيانات Firebase؟`)) {
+        try {
+          const userDocRef = window.doc(window.db, "users", uid);
+          await window.deleteDoc(userDocRef);
+          showToast('تم حذف المستخدم من Firebase بنجاح');
+          window.fetchUsersFromFirestore();
+        } catch (err) {
+          alert('خطأ في الحذف: ' + err.message);
+        }
+      }
+    }
+
+    // تصدير JSON
+    function exportDataJSON() {
+      const users = window.usersList || [];
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(users, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `firebase_users_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('تم تصدير ملف JSON بنجاح');
+    }
+
+    // تصدير CSV
+    function exportDataCSV() {
+      const users = window.usersList || [];
+      if (users.length === 0) return;
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      csvContent += "الرقم,الاسم,البريد,الدور,مفعل,تاريخ الانتهاء,كود التفعيل,طريقة التسجيل\n";
+
+      users.forEach(u => {
+        const line = [
+          u.uid,
+          `"${u.name}"`,
+          `"${u.email}"`,
+          u.role,
+          u.isPremium ? "نعم" : "لا",
+          u.expiryDate || "غير محدد",
+          u.activationCode || "",
+          u.authMethod || "google"
+        ].join(",");
+        csvContent += line + "\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `firebase_users_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast('تم تصدير ملف CSV بنجاح');
+    }
+
+    // إظهار التوست
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastText').innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
