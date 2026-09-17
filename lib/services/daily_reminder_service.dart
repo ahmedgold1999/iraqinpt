@@ -200,7 +200,8 @@ class DailyReminderService {
     // ✅ تهيئة المنطقة الزمنية لضمان عمل المنبه في الخلفية
     try {
       tz.initializeTimeZones();
-      final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+      final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+      final String timeZoneName = timeZoneInfo.identifier;
       tz.setLocalLocation(tz.getLocation(timeZoneName));
     } catch (e) {
       if (kDebugMode) print('❌ Error initializing timezone: $e');
