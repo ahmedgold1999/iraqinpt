@@ -145,14 +145,16 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
         if (e.toString().contains('QUOTA_EXCEEDED')) {
           _showQuotaExceededDialog();
         } else {
+          final errorMsg = e.toString().replaceFirst('Exception: ', '');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'تعذر الاتصال بالأستاذ الذكي، تأكد من الاتصال بالإنترنت.',
-                style: TextStyle(fontFamily: 'Tajawal'),
+                errorMsg,
+                style: const TextStyle(fontFamily: 'Tajawal'),
               ),
               backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
             ),
           );
         }

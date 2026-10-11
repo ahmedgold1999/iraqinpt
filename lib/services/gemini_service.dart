@@ -37,7 +37,7 @@ class GeminiService {
   GeminiService._internal();
 
   // مفتاح مخصص شغال ومجاني 100% من Google AI Studio
-  static const String _defaultApiKey = 'AQ.Ab8RN6Kybbtow1yAeQz2Jnc32_Wa1pJYqwYNdfq6bPWkxMKY1Q';
+  static const String _defaultApiKey = 'AQ.Ab8RN6L3PoUe9sdNH5qaDP0_koFFpwmJWlgxF7cT9GPZflffUg';
   
   static const int freeDailyLimit = 5;
 
@@ -96,11 +96,9 @@ class GeminiService {
   }
 
   static const List<String> _candidateModels = [
+    'gemini-3.8-flash',
+    'gemini-2.5-flash',
     'gemini-flash-latest',
-    'gemini-3.5-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-flash-lite-latest',
-    'gemini-3.1-flash-lite',
   ];
 
   /// إرسال رسالة إلى Gemini API مع دعم المحادثة المتصلة والتبديل التلقائي الذكي بين النماذج

@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/question_model.dart';
 import '../../services/question_service.dart';
 import '../../services/tts_service.dart';
+import 'subscription_screen.dart';
 
 class QuestionSearchScreen extends StatefulWidget {
   const QuestionSearchScreen({super.key});
@@ -35,6 +38,42 @@ class _QuestionSearchScreenState extends State<QuestionSearchScreen> {
   }
 
   Future<void> _loadSubjectQuestions(String subjectKey) async {
+    // حماية المواد المدفوعة (الحاسوب والإنكليزي)
+    if (subjectKey == 'computer' || subjectKey == 'english') {
+      bool isPremium = false;
+      try {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+          if (doc.exists && doc.data()?['isPremium'] == true) {
+            final expRaw = doc.data()!['expiryDate'];
+            if (expRaw == null || (expRaw is Timestamp && expRaw.toDate().isAfter(DateTime.now()))) {
+              isPremium = true;
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (!isPremium) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '🔒 البحث في أسئلة الحاسوب والإنكليزي متاح فقط لمشتركي VIP.',
+              style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Color(0xFFD97706),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+        );
+        return;
+      }
+    }
+
     if (_cachedQuestions.containsKey(subjectKey)) {
       setState(() {
         _selectedSubject = subjectKey;

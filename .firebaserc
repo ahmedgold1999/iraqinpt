@@ -3,6 +3,14 @@
     "inpt": "inptiq",
     "default": "inptiq"
   },
-  "targets": {},
+  "targets": {
+    "inpt-app-20260108022659": {
+      "hosting": {
+        "inptiq": [
+          "inptiq"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

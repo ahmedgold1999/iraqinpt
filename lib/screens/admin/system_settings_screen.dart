@@ -23,6 +23,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
   final _examEndDateController = TextEditingController();
   final _admissionsUrlController = TextEditingController();
+  final _geminiApiKeyController = TextEditingController();
 
   bool _forceUpdate = false;
   bool _maintenanceMode = false;
@@ -51,28 +52,32 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       final doc = await _db.collection('system_settings').doc('maintenance_and_updates').get();
       if (doc.exists) {
         final data = doc.data()!;
-        setState(() {
-          _versionController.text = data['latest_version'] ?? '';
-          _storeUrlController.text = data['update_url'] ?? '';
-          _forceUpdate = data['is_force_update'] ?? false;
-          _maintenanceMode = data['is_maintenance_on'] ?? false;
-          _targetAndroid = data['target_android'] ?? true;
-          _targetIos = data['target_ios'] ?? true;
-          _targetWeb = data['target_web'] ?? true;
-          
-          _price1mController.text = (data['price_1m'] ?? '10,000').toString();
-          _price2mController.text = (data['price_2m'] ?? '15,000').toString();
-          _price3mController.text = (data['price_3m'] ?? '20,000').toString();
-          _price1yController.text = (data['price_1y'] ?? '30,000').toString();
-          
-          _examEndDateController.text = data['exam_end_date'] ?? '2026-06-15';
-          _admissionsUrlController.text = data['admissions_pdf_url'] ?? data['mohesr_pdf_url'] ?? 'https://pub-c2719701c033412b8917a6722dcf93d2.r2.dev/inpt/mohesr.pdf';
-
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
+        _versionController.text = data['latest_version'] ?? '';
+        _storeUrlController.text = data['update_url'] ?? '';
+        _forceUpdate = data['is_force_update'] ?? false;
+        _maintenanceMode = data['is_maintenance_on'] ?? false;
+        _targetAndroid = data['target_android'] ?? true;
+        _targetIos = data['target_ios'] ?? true;
+        _targetWeb = data['target_web'] ?? true;
+        
+        _price1mController.text = (data['price_1m'] ?? '10,000').toString();
+        _price2mController.text = (data['price_2m'] ?? '15,000').toString();
+        _price3mController.text = (data['price_3m'] ?? '20,000').toString();
+        _price1yController.text = (data['price_1y'] ?? '30,000').toString();
+        
+        _examEndDateController.text = data['exam_end_date'] ?? '2026-06-15';
+        _admissionsUrlController.text = data['admissions_pdf_url'] ?? data['mohesr_pdf_url'] ?? 'https://pub-c2719701c033412b8917a6722dcf93d2.r2.dev/inpt/mohesr.pdf';
       }
+
+      // تحميل إعدادات Gemini API
+      try {
+        final geminiDoc = await _db.collection('system_settings').doc('gemini_config').get();
+        if (geminiDoc.exists && geminiDoc.data()?['api_key'] != null) {
+          _geminiApiKeyController.text = geminiDoc.data()!['api_key'].toString();
+        }
+      } catch (_) {}
+
+      setState(() => _isLoading = false);
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ في التحميل: $e')));
@@ -150,6 +155,21 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('خطأ في الحفظ: $e');
+    }
+  }
+
+  Future<void> _saveGeminiSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      await _db.collection('system_settings').doc('gemini_config').set({
+        'api_key': _geminiApiKeyController.text.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      setState(() => _isLoading = false);
+      _showSuccess('تم حفظ وتحديث مفتاح Gemini API بنجاح');
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showError('خطأ في حفظ المفتاح: $e');
     }
   }
 
@@ -409,6 +429,56 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                       ),
                       const SizedBox(height: 16),
                       _buildMiniSaveButton(_saveAdmissionsSettings),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // قسم إعدادات الذكاء الاصطناعي (Gemini API)
+                _buildSectionTitle('الأستاذ الذكي (Gemini AI API)', Icons.auto_awesome_rounded),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE5E5EA)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'مفتاح Gemini API Key (من Google AI Studio):',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: _geminiApiKeyController,
+                        style: const TextStyle(color: Color(0xFF1C1C1E), fontFamily: 'Tajawal', fontSize: 13),
+                        decoration: _inputDecoration('AIzaSy...', Icons.key_rounded),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '💡 ملاحظة: عند تغيير المفتاح هنا، سيتحدث فوراً لدى جميع الطلاب دون الحاجة لتحديث التطبيق.',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 11,
+                          color: Color(0xFFD97706),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildMiniSaveButton(_saveGeminiSettings),
                     ],
                   ),
                 ),

@@ -16,6 +16,7 @@ import '../../services/tts_service.dart';
 import '../../services/mistake_vault_service.dart';
 import '../../services/ai_explainer_service.dart';
 import '../../services/sound_effects_service.dart';
+import '../../services/subscription_service.dart';
 import '../../widgets/luxury_score_certificate.dart';
 
 // ==================== نموذج نتيجة الاختبار للتخزين المحلي ====================
@@ -1604,6 +1605,8 @@ class QuizScreen extends StatefulWidget {
   final bool showAnswersDuringExam; // ⭐ أضف هذا
   final List<Question>? initialQuestions;
   final bool updateLeaderboard; // ⭐ إضافة هذا
+  // ✅ علامة التجربة المجانية لتثبيت الأسئلة ومنع التحايل
+  final bool isFreeArabicTrial;
 
   const QuizScreen({
     super.key,
@@ -1613,11 +1616,13 @@ class QuizScreen extends StatefulWidget {
     this.showAnswersDuringExam = false, // ⭐ افتراضي false
     this.initialQuestions,
     this.updateLeaderboard = true, // ⭐ افتراضي true
+    this.isFreeArabicTrial = false,
   });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
 }
+
 
 class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateMixin {
   int _currentQuestionIndex = 0;
@@ -1656,8 +1661,64 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         .animate(_shakeController);
 
     _loadStudentPreferences();
+    // ✅ التحقق من الاشتراك قبل تحميل الأسئلة (حماية مضاعفة لمادة الحاسوب والإنكليزي)
+    _checkAccessAndLoadQuestions();
+  }
+
+  /// ✅ حماية مضاعفة: يتحقق من Firestore مباشرة قبل تحميل أسئلة الحاسوب والإنكليزي
+  Future<void> _checkAccessAndLoadQuestions() async {
+    final isProtectedSubject = widget.subject.contains('حاسوب') ||
+        widget.subject.contains('Computer') ||
+        widget.subject.contains('computer') ||
+        widget.subject.contains('إنكليزي') ||
+        widget.subject.contains('English') ||
+        widget.subject.contains('english');
+
+    if (isProtectedSubject) {
+      try {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid == null) {
+          // غير مسجّل → أخرج فوراً
+          if (mounted) Navigator.of(context).pop();
+          return;
+        }
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final data = doc.data();
+        final bool isPremium = data?['isPremium'] == true;
+        final expiryRaw = data?['expiryDate'];
+        bool isValid = isPremium;
+        if (isPremium && expiryRaw != null) {
+          DateTime? expiry;
+          if (expiryRaw is Timestamp) expiry = expiryRaw.toDate();
+          if (expiry != null && expiry.isBefore(DateTime.now())) {
+            isValid = false; // انتهت صلاحية الاشتراك
+          }
+        }
+        if (!isValid) {
+          if (mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  '⛔ هذه المادة مخصصة للمشتركين فقط. يرجى الاشتراك في باقة VIP.',
+                  style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                ),
+                backgroundColor: Color(0xFFDC2626),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return;
+        }
+      } catch (e) {
+        // إذا فشل الاتصال بـ Firestore، نمنع الوصول احتياطاً
+        if (mounted) Navigator.of(context).pop();
+        return;
+      }
+    }
     _loadQuestions();
   }
+
 
   Future<void> _loadStudentPreferences() async {
     try {
@@ -1891,8 +1952,17 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
       } else {
         questions = await QuestionService.loadQuestions(widget.questionsUrl);
       }
-      final random = Random();
-      questions.shuffle(random);
+
+      // ✅ التجربة المجانية: seed ثابت دائماً (نفس الأسئلة لكل الحسابات، لا يمكن التحايل)
+      // الاختبارات العادية: عشوائية لكل جلسة
+      if (widget.isFreeArabicTrial) {
+        // Seed ثابت = أسئلة ثابتة دائماً بغض النظر عن الحساب أو الجهاز أو مسح البيانات
+        final random = Random(20260101);
+        questions.shuffle(random);
+      } else {
+        final random = Random();
+        questions.shuffle(random);
+      }
 
       final selected = questions.take(widget.questionsCount).toList();
 
@@ -1908,6 +1978,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
 
       _startTimer();
     } catch (_) {
+
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2024,10 +2095,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
       );
     }
 
-    // ✅ إذا كان الاختبار مجانياً (العربية 30 سؤال)، نضع علامة الاستهلاك
-    if (widget.subject.contains('عربية') && widget.questionsCount == 30) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('has_taken_free_arabic', true);
+    // ✅ إذا كان الاختبار تجربة مجانية، نسجّل الاستهلاك في Firestore (مرتبط بالحساب لا بالجهاز)
+    if (widget.isFreeArabicTrial) {
+      final subService = SubscriptionService();
+      await subService.markFreeArabicTrialUsed();
     }
 
     if (!mounted) return;

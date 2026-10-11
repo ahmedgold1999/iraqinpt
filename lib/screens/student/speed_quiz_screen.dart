@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/question_model.dart';
 import '../../services/question_service.dart';
 import '../../services/leaderboard_service.dart';
@@ -35,8 +36,30 @@ class _SpeedQuizScreenState extends State<SpeedQuizScreen> with SingleTickerProv
   }
 
   Future<void> _loadQuestions() async {
+    // التحقق من اشتراك المستخدم
+    bool isPremium = false;
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        if (doc.exists && doc.data()?['isPremium'] == true) {
+          final expRaw = doc.data()!['expiryDate'];
+          if (expRaw == null || (expRaw is Timestamp && expRaw.toDate().isAfter(DateTime.now()))) {
+            isPremium = true;
+          }
+        }
+      }
+    } catch (_) {}
+
     final List<Question> combined = [];
-    for (var url in QuestionService.defaultSubjectUrls.values) {
+    
+    // إذا كان غير مشترك، يحصل فقط على أسئلة العربي (ولا يمكنه الوصول للحاسوب أو الإنكليزي)
+    final urlsToLoad = isPremium
+        ? QuestionService.defaultSubjectUrls.values
+        : [QuestionService.defaultSubjectUrls['arabic'] ?? ''];
+
+    for (var url in urlsToLoad) {
+      if (url.isEmpty) continue;
       try {
         final list = await QuestionService.loadQuestions(url);
         combined.addAll(list);

@@ -11,6 +11,36 @@ class SubscriptionService {
     return isPremium;
   }
 
+  // ✅ التحقق من التجربة المجانية عبر Firestore (مرتبطة بالحساب وليس الجهاز)
+  Future<bool> hasTakenFreeArabicTrial() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null || uid.isEmpty) return false;
+      final doc = await _db.collection('users').doc(uid).get();
+      if (!doc.exists) return false;
+      final data = doc.data();
+      return data?['freeArabicTrialUsed'] == true;
+    } catch (e) {
+      // إذا فشل الاتصال، نمنع التجربة احتياطاً
+      return true;
+    }
+  }
+
+  // ✅ تسجيل استهلاك التجربة المجانية في Firestore (لا يمكن مسحها بمسح بيانات التطبيق)
+  Future<void> markFreeArabicTrialUsed() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null || uid.isEmpty) return;
+      await _db.collection('users').doc(uid).update({
+        'freeArabicTrialUsed': true,
+        'freeArabicTrialDate': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error marking trial used: $e');
+    }
+  }
+
+
   // تفعيل الاشتراك مع حماية من السباق والتكرار (Atomic Transaction)
   Future<bool> activateSubscription(String code) async {
     final cleanCode = code.trim();

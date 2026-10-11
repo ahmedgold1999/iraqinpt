@@ -697,8 +697,9 @@ class StudentHomeScreen extends StatelessWidget {
 
   void _showFreeArabicDialog(
       BuildContext context, String subjectName, String subjectKey) async {
-    final prefs = await SharedPreferences.getInstance();
-    final bool hasTakenFree = prefs.getBool('has_taken_free_arabic') ?? false;
+    // ✅ التحقق من Firestore أولاً (لا يمكن التحايل عليه بمسح بيانات التطبيق)
+    final subService = SubscriptionService();
+    final bool hasTakenFree = await subService.hasTakenFreeArabicTrial();
 
     if (hasTakenFree) {
       if (!context.mounted) return;
@@ -802,6 +803,21 @@ class StudentHomeScreen extends StatelessWidget {
                               w: FontWeight.w500, c: Colors.white54, h: 1.4),
                           textAlign: TextAlign.center,
                         ),
+                        const SizedBox(height: 8),
+                        // ⚠️ تنبيه: التجربة مرة واحدة فقط
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            '⚠️ هذه التجربة متاحة مرة واحدة فقط لكل حساب',
+                            style: _t(12, w: FontWeight.w700, c: Colors.orange, h: 1.4),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -836,7 +852,7 @@ class StudentHomeScreen extends StatelessWidget {
                           ),
                           onPressed: () {
                             Navigator.pop(context);
-                            _startQuiz(context, subjectName, subjectKey, 30, false);
+                            _startQuiz(context, subjectName, subjectKey, 30, false, isFreeArabicTrial: true);
                           },
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -860,6 +876,7 @@ class StudentHomeScreen extends StatelessWidget {
       ),
     );
   }
+
 
   void _showNonPremiumDialog(BuildContext context) {
     _showLuxurySubscriptionDialog(
@@ -1108,7 +1125,7 @@ class StudentHomeScreen extends StatelessWidget {
   }
 
   void _startQuiz(BuildContext context, String subjectName, String subjectKey,
-      int questionsCount, bool showAnswersDuringExam) {
+      int questionsCount, bool showAnswersDuringExam, {bool isFreeArabicTrial = false}) {
     final Map<String, String> questionsUrls = {
       'arabic':
           'https://raw.githubusercontent.com/ahmedgold1999/questionsinpt/refs/heads/main/arabic',
@@ -1126,10 +1143,12 @@ class StudentHomeScreen extends StatelessWidget {
           questionsUrl: questionsUrls[subjectKey]!,
           questionsCount: questionsCount,
           showAnswersDuringExam: showAnswersDuringExam,
+          isFreeArabicTrial: isFreeArabicTrial,
         ),
       ),
     );
   }
+
 
   void _showActivationDialog(BuildContext context) {
     final controller = TextEditingController();
