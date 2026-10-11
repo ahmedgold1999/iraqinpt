@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/question_model.dart';
 
 class AiExplanationResult {
@@ -24,51 +25,106 @@ class AiExplainerService {
   factory AiExplainerService() => _instance;
   AiExplainerService._internal();
 
-  /// توليد الشرح الذكي للسؤال (مجاني 100% بدون أي تكلفة)
+  static const String _defaultApiKey = 'AQ.Ab8RN6L3PoUe9sdNH5qaDP0_koFFpwmJWlgxF7cT9GPZflffUg';
+
+  Future<String> _getApiKey() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('system_settings')
+          .doc('gemini_config')
+          .get();
+      if (doc.exists && doc.data()?['api_key'] != null) {
+        final key = doc.data()!['api_key'].toString().trim();
+        if (key.isNotEmpty) return key;
+      }
+    } catch (_) {}
+    return _defaultApiKey;
+  }
+
+  /// توليد الشرح الذكي للسؤال باستخدام محرك Gemini 3.8 Flash المتطور
   Future<AiExplanationResult> getExplanation({
     required Question question,
     String? subject,
   }) async {
-    // 1. محاولة الاستعلام السريع المجاني
+    // 1. توليد الشرح عبر Gemini 3.8 Flash فائق الذكاء والسرعة
     try {
-      final prompt = '''
-أنت معلم خبير في الاختبار التنافسي والوزاري العراقي. اشرح السؤال التالي بإيجاز وبشكل مفيد جداً للطالب:
+      final apiKey = await _getApiKey();
+      final wrongList = question.options
+          .where((o) => o.trim() != question.originalAnswer.trim())
+          .join(' ، ');
+
+      final promptText = '''
+أنت "الأستاذ الذكي المساعد" المتخصص في الامتحان الوطني العراقي للقبول بالدراسات العليا (INPT).
+اشرح للطالب هذا السؤال بدقة وإيجاز تعليمي فائق:
 السؤال: ${question.question}
 الإجابة الصحيحة: ${question.originalAnswer}
-الخيارات الأخرى: ${question.options.where((o) => o.trim() != question.originalAnswer.trim()).join(' - ')}
+الخيارات الخاطئة الأخرى: $wrongList
+المادة: ${subject ?? 'عام'}
 
-أجب فقط بصيغة JSON التالية بدون أي نصوص إضافية:
+أجب بصيغة JSON حصراً بهذا التنسيق وبدون أي علامات Markdown أو نصوص خارج الـ JSON:
 {
-  "whyCorrect": "شرح مبسط ومباشر لسبب صحة الإجابة",
-  "whyOthersWrong": "توضيح مختصر لماذا استبعدنا الخيارات الأخرى",
-  "memoryTip": "قاعدة ذهبية سريعة أو مفتاح حل لتذكر هذا السؤال في الامتحان"
+  "whyCorrect": "شرح علمي دقيق وواضح لسبب صحة الإجابة وكيفية استنتاجها",
+  "whyOthersWrong": "توضيح مختصر ومقنع لسبب خطأ واستبعاد الخيارات الأخرى",
+  "memoryTip": "قاعدة ذهبية سريعة أو مفتاح حل ذكي يسهل تذكره في الامتحان"
 }
 ''';
 
-      // استخدام نقطة نهاية مجانية وسريعة
-      final response = await http
-          .post(
-            Uri.parse('https://api.duckduckgo.com/'), // Safe fallback check
-            headers: {'Content-Type': 'application/json'},
-          )
-          .timeout(const Duration(milliseconds: 1500));
+      final payload = {
+        'contents': [
+          {
+            'parts': [
+              {'text': promptText}
+            ]
+          }
+        ],
+        'generationConfig': {
+          'temperature': 0.4,
+          'maxOutputTokens': 800,
+        }
+      };
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data != null && data['whyCorrect'] != null) {
-          return AiExplanationResult(
-            whyCorrect: data['whyCorrect'],
-            whyOthersWrong: data['whyOthersWrong'] ?? '',
-            memoryTip: data['memoryTip'] ?? '',
-            isFromOnlineAi: true,
+      final models = ['gemini-3.8-flash', 'gemini-2.5-flash'];
+      for (final model in models) {
+        try {
+          final url = Uri.parse(
+            'https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey',
           );
+
+          final response = await http.post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(payload),
+          ).timeout(const Duration(seconds: 8));
+
+          if (response.statusCode == 200) {
+            final data = json.decode(utf8.decode(response.bodyBytes));
+            final candidates = data['candidates'] as List?;
+            if (candidates != null && candidates.isNotEmpty) {
+              final content = candidates[0]['content'];
+              final parts = content?['parts'] as List?;
+              if (parts != null && parts.isNotEmpty) {
+                String rawText = parts[0]['text']?.toString() ?? '';
+                // تنظيف نصوص الماركداون إذا وجدت
+                rawText = rawText.replaceAll('```json', '').replaceAll('```', '').trim();
+                final parsedJson = json.decode(rawText);
+                if (parsedJson is Map<String, dynamic>) {
+                  return AiExplanationResult(
+                    whyCorrect: parsedJson['whyCorrect']?.toString() ?? '',
+                    whyOthersWrong: parsedJson['whyOthersWrong']?.toString() ?? '',
+                    memoryTip: parsedJson['memoryTip']?.toString() ?? '',
+                    isFromOnlineAi: true,
+                  );
+                }
+              }
+            }
+          }
+        } catch (_) {
+          continue;
         }
       }
-    } catch (_) {
-      // الانتقال الفوري للمحرك التحليلي الداخلي الفائق السرعة
-    }
+    } catch (_) {}
 
-    // 2. المحرك التحليلي الذكي المدمج (Offline Smart NLP Engine)
+    // 2. المحرك الاحتياطي الفوري في حال عدم توفر اتصال لحظي
     return _generateLocalSmartExplanation(question, subject);
   }
 

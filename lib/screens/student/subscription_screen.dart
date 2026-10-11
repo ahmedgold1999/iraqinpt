@@ -354,9 +354,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
   Future<void> _launchSupportForIos() async {
     String username = 'XG0LDX';
+    String planLabel = _getPlanLabel(_selectedPlan);
+    String price = _getPlanPrice(_selectedPlan);
+
     String message = _userName.isNotEmpty
-        ? 'السلام عليكم، أحتاج مساعدة أو استفسار بخصوص حسابي في تطبيق دليل الامتحان الوطني واسمي داخل التطبيق هو $_userName'
-        : 'السلام عليكم، أحتاج مساعدة أو استفسار بخصوص حسابي في تطبيق دليل الامتحان الوطني';
+        ? 'السلام عليكم، اريد اشترك بالتطبيق (دليل الامتحان الوطني العراقي) لمدة ($planLabel) بسعر ($price) واسمي داخل التطبيق هو $_userName'
+        : 'السلام عليكم، اريد اشترك بالتطبيق (دليل الامتحان الوطني العراقي) لمدة ($planLabel) بسعر ($price)';
 
     String encodedMessage = Uri.encodeComponent(message);
     String telegramUrl = 'https://t.me/$username?text=$encodedMessage';

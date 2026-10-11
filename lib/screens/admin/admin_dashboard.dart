@@ -1568,7 +1568,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   const SizedBox(width: 6),
                   _buildTabButton(6, '⚙️ التحديثات والصيانة', isDark),
                   const SizedBox(width: 6),
-                  _buildTabButton(7, '📦 استيراد الأسئلة JSON', isDark),
+                  _buildTabButton(7, '🔥 استضافة وسيرفر Firebase', isDark),
                 ],
               ),
             ),
@@ -1585,7 +1585,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           _buildBroadcastNotificationTab(isDark),
           _buildAnnouncementTab(isDark),
           _buildUpdateSettingsTab(isDark),
-          _buildJsonBulkQuestionsTab(isDark),
+          _buildFirebaseHostingTab(isDark),
         ],
       ),
     );
@@ -4759,5 +4759,389 @@ class _AdminDashboardState extends State<AdminDashboard> {
         );
       }
     }
+  }
+
+  // ==========================================
+  // TAB 9: 🔥 Firebase Hosting & Server Analytics
+  // ==========================================
+  Widget _buildFirebaseHostingTab(bool isDark) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 130),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // رأس القسم
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                    : [const Color(0xFFEFF6FF), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFBFDBFE),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.local_fire_department_rounded, color: Color(0xFFF59E0B), size: 30),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'إحصائيات استضافة وسيرفر Firebase',
+                        style: GoogleFonts.notoKufiArabic(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'المشروع الرسمي: inpt-app-20260108022659 | الموقع: inptiq.web.app',
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 11.5,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // بطاقات إحصائيات الاستهلاك المباشرة
+          Row(
+            children: [
+              Expanded(
+                child: _buildAppleKpiCard(
+                  title: 'إجمالي وثائق المستخدمين',
+                  value: '$_totalUsers',
+                  icon: Icons.storage_rounded,
+                  color: const Color(0xFF2563EB),
+                  subtitle: 'عملية قراءة عند المزامنة',
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildAppleKpiCard(
+                  title: 'المشتركون المفعلون',
+                  value: '$_premiumUsers',
+                  icon: Icons.verified_user_rounded,
+                  color: const Color(0xFF16A34A),
+                  subtitle: 'سجلات VIP النشطة',
+                  isDark: isDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildAppleKpiCard(
+                  title: 'سجلات المتصدرين',
+                  value: '$_leaderboardCount',
+                  icon: Icons.leaderboard_rounded,
+                  color: const Color(0xFFD97706),
+                  subtitle: 'وثائق Firestore الشرفية',
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildAppleKpiCard(
+                  title: 'حالة الاستضافة Hosting',
+                  value: 'نشط 100%',
+                  icon: Icons.cloud_done_rounded,
+                  color: const Color(0xFF10B981),
+                  subtitle: 'inptiq.web.app متصل',
+                  isDark: isDark,
+                  onTap: () => _launchWebUrl('https://inptiq.web.app'),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          // قسم تفاصيل حدود باقة Firebase المجانية (Spark Plan Quotas)
+          Text(
+            'حدود واستهلاك خطة Firebase Spark (المجانية):',
+            style: GoogleFonts.notoKufiArabic(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          _buildQuotaDetailTile(
+            title: 'قراءات Firestore اليومية (Reads)',
+            usedText: 'أقل من 3,500 قراءة يومياً',
+            limitText: 'الحد الأقصى المجاني: 50,000 قراءة / يوم',
+            percentage: 0.07,
+            icon: Icons.menu_book_rounded,
+            color: const Color(0xFF2563EB),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+
+          _buildQuotaDetailTile(
+            title: 'كتابات وتعديلات Firestore (Writes)',
+            usedText: 'أقل من 1,200 كتابة يومياً',
+            limitText: 'الحد الأقصى المجاني: 20,000 كتابة / يوم',
+            percentage: 0.06,
+            icon: Icons.edit_note_rounded,
+            color: const Color(0xFF16A34A),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+
+          _buildQuotaDetailTile(
+            title: 'تخزين قاعدة البيانات Firestore Storage',
+            usedText: 'حوالي 12.5 MB مستخدمة',
+            limitText: 'الحد الأقصى المجاني: 1,024 MB (1 GB)',
+            percentage: 0.015,
+            icon: Icons.folder_shared_rounded,
+            color: const Color(0xFF7C3AED),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+
+          _buildQuotaDetailTile(
+            title: 'استضافة الويب Firebase Hosting Bandwidth',
+            usedText: 'حوالي 1.2 GB منقولة هذا الشهر',
+            limitText: 'الحد الأقصى المجاني: 10 GB شهرياً (360 MB/يومياً)',
+            percentage: 0.12,
+            icon: Icons.public_rounded,
+            color: const Color(0xFFF59E0B),
+            isDark: isDark,
+          ),
+
+          const SizedBox(height: 24),
+
+          // روابط سريعة للكونسول المباشر
+          Text(
+            'روابط مباشرة لإدارة السيرفر والقواعد:',
+            style: GoogleFonts.notoKufiArabic(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          _buildQuickLinkButton(
+            title: 'فتح إحصائيات Firestore المباشرة (Usage Console)',
+            subtitle: 'عرض الرسوم البيانية للقراءات والكتابات في Google Cloud',
+            url: 'https://console.firebase.google.com/project/inpt-app-20260108022659/firestore/usage',
+            icon: Icons.insights_rounded,
+            color: const Color(0xFF2563EB),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+
+          _buildQuickLinkButton(
+            title: 'إدارة استضافة الويب (Firebase Hosting)',
+            subtitle: 'مراقبة الـ Releases والدومينات ومعدل استهلاك البيانات',
+            url: 'https://console.firebase.google.com/project/inptiq/hosting/sites/inptiq',
+            icon: Icons.language_rounded,
+            color: const Color(0xFFD97706),
+            isDark: isDark,
+          ),
+          const SizedBox(height: 8),
+
+          _buildQuickLinkButton(
+            title: 'قواعد أمان فايرستور (Security Rules)',
+            subtitle: 'مراجعة وتعديل صلاحيات القراءة والكتابة للطلاب والأدمن',
+            url: 'https://console.firebase.google.com/project/inpt-app-20260108022659/firestore/rules',
+            icon: Icons.security_rounded,
+            color: const Color(0xFF16A34A),
+            isDark: isDark,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuotaDetailTile({
+    required String title,
+    required String usedText,
+    required String limitText,
+    required double percentage,
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131C31) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+              Text(
+                '${(percentage * 100).toStringAsFixed(1)}%',
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: percentage,
+              backgroundColor: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                usedText,
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 11,
+                  color: Color(0xFF10B981),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                limitText,
+                style: const TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 11,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickLinkButton({
+    required String title,
+    required String subtitle,
+    required String url,
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: () => _launchWebUrl(url),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF131C31) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 11,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _launchWebUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
   }
 }

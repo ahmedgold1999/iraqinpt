@@ -18,6 +18,7 @@ import '../../services/ai_explainer_service.dart';
 import '../../services/sound_effects_service.dart';
 import '../../services/subscription_service.dart';
 import '../../widgets/luxury_score_certificate.dart';
+import 'package:flutter_windowmanager/flutter_windowmanager.dart';
 
 // ==================== نموذج نتيجة الاختبار للتخزين المحلي ====================
 class LocalQuizResult {
@@ -1651,6 +1652,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
 
+    // 🔒 منع التقاط لقطات الشاشة أو تسجيل الفيديو أثناء الاختبار للحفاظ على سرية الأسئلة
+    _enableSecureScreen();
+
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -1663,6 +1667,22 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     _loadStudentPreferences();
     // ✅ التحقق من الاشتراك قبل تحميل الأسئلة (حماية مضاعفة لمادة الحاسوب والإنكليزي)
     _checkAccessAndLoadQuestions();
+  }
+
+  Future<void> _enableSecureScreen() async {
+    try {
+      if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android)) {
+        await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _disableSecureScreen() async {
+    try {
+      if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.android)) {
+        await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
+      }
+    } catch (_) {}
   }
 
   /// ✅ حماية مضاعفة: يتحقق من Firestore مباشرة قبل تحميل أسئلة الحاسوب والإنكليزي
@@ -2137,6 +2157,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    // إعادة السماح بلقطات الشاشة عند مغادرة شاشة الاختبار
+    _disableSecureScreen();
     _timer?.cancel();
     _shakeController.dispose();
     TtsService().stop();

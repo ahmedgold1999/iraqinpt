@@ -1638,23 +1638,7 @@ class StudentHomeScreen extends StatelessWidget {
                 ),
               ],
             ),
-            actions: [
-              Container(
-                margin: const EdgeInsets.only(left: 4),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFFA855F7)],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.psychology_rounded, color: Colors.white, size: 20),
-                  tooltip: 'الأستاذ الذكي AI',
-                  onPressed: () => Navigator.pushNamed(context, AppRoutes.aiTutor),
-                ),
-              ),
-              _buildNotificationBell(context, isDark),
-            ],
+            actions: const [],
           ),
 
           body: _luxuryBackground(

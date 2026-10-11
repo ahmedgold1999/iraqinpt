@@ -109,6 +109,11 @@ class LeaderboardService {
         }
       } catch (_) {}
 
+      // 🚫 الطلاب المجانيون لا يدخلون لوحة الشرف نهائياً (حصراً للمشتركين فقط)
+      if (!userIsPremium) {
+        return;
+      }
+
       if (realName.isEmpty) realName = 'طالب متميز';
 
       if (!docSnapshot.exists) {
@@ -117,7 +122,7 @@ class LeaderboardService {
           'photoUrl': photoUrl,
           'avatarId': userAvatarId,
           'gender': userGender,
-          'isPremium': userIsPremium,
+          'isPremium': true,
           'totalScore': scoreEarned,
           'arabicScore': cleanSubject == 'arabic' ? scoreEarned : 0,
           'computerScore': cleanSubject == 'computer' ? scoreEarned : 0,
@@ -175,18 +180,20 @@ class LeaderboardService {
     return 'general';
   }
 
-  /// ✅ جلب قائمة المتصدرين مع الفرز حسب المادة
+  /// ✅ جلب قائمة المتصدرين (حصراً للطلاب المشتركين فقط)
   static Stream<List<LeaderboardEntry>> getLeaderboardStream({
     String subject = 'all',
     int limit = 50,
   }) {
     return _leaderboardRef
         .orderBy('totalScore', descending: true)
-        .limit(limit)
+        .limit(limit * 2)
         .snapshots()
         .map((snapshot) {
+          // فلترة الطلاب المشتركين فقط (استبعاد أي حساب غير مفعل)
           final list = snapshot.docs
               .map((doc) => LeaderboardEntry.fromFirestore(doc))
+              .where((e) => e.isPremium == true)
               .toList();
 
           if (subject != 'all') {
@@ -197,10 +204,10 @@ class LeaderboardService {
               final scoreA = a.getScoreForSubject(subject);
               return scoreB.compareTo(scoreA);
             });
-            return filtered;
+            return filtered.take(limit).toList();
           }
 
-          return list;
+          return list.take(limit).toList();
         });
   }
 }
