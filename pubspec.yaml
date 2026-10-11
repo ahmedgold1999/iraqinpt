@@ -69,6 +69,11 @@ flutter:
     - assets/icons/mohesr.pdf
     - assets/fonts/
     - assets/icons/exam_schedule.png
+    - assets/icons/app_icon.png
+    - assets/icons/winter.png
+    - assets/icons/newyear.png
+    - assets/icons/ramdan.png
+    - assets/icons/iraq.png
     - assets/audio/
 
   # الخطوط المخصصة

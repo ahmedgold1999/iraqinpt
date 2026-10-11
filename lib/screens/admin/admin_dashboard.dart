@@ -16,6 +16,7 @@ import '../../services/app_update_service.dart';
 import '../../services/question_service.dart';
 import '../../services/config_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/dynamic_app_icon_service.dart';
 import '../../routes.dart';
 import 'leaderboard_management_screen.dart';
 
@@ -1569,6 +1570,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   _buildTabButton(6, '⚙️ التحديثات والصيانة', isDark),
                   const SizedBox(width: 6),
                   _buildTabButton(7, '🔥 استضافة وسيرفر Firebase', isDark),
+                  const SizedBox(width: 6),
+                  _buildTabButton(8, '🎨 أيقونة التطبيق الحية', isDark),
                 ],
               ),
             ),
@@ -1586,6 +1589,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           _buildAnnouncementTab(isDark),
           _buildUpdateSettingsTab(isDark),
           _buildFirebaseHostingTab(isDark),
+          _buildAppIconManagerTab(isDark),
         ],
       ),
     );
@@ -5143,5 +5147,272 @@ class _AdminDashboardState extends State<AdminDashboard> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (_) {}
+  }
+
+  // ==========================================
+  // TAB 10: 🎨 Dynamic App Icon Manager
+  // ==========================================
+  Widget _buildAppIconManagerTab(bool isDark) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('system_settings')
+          .doc('app_icon_config')
+          .snapshots(),
+      builder: (context, snapshot) {
+        String activeKey = 'default';
+        if (snapshot.hasData && snapshot.data!.exists && snapshot.data!.data() != null) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          activeKey = data['active_icon']?.toString().toLowerCase().trim() ?? 'default';
+        }
+
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 130),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // كارت الرأس التوضيحي
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                        : [const Color(0xFFEFF6FF), Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFBFDBFE),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.palette_rounded, color: Color(0xFF6366F1), size: 30),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'تغيير أيقونة التطبيق للمستخدمين (مباشر)',
+                            style: GoogleFonts.notoKufiArabic(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'اختر أيقونة المناسبة، وسيتم تطبيقها على هواتف كافة الطلاب تلقائياً دون الحاجة لتحديث التطبيق!',
+                            style: TextStyle(
+                              fontFamily: 'Tajawal',
+                              fontSize: 11.5,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              Text(
+                'الأيقونات المتاحة للتفعيل:',
+                style: GoogleFonts.notoKufiArabic(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // قائمة الأيقونات المتاحة
+              ...DynamicAppIconService.availableIcons.entries.map((entry) {
+                final key = entry.key;
+                final info = entry.value;
+                final isSelected = activeKey == key;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF131C31) : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFF22C55E)
+                          : (isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0)),
+                      width: isSelected ? 2 : 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isSelected ? const Color(0xFF22C55E).withOpacity(0.12) : Colors.black.withOpacity(0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    leading: Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.asset(
+                          info['asset']!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFF0F172A),
+                            child: const Icon(Icons.apps_rounded, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      info['name']!,
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        info['description']!,
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF22C55E).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF22C55E)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 16),
+                                SizedBox(width: 4),
+                                Text(
+                                  'المفعلة حالياً',
+                                  style: TextStyle(
+                                    fontFamily: 'Tajawal',
+                                    color: Color(0xFF22C55E),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F172A),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            ),
+                            onPressed: () => _applyNewGlobalIcon(key, info['name']!),
+                            child: const Text(
+                              'تفعيل الآن',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _applyNewGlobalIcon(String iconKey, String iconName) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('تأكيد تغيير أيقونة التطبيق', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+        content: Text(
+          'هل أنت متأكد من رغبتك بتفعيل أيقونة ($iconName) كأيقونة رسمية للتطبيق لجميع الطلاب؟\n\nستتغير الأيقونة تلقائياً على شاشات هواتفهم دون الحاجة لتحديث.',
+          style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal', color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF22C55E),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('نعم، تفعيل', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final success = await DynamicAppIconService.setGlobalAppIcon(iconKey);
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎉 تم تعيين أيقونة ($iconName) وحفظها سحابياً بنجاح!'),
+          backgroundColor: const Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❌ تعذر تحديث الأيقونة، يرجى المحاولة ثانية.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }

@@ -21,6 +21,7 @@ import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/daily_reminder_service.dart';
 import 'services/device_service.dart';
+import 'services/dynamic_app_icon_service.dart';
 import 'services/sound_effects_service.dart';
 import 'utils/web_helper.dart';
 import 'screens/auth/login_screen.dart';
@@ -58,6 +59,9 @@ void main() async {
     
     NotificationService.setupListeners();
     NotificationService.enableNotifications();
+
+    // 🎨 المزامنة اللحظية لأيقونة التطبيق مع فايربيس (تتغير الأيقونة تلقائياً دون تحديث)
+    DynamicAppIconService().initializeSync();
 
     if (kIsWeb) {
       await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
