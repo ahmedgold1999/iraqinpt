@@ -313,43 +313,59 @@ class _LuxuryUpdateModalContentState extends State<_LuxuryUpdateModalContent>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // أيقونة الرأس النابضة
+            // أيقونة التحديث المتحركة الفاخرة (Animated GIF)
             AnimatedBuilder(
               animation: _pulseAnimation,
               builder: (context, child) {
                 return Transform.scale(
                   scale: _pulseAnimation.value,
                   child: Container(
-                    width: 78,
-                    height: 78,
+                    width: 96,
+                    height: 96,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        colors: widget.isForceUpdate
-                            ? [const Color(0xFFDC2626), const Color(0xFFF97316)]
-                            : [const Color(0xFF2563EB), const Color(0xFF06B6D4)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: (widget.isForceUpdate ? const Color(0xFFDC2626) : const Color(0xFF2563EB))
-                              .withOpacity(0.5),
-                          blurRadius: 22,
-                          offset: const Offset(0, 8),
+                          color: (widget.isForceUpdate ? const Color(0xFFEF4444) : const Color(0xFF2563EB))
+                              .withOpacity(0.35),
+                          blurRadius: 28,
+                          spreadRadius: 4,
+                          offset: const Offset(0, 10),
                         ),
                       ],
                     ),
-                    child: Icon(
-                      widget.isForceUpdate ? Icons.warning_amber_rounded : Icons.rocket_launch_rounded,
-                      color: Colors.white,
-                      size: 40,
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/icons/update_anim.gif',
+                        width: 96,
+                        height: 96,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: widget.isForceUpdate
+                                    ? [const Color(0xFFDC2626), const Color(0xFFF97316)]
+                                    : [const Color(0xFF2563EB), const Color(0xFF06B6D4)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: Icon(
+                              widget.isForceUpdate ? Icons.system_update_rounded : Icons.rocket_launch_rounded,
+                              color: Colors.white,
+                              size: 46,
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 );
               },
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
             // شارة نوع التحديث
             Container(

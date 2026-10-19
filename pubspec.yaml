@@ -66,6 +66,7 @@ flutter:
   # الأصول
   assets:
     - assets/icons/loading_luxury.gif
+    - assets/icons/update_anim.gif
     - assets/icons/mohesr.pdf
     - assets/fonts/
     - assets/icons/exam_schedule.png
