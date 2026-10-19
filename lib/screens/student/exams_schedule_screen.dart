@@ -2135,46 +2135,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
     );
   }
 
-  Widget _buildSquareCard({
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-    String? subtitle,
-  }) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [color.withOpacity(0.9), color.withOpacity(0.7)],
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 28, color: Colors.white),
-                  const SizedBox(height: 10),
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'Tajawal'), textAlign: TextAlign.center),
-                  if (subtitle != null) Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'Tajawal'), textAlign: TextAlign.center),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
