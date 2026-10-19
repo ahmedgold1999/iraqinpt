@@ -17,13 +17,39 @@ class SpecializedExamService {
   static const String _offlineListPrefix = 'offline_specialized_list_';
   static const String _offlineUrlPrefix = 'offline_specialized_url_';
 
-  /// تحويل أي رابط GitHub عادي إلى رابط Raw مباشر يمكن تحميله فوراً
+  static const String workerBaseUrl = 'https://inptiq.ahmeedgold1000.workers.dev';
+  static const String appSecureKey = 'INQU_SECURE_KEY_2026';
+  static const Map<String, String> secureHeaders = {
+    'x-app-key': appSecureKey,
+  };
+
+  /// تحويل أي رابط GitHub عادي أو مسار ملف إلى رابط Cloudflare Worker الآمن
   static String normalizeGitHubUrl(String rawUrl) {
     String url = rawUrl.trim();
     if (url.isEmpty) return '';
 
-    // إذا كان الرابط بالشكل: https://github.com/user/repo/blob/branch/path/file.json
-    // يتحول إلى: https://raw.githubusercontent.com/user/repo/branch/path/file.json
+    // إذا كان الرابط يمر بالـ Worker بالفعل
+    if (url.startsWith(workerBaseUrl)) {
+      return url;
+    }
+
+    // إذا أدخل الأدمن مساراً نسبياً مثل: english/conversations.json
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      final cleanPath = url.replaceFirst(RegExp(r'^/+'), '');
+      return '$workerBaseUrl/$cleanPath';
+    }
+
+    // إذا كان الرابط من مستودع INQU (سواء كان github.com أو raw.githubusercontent.com)
+    final inquRegex = RegExp(
+      r'https?:\/\/(?:raw\.githubusercontent\.com|github\.com)\/ahmedgold1999\/INQU\/(?:blob\/|raw\/)?(?:main\/|master\/|refs\/heads\/main\/)?(.+)',
+      caseSensitive: false,
+    );
+    final match = inquRegex.firstMatch(url);
+    if (match != null && match.group(1) != null) {
+      return '$workerBaseUrl/${match.group(1)}';
+    }
+
+    // الروابط الأخرى العادية
     if (url.contains('github.com') && url.contains('/blob/')) {
       url = url.replaceFirst('github.com', 'raw.githubusercontent.com');
       url = url.replaceFirst('/blob/', '/');
@@ -40,7 +66,10 @@ class SpecializedExamService {
 
     try {
       final response = await http
-          .get(Uri.parse(directUrl))
+          .get(
+            Uri.parse(directUrl),
+            headers: secureHeaders,
+          )
           .timeout(const Duration(seconds: 12));
 
       if (response.statusCode != 200) {
@@ -173,6 +202,7 @@ class SpecializedExamService {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0',
+            'x-app-key': appSecureKey,
           },
         ).timeout(const Duration(seconds: 4)); // مهلة 4 ثوانٍ فقط لتجنب أي بطء
 
@@ -266,6 +296,7 @@ class SpecializedExamService {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
                 'Expires': '0',
+                'x-app-key': appSecureKey,
               },
             ).timeout(const Duration(seconds: 12));
 
@@ -356,7 +387,10 @@ class SpecializedExamService {
       );
       final res = await http.get(
         fetchUri,
-        headers: {'Cache-Control': 'no-cache'},
+        headers: {
+          'Cache-Control': 'no-cache',
+          'x-app-key': appSecureKey,
+        },
       ).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         await saveExamQuestionsLocally(docRef.id, utf8.decode(res.bodyBytes), url: directUrl);
@@ -383,7 +417,10 @@ class SpecializedExamService {
       );
       final res = await http.get(
         fetchUri,
-        headers: {'Cache-Control': 'no-cache'},
+        headers: {
+          'Cache-Control': 'no-cache',
+          'x-app-key': appSecureKey,
+        },
       ).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         await saveExamQuestionsLocally(exam.id, utf8.decode(res.bodyBytes), url: directUrl);

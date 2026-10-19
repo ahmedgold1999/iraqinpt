@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/specialized_exam_model.dart';
 import '../../services/specialized_exam_service.dart';
 
@@ -258,12 +257,12 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                     ),
                     const SizedBox(height: 14),
 
-                    // رابط ملف الـ JSON في GitHub
+                    // رابط ملف الـ JSON
                     _buildTextField(
                       controller: urlController,
-                      label: 'رابط ملف JSON في GitHub (يدعم Raw أو رابط الملف المباشر)',
-                      hint: 'https://raw.githubusercontent.com/.../exam.json',
-                      icon: Icons.link_rounded,
+                      label: 'رابط ملف JSON (سيرفر السحابة الآمن أو مسار الملف أو GitHub)',
+                      hint: 'مثال: english/ProficiencyandConversational أو رابط السيرفر',
+                      icon: Icons.security_rounded,
                       isDark: isDark,
                     ),
                     const SizedBox(height: 10),

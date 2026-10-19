@@ -44,7 +44,10 @@ class QuestionService {
 
     // 2. الجلب من الإنترنت وتحديث الكاش المحلي
     try {
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'x-app-key': 'INQU_SECURE_KEY_2026'},
+      ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
         final dynamic decoded = json.decode(response.body);
