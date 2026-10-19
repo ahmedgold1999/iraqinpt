@@ -49,6 +49,9 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
     final orderController = TextEditingController(
       text: existingExam != null ? existingExam.order.toString() : '0',
     );
+    final emojiController = TextEditingController(
+      text: existingExam?.iconEmoji ?? '📝',
+    );
 
     String selectedSubject = existingExam?.subjectKey ??
         (_selectedFilterSubject != 'all' ? _selectedFilterSubject : 'computer');
@@ -157,6 +160,79 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                             if (val != null) setDialogState(() => selectedSubject = val);
                           },
                         ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // إيموجي وأيقونة الاختبار
+                    const Text(
+                      'أيقونة الاختبار (إيموجي آيفون مميز):',
+                      style: TextStyle(fontFamily: 'Tajawal', fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            emojiController.text.trim().isEmpty ? '📝' : emojiController.text.trim(),
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: emojiController,
+                            label: 'رمز الإيموجي (أدخل إيموجي أو اختر من المقترحات)',
+                            hint: '📝',
+                            icon: Icons.emoji_emotions_outlined,
+                            isDark: isDark,
+                            onChanged: (_) => setDialogState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: [
+                          '📝', '💻', '⌨️', '📚', '⚡', '🎯', '🧠', '🔍', '📖', '🏆', '🌟', '💡', '⏱️', '🎓', '🔥', '📊', '🌐', '🚀'
+                        ].map((em) {
+                          final isSel = emojiController.text.trim() == em;
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: InkWell(
+                              onTap: () {
+                                setDialogState(() {
+                                  emojiController.text = em;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isSel
+                                      ? const Color(0xFF2563EB).withOpacity(0.2)
+                                      : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSel ? const Color(0xFF2563EB) : Colors.transparent,
+                                  ),
+                                ),
+                                child: Text(em, style: const TextStyle(fontSize: 18)),
+                              ),
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -411,6 +487,7 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                                 return;
                               }
 
+                              final examEmoji = emojiController.text.trim().isEmpty ? '📝' : emojiController.text.trim();
                               final examModel = SpecializedExamModel(
                                 id: isEdit ? existingExam.id : '',
                                 subjectKey: selectedSubject,
@@ -420,6 +497,7 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                                 jsonUrl: jsonUrl,
                                 questionsCount: count,
                                 durationMinutes: duration,
+                                iconEmoji: examEmoji,
                                 order: order,
                                 isActive: isActive,
                                 createdAt: isEdit ? existingExam.createdAt : DateTime.now(),
@@ -471,6 +549,7 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
     required bool isDark,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    ValueChanged<String>? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -490,6 +569,7 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
             controller: controller,
             maxLines: maxLines,
             keyboardType: keyboardType,
+            onChanged: onChanged,
             style: const TextStyle(fontFamily: 'Tajawal', fontSize: 13),
             decoration: InputDecoration(
               icon: Icon(icon, size: 18, color: Colors.grey),
@@ -797,13 +877,24 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
               ],
             ),
             const SizedBox(height: 10),
-            Text(
-              exam.title,
-              style: GoogleFonts.notoKufiArabic(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
-              ),
+            Row(
+              children: [
+                Text(
+                  exam.iconEmoji,
+                  style: const TextStyle(fontSize: 18),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    exam.title,
+                    style: GoogleFonts.notoKufiArabic(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
             ),
             if (exam.description.isNotEmpty) ...[
               const SizedBox(height: 4),

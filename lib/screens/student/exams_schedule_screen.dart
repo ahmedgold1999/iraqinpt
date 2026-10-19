@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/config_service.dart';
 import '../../services/question_service.dart';
+import '../../services/specialized_exam_service.dart';
 import 'smart_vault_screen.dart';
 import 'notifications_screen.dart';
 import 'about_national_exam_screen.dart';
@@ -118,6 +119,10 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
     try {
       final results = await QuestionService.syncAllQuestions();
       int total = results.values.fold(0, (a, b) => a + b);
+      
+      // ✅ مزامنة وتحميل كافة الاختبارات التخصصية والفرعية أوفلاين
+      await SpecializedExamService().syncAllExamsOffline(forceUpdate: true);
+
       await _loadAllQuestionsCounts();
       await _loadLastSyncDate();
 
@@ -133,7 +138,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'تم تحديث وحفظ $total سؤال بنجاح للاستخدام بدون إنترنت!',
+                    'تم تحديث كافة الأسئلة ($total سؤال) والاختبارات التخصصية بنجاح للاستخدام أوفلاين!',
                     style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -2558,24 +2563,12 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildIosToolCard(
-                    icon: Icons.search_rounded,
-                    title: 'البحث في الأسئلة',
-                    subtitle: 'محرك بحث فوري',
-                    color: const Color(0xFF2563EB),
-                    onTap: () => _checkPremiumAndNavigate(() => Navigator.pushNamed(context, AppRoutes.questionSearch)),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildIosToolCard(
-                    icon: Icons.bolt_rounded,
-                    title: 'تحدي الـ 60 ثانية',
-                    subtitle: 'اختبار السرعة الحماسي',
-                    color: const Color(0xFFF59E0B),
-                    onTap: () => _checkPremiumAndNavigate(() => Navigator.pushNamed(context, AppRoutes.speedQuiz)),
-                  ),
-                ],
+              _buildWideIosToolCard(
+                icon: Icons.bolt_rounded,
+                title: 'تحدي الـ 60 ثانية ⚡',
+                subtitle: 'اختبار السرعة الحماسي والتحدي التنافسي للأسئلة',
+                color: const Color(0xFFF59E0B),
+                onTap: () => _checkPremiumAndNavigate(() => Navigator.pushNamed(context, AppRoutes.speedQuiz)),
               ),
               const SizedBox(height: 12),
               Row(
@@ -2917,6 +2910,84 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
               const LuxuryExamCountdownCard(),
               const SizedBox(height: 100),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWideIosToolCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF131C31) : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.notoKufiArabic(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: isDark ? Colors.white38 : Colors.grey.shade400,
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -354,122 +354,230 @@ class StudentHomeScreen extends StatelessWidget {
       ) {
     final Color base = subject['color'] as Color;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF131C31) : Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFE2E8F0),
-          width: 1,
-        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: base.withOpacity(isDark ? 0.25 : 0.12),
             blurRadius: 16,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SubjectExamsScreen(
-                  subjectName: subject['name'] as String,
-                  subjectKey: subject['key'] as String,
-                  subjectIcon: subject['icon'] as IconData,
-                  subjectColor: subject['color'] as Color,
-                  user: user,
+        child: Stack(
+          children: [
+            // خلفية البطاقة الفاخرة
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [
+                          const Color(0xFF131C31),
+                          const Color(0xFF1E293B),
+                          base.withOpacity(0.12),
+                        ]
+                      : [
+                          Colors.white,
+                          const Color(0xFFF8FAFC),
+                          base.withOpacity(0.08),
+                        ],
+                  begin: Alignment.centerRight,
+                  end: Alignment.centerLeft,
+                ),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: base.withOpacity(isDark ? 0.3 : 0.22),
+                  width: 1.2,
                 ),
               ),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // أيقونة المادة الهادئة بنمط آيفون
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: base.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: base.withOpacity(0.18)),
-                  ),
-                  child: Icon(
-                    subject['icon'] as IconData,
-                    color: base,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                // اسم المادة والحالة الهادئة
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        subject['name'] as String,
-                        textAlign: TextAlign.right,
-                        style: GoogleFonts.notoKufiArabic(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SubjectExamsScreen(
+                          subjectName: subject['name'] as String,
+                          subjectKey: subject['key'] as String,
+                          subjectIcon: subject['icon'] as IconData,
+                          subjectColor: subject['color'] as Color,
+                          user: user,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(subject['key'] as String, isLocked).withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              _getSubjectStatus(subject['key'] as String, isLocked),
-                              style: GoogleFonts.notoKufiArabic(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: _getStatusColor(subject['key'] as String, isLocked),
+                    );
+                  },
+                  child: Row(
+                    children: [
+                      // القسم الأيمن: أيقونة المادة + اسم المادة + اضغط للبدء أو مطلوب اشتراك
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      base.withOpacity(0.22),
+                                      base.withOpacity(0.08),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: base.withOpacity(0.3)),
+                                ),
+                                child: Icon(
+                                  subject['icon'] as IconData,
+                                  color: base,
+                                  size: 26,
+                                ),
                               ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      subject['name'] as String,
+                                      style: GoogleFonts.notoKufiArabic(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    if (isLocked)
+                                      Row(
+                                        children: [
+                                          Icon(Icons.lock_rounded, size: 13, color: Colors.redAccent.shade200),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'مطلوب اشتراك 🔒',
+                                            style: TextStyle(
+                                              fontFamily: 'Tajawal',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.redAccent.shade200,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    else
+                                      const Row(
+                                        children: [
+                                          Icon(Icons.stars_rounded, size: 14, color: Color(0xFF22C55E)),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'اضغط للبدء ✨',
+                                            style: TextStyle(
+                                              fontFamily: 'Tajawal',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF22C55E),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // القسم الأيسر: زر سهم الانتقال
+                      SizedBox(
+                        width: 70,
+                        child: Center(
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  base.withOpacity(0.22),
+                                  base.withOpacity(0.08),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(color: base.withOpacity(0.35)),
+                            ),
+                            child: Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 15,
+                              color: base,
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                // زر سهم الانتقال الفاخر
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: base.withOpacity(0.1),
-                    border: Border.all(
-                      color: base.withOpacity(0.25),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: base,
+              ),
+            ),
+
+            // الخط العمودي المتقطع (Perforated Line)
+            Positioned(
+              left: 70,
+              top: 12,
+              bottom: 12,
+              child: CustomPaint(
+                size: const Size(1, double.infinity),
+                painter: _VerticalDashedLinePainter(
+                  color: base.withOpacity(isDark ? 0.35 : 0.25),
+                ),
+              ),
+            ),
+
+            // الفتحة النصف دائرية العلوية (Top Notch)
+            Positioned(
+              left: 59,
+              top: -11,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: scaffoldBg,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: base.withOpacity(isDark ? 0.3 : 0.22),
+                    width: 1.2,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+
+            // الفتحة النصف دائرية السفلية (Bottom Notch)
+            Positioned(
+              left: 59,
+              bottom: -11,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: scaffoldBg,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: base.withOpacity(isDark ? 0.3 : 0.22),
+                    width: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2519,6 +2627,31 @@ class _MarqueeAnnouncementTextState extends State<MarqueeAnnouncementText>
       ),
     );
   }
+}
+
+class _VerticalDashedLinePainter extends CustomPainter {
+  final Color color;
+  _VerticalDashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+    double startY = 0;
+    while (startY < size.height) {
+      canvas.drawLine(
+        Offset(0, startY),
+        Offset(0, (startY + 4).clamp(0.0, size.height)),
+        paint,
+      );
+      startY += 8;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 

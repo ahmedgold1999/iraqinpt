@@ -188,7 +188,7 @@ class SpecializedExamService {
   }
 
   /// مزامنة وتحميل جميع الاختبارات التخصصية والأسئلة تلقائياً إلى ذاكرة الهاتف أوفلاين
-  Future<void> syncAllExamsOffline() async {
+  Future<void> syncAllExamsOffline({bool forceUpdate = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final snapshot = await _examsRef.where('isActive', isEqualTo: true).get();
@@ -213,8 +213,8 @@ class SpecializedExamService {
         final cacheKey = '$_offlineExamPrefix${exam.id}';
         final hasCache = prefs.containsKey(cacheKey);
 
-        // إذا لم يكن محملاً مسبقاً، نحمله الآن
-        if (!hasCache && exam.jsonUrl.isNotEmpty) {
+        // إذا طلب التحديث الإجباري أو لم يكن محملاً مسبقاً، نحمله الآن
+        if ((forceUpdate || !hasCache) && exam.jsonUrl.isNotEmpty) {
           try {
             final directUrl = normalizeGitHubUrl(exam.jsonUrl);
             final response = await http

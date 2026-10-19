@@ -9,6 +9,7 @@ class SpecializedExamModel {
   final String jsonUrl;
   final int questionsCount;
   final int durationMinutes;
+  final String iconEmoji;
   final bool isActive;
   final int order;
   final DateTime createdAt;
@@ -22,6 +23,7 @@ class SpecializedExamModel {
     required this.jsonUrl,
     required this.questionsCount,
     this.durationMinutes = 30,
+    this.iconEmoji = '📝',
     this.isActive = true,
     this.order = 0,
     required this.createdAt,
@@ -46,6 +48,7 @@ class SpecializedExamModel {
       jsonUrl: map['jsonUrl'] ?? '',
       questionsCount: (map['questionsCount'] as num?)?.toInt() ?? 0,
       durationMinutes: (map['durationMinutes'] as num?)?.toInt() ?? 30,
+      iconEmoji: (map['iconEmoji'] ?? map['emoji'] ?? '📝').toString(),
       isActive: map['isActive'] ?? true,
       order: (map['order'] as num?)?.toInt() ?? 0,
       createdAt: parsedDate,
@@ -61,6 +64,7 @@ class SpecializedExamModel {
       'jsonUrl': jsonUrl,
       'questionsCount': questionsCount,
       'durationMinutes': durationMinutes,
+      'iconEmoji': iconEmoji,
       'isActive': isActive,
       'order': order,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -76,6 +80,7 @@ class SpecializedExamModel {
     String? jsonUrl,
     int? questionsCount,
     int? durationMinutes,
+    String? iconEmoji,
     bool? isActive,
     int? order,
     DateTime? createdAt,
@@ -89,6 +94,7 @@ class SpecializedExamModel {
       jsonUrl: jsonUrl ?? this.jsonUrl,
       questionsCount: questionsCount ?? this.questionsCount,
       durationMinutes: durationMinutes ?? this.durationMinutes,
+      iconEmoji: iconEmoji ?? this.iconEmoji,
       isActive: isActive ?? this.isActive,
       order: order ?? this.order,
       createdAt: createdAt ?? this.createdAt,

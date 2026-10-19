@@ -757,6 +757,163 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
       return;
     }
 
+    bool showAnswersDuringExam = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+            backgroundColor: Colors.transparent,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(26),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B1220).withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: widget.subjectColor.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(
+                              exam.iconEmoji,
+                              style: const TextStyle(fontSize: 24),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  exam.title,
+                                  style: GoogleFonts.notoKufiArabic(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  '${exam.questionsCount} سؤالاً • ${exam.durationMinutes} دقيقة',
+                                  style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: Colors.white54),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (exam.description.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.04),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            exam.description,
+                            style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: Colors.white70, height: 1.4),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      // مفتاح إظهار التفسير والإجابة فور الاختيار
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.04),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.visibility_outlined, color: Color(0xFF38BDF8), size: 18),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'إظهار التفسير والإجابة فور الاختيار',
+                                style: TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontSize: 12.5,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
+                            Switch(
+                              value: showAnswersDuringExam,
+                              activeColor: const Color(0xFF38BDF8),
+                              onChanged: (val) => setModalState(() => showAnswersDuringExam = val),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                              ),
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal', color: Colors.white70)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: widget.subjectColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                elevation: 0,
+                              ),
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _proceedToSpecializedExam(exam, showAnswersDuringExam);
+                              },
+                              child: const Text(
+                                'بدء الامتحان 🚀',
+                                style: TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _proceedToSpecializedExam(SpecializedExamModel exam, bool showAnswersDuringExam) async {
     // إظهار مؤشر تحميل خفيف أثناء استخراج الأسئلة من الذاكرة المحلية
     showDialog(
       context: context,
@@ -815,7 +972,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
               questionsUrl: exam.jsonUrl,
               questionsCount: questions.length,
               initialQuestions: questions,
-              showAnswersDuringExam: false,
+              showAnswersDuringExam: showAnswersDuringExam,
             ),
           ),
         );
@@ -1043,12 +1200,17 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
     final bool isGeneralLocked = !isPremium && (!isArabic || (isArabic && _hasTakenFreeArabic));
     final bool isGeneralFreeTrial = isArabic && !isPremium && !_hasTakenFreeArabic;
 
+    String defaultGeneralEmoji = '💻';
+    if (widget.subjectKey == 'arabic') defaultGeneralEmoji = '📚';
+    if (widget.subjectKey == 'english') defaultGeneralEmoji = '🇬🇧';
+
     return Column(
       children: [
         // 1. قسيمة الامتحان الرئيسي الشامل (Voucher 0)
         _buildVoucherCard(
           context: context,
           title: 'الامتحان الشامل - ${widget.subjectName}',
+          emoji: defaultGeneralEmoji,
           shortDesc: 'الاختبار الوزاري الشامل للبنك الرئيسي مع مؤقت ونظام درجات رسمي',
           detailBadges: [
             _buildVoucherBadge(Icons.format_list_numbered_rounded, 'اختيار 20 - 100 سؤال'),
@@ -1071,6 +1233,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
           return _buildVoucherCard(
             context: context,
             title: exam.title,
+            emoji: exam.iconEmoji,
             shortDesc: exam.description.isNotEmpty ? exam.description : null,
             detailBadges: [
               _buildVoucherBadge(Icons.quiz_outlined, '${exam.questionsCount} سؤال'),
@@ -1094,6 +1257,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
   Widget _buildVoucherCard({
     required BuildContext context,
     required String title,
+    String? emoji,
     required String? shortDesc,
     required List<Widget> detailBadges,
     required VoidCallback onTap,
@@ -1148,11 +1312,13 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: Colors.white.withOpacity(0.2)),
                           ),
-                          child: Icon(
-                            isLocked ? Icons.lock_outline_rounded : Icons.quiz_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
+                          child: emoji != null
+                              ? Text(emoji, style: const TextStyle(fontSize: 22))
+                              : Icon(
+                                  isLocked ? Icons.lock_outline_rounded : Icons.quiz_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
