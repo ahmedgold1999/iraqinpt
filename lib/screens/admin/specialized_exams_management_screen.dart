@@ -501,6 +501,7 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                                 order: order,
                                 isActive: isActive,
                                 createdAt: isEdit ? existingExam.createdAt : DateTime.now(),
+                                updatedAt: DateTime.now(),
                               );
 
                               Navigator.pop(ctx);

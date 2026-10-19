@@ -516,7 +516,7 @@ class StudentHomeScreen extends StatelessWidget {
                               border: Border.all(color: base.withOpacity(0.35)),
                             ),
                             child: Icon(
-                              Icons.arrow_back_ios_new_rounded,
+                              Icons.arrow_forward_ios_rounded,
                               size: 15,
                               color: base,
                             ),

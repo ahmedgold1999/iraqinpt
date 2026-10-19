@@ -1048,6 +1048,29 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.sync_rounded, size: 22),
+            tooltip: 'تحديث ومزامنة الأسئلة',
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text('جاري فحص وتحديث أحدث الأسئلة من GitHub... ⚡', style: TextStyle(fontFamily: 'Tajawal')),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+              await _examService.syncAllExamsOffline(forceUpdate: true);
+              if (mounted) {
+                setState(() {});
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('تم تحديث بنك الأسئلة بالكامل بنجاح! ✨', style: TextStyle(fontFamily: 'Tajawal')),
+                    backgroundColor: Color(0xFF22C55E),
+                  ),
+                );
+              }
+            },
+          ),
           if (!isPremium)
             Padding(
               padding: const EdgeInsets.only(left: 12),

@@ -13,6 +13,7 @@ class SpecializedExamModel {
   final bool isActive;
   final int order;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   SpecializedExamModel({
     required this.id,
@@ -27,6 +28,7 @@ class SpecializedExamModel {
     this.isActive = true,
     this.order = 0,
     required this.createdAt,
+    this.updatedAt,
   });
 
   factory SpecializedExamModel.fromMap(Map<String, dynamic> map, String docId) {
@@ -36,6 +38,15 @@ class SpecializedExamModel {
         parsedDate = (map['createdAt'] as Timestamp).toDate();
       } else if (map['createdAt'] is String) {
         parsedDate = DateTime.tryParse(map['createdAt']) ?? DateTime.now();
+      }
+    }
+
+    DateTime? parsedUpdateDate;
+    if (map['updatedAt'] != null) {
+      if (map['updatedAt'] is Timestamp) {
+        parsedUpdateDate = (map['updatedAt'] as Timestamp).toDate();
+      } else if (map['updatedAt'] is String) {
+        parsedUpdateDate = DateTime.tryParse(map['updatedAt']);
       }
     }
 
@@ -52,6 +63,7 @@ class SpecializedExamModel {
       isActive: map['isActive'] ?? true,
       order: (map['order'] as num?)?.toInt() ?? 0,
       createdAt: parsedDate,
+      updatedAt: parsedUpdateDate,
     );
   }
 
@@ -68,6 +80,7 @@ class SpecializedExamModel {
       'isActive': isActive,
       'order': order,
       'createdAt': Timestamp.fromDate(createdAt),
+      if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
     };
   }
 
@@ -84,6 +97,7 @@ class SpecializedExamModel {
     bool? isActive,
     int? order,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return SpecializedExamModel(
       id: id ?? this.id,
@@ -98,6 +112,7 @@ class SpecializedExamModel {
       isActive: isActive ?? this.isActive,
       order: order ?? this.order,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

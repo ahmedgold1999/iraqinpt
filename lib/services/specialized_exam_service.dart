@@ -15,6 +15,7 @@ class SpecializedExamService {
 
   static const String _offlineExamPrefix = 'offline_specialized_exam_';
   static const String _offlineListPrefix = 'offline_specialized_list_';
+  static const String _offlineUrlPrefix = 'offline_specialized_url_';
 
   /// تحويل أي رابط GitHub عادي إلى رابط Raw مباشر يمكن تحميله فوراً
   static String normalizeGitHubUrl(String rawUrl) {
@@ -114,27 +115,93 @@ class SpecializedExamService {
     }
   }
 
-  /// حفظ أسئلة الاختبار محلياً في الهاتف (أوف لاين)
-  Future<void> saveExamQuestionsLocally(String examId, String rawJson) async {
+  /// حذف الكاش المحلي لاختبار معين
+  Future<void> clearExamCache(String examId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('$_offlineExamPrefix$examId');
+      await prefs.remove('$_offlineUrlPrefix$examId');
+      await prefs.remove('${_offlineExamPrefix + examId}_timestamp');
+    } catch (_) {}
+  }
+
+  /// حفظ أسئلة الاختبار محلياً في الهاتف (أوف لاين) مع حفظ الرابط الأصلي
+  Future<void> saveExamQuestionsLocally(String examId, String rawJson, {String? url}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('$_offlineExamPrefix$examId', rawJson);
       await prefs.setString('${_offlineExamPrefix + examId}_timestamp', DateTime.now().toIso8601String());
+      if (url != null && url.isNotEmpty) {
+        await prefs.setString('$_offlineUrlPrefix$examId', url);
+      }
     } catch (e) {
       print('⚠️ Failed to cache exam questions locally: $e');
     }
   }
 
-  /// جلب أسئلة الاختبار (مع أولوية التخزين المحلي Offline First)
-  Future<List<Question>> getQuestionsForExam(SpecializedExamModel exam) async {
+  /// جلب أسئلة الاختبار مع أولوية التحديث الحي وملاءمة الأوفلاين (Online-First with Offline Fallback)
+  Future<List<Question>> getQuestionsForExam(SpecializedExamModel exam, {bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final cacheKey = '$_offlineExamPrefix${exam.id}';
+    final urlKey = '$_offlineUrlPrefix${exam.id}';
+    final directUrl = normalizeGitHubUrl(exam.jsonUrl);
 
-    // 1. فحص التخزين المحلي أولاً
-    final cachedData = prefs.getString(cacheKey);
-    if (cachedData != null && cachedData.isNotEmpty) {
+    final cachedUrl = prefs.getString(urlKey);
+    final String? cachedData = prefs.getString(cacheKey);
+
+    // 1. إذا تغير رابط الـ JSON الخاص بالاختبار، فإن الكاش القديم أصبح غير صالح ويجب حذفه فوراً
+    final bool urlChanged = cachedUrl != null && directUrl.isNotEmpty && cachedUrl != directUrl;
+    if (urlChanged) {
+      await prefs.remove(cacheKey);
+      await prefs.remove(urlKey);
+    }
+
+    // 2. إذا كان هناك رابط متاح، نحاول الجلب الحي من GitHub فوراً لتطبيق أي تصحيحات بالأسئلة
+    if (directUrl.isNotEmpty) {
       try {
-        final dynamic decoded = json.decode(cachedData);
+        // نضع معامل زمني لمنع تخزين CDN لـ GitHub Raw مؤقتاً
+        final Uri fetchUri = Uri.parse(directUrl).replace(
+          queryParameters: {
+            ...Uri.parse(directUrl).queryParameters,
+            '_t': DateTime.now().millisecondsSinceEpoch.toString(),
+          },
+        );
+
+        final response = await http.get(
+          fetchUri,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          },
+        ).timeout(const Duration(seconds: 4)); // مهلة 4 ثوانٍ فقط لتجنب أي بطء
+
+        if (response.statusCode == 200) {
+          final body = utf8.decode(response.bodyBytes);
+          final dynamic decoded = json.decode(body);
+          List<dynamic> list = [];
+          if (decoded is List) {
+            list = decoded;
+          } else if (decoded is Map<String, dynamic> && decoded.containsKey('questions')) {
+            list = decoded['questions'] as List<dynamic>;
+          }
+
+          if (list.isNotEmpty) {
+            // تحديث الكاش المحلي بالنسخة المصححة فوراً للعمل أوفلاين لاحقاً
+            await saveExamQuestionsLocally(exam.id, body, url: directUrl);
+            return list.map((q) => Question.fromMap(Map<String, dynamic>.from(q))).toList();
+          }
+        }
+      } catch (e) {
+        print('🌐 Live questions fetch skipped/timeout, falling back to local offline cache: $e');
+      }
+    }
+
+    // 3. Fallback: عند انقطاع الإنترنت أو بطئه، نقرأ من الكاش المحلي المحفوظ مسبقاً
+    final fallbackData = prefs.getString(cacheKey) ?? (urlChanged ? null : cachedData);
+    if (fallbackData != null && fallbackData.isNotEmpty) {
+      try {
+        final dynamic decoded = json.decode(fallbackData);
         List<dynamic> list = [];
         if (decoded is List) {
           list = decoded;
@@ -147,41 +214,6 @@ class SpecializedExamService {
       } catch (e) {
         print('⚠️ Error parsing local offline questions for ${exam.id}: $e');
       }
-    }
-
-    // 2. إذا لم يكن محفوظاً محلياً، نجلبه من الرابط ونحفظه فوراً
-    final directUrl = normalizeGitHubUrl(exam.jsonUrl);
-    if (directUrl.isNotEmpty) {
-      try {
-        final response = await http
-            .get(Uri.parse(directUrl))
-            .timeout(const Duration(seconds: 15));
-
-        if (response.statusCode == 200) {
-          final body = utf8.decode(response.bodyBytes);
-          await saveExamQuestionsLocally(exam.id, body);
-
-          final dynamic decoded = json.decode(body);
-          List<dynamic> list = [];
-          if (decoded is List) {
-            list = decoded;
-          } else if (decoded is Map<String, dynamic> && decoded.containsKey('questions')) {
-            list = decoded['questions'] as List<dynamic>;
-          }
-          return list.map((q) => Question.fromMap(Map<String, dynamic>.from(q))).toList();
-        }
-      } catch (e) {
-        print('⚠️ Error fetching questions online for ${exam.id}: $e');
-      }
-    }
-
-    // إذا فشل كل شيء وكان هناك كاش قديم
-    if (cachedData != null && cachedData.isNotEmpty) {
-      try {
-        final dynamic decoded = json.decode(cachedData);
-        List<dynamic> list = decoded is List ? decoded : (decoded['questions'] ?? []);
-        return list.map((q) => Question.fromMap(Map<String, dynamic>.from(q))).toList();
-      } catch (_) {}
     }
 
     return [];
@@ -211,19 +243,35 @@ class SpecializedExamService {
       // تحميل ملفات الـ JSON في الخلفية وحفظها محلياً
       for (final exam in activeExams) {
         final cacheKey = '$_offlineExamPrefix${exam.id}';
-        final hasCache = prefs.containsKey(cacheKey);
+        final urlKey = '$_offlineUrlPrefix${exam.id}';
+        final directUrl = normalizeGitHubUrl(exam.jsonUrl);
 
-        // إذا طلب التحديث الإجباري أو لم يكن محملاً مسبقاً، نحمله الآن
-        if ((forceUpdate || !hasCache) && exam.jsonUrl.isNotEmpty) {
+        final hasCache = prefs.containsKey(cacheKey);
+        final cachedUrl = prefs.getString(urlKey);
+        final bool urlChanged = cachedUrl != null && directUrl.isNotEmpty && cachedUrl != directUrl;
+
+        // إذا طلب التحديث الإجباري، أو لم يكن محملاً، أو تغير رابط الاختبار في لوحة التحكم
+        if ((forceUpdate || !hasCache || urlChanged) && directUrl.isNotEmpty) {
           try {
-            final directUrl = normalizeGitHubUrl(exam.jsonUrl);
-            final response = await http
-                .get(Uri.parse(directUrl))
-                .timeout(const Duration(seconds: 15));
+            final Uri fetchUri = Uri.parse(directUrl).replace(
+              queryParameters: {
+                ...Uri.parse(directUrl).queryParameters,
+                '_t': DateTime.now().millisecondsSinceEpoch.toString(),
+              },
+            );
+
+            final response = await http.get(
+              fetchUri,
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+              },
+            ).timeout(const Duration(seconds: 12));
 
             if (response.statusCode == 200) {
               final body = utf8.decode(response.bodyBytes);
-              await prefs.setString(cacheKey, body);
+              await saveExamQuestionsLocally(exam.id, body, url: directUrl);
             }
           } catch (e) {
             print('⚠️ Sync failed for exam ${exam.title}: $e');
@@ -292,36 +340,60 @@ class SpecializedExamService {
 
   Future<void> createExam(SpecializedExamModel exam) async {
     final directUrl = normalizeGitHubUrl(exam.jsonUrl);
-    final examData = exam.copyWith(jsonUrl: directUrl);
+    final examData = exam.copyWith(
+      jsonUrl: directUrl,
+      updatedAt: DateTime.now(),
+    );
     final docRef = await _examsRef.add(examData.toMap());
 
     // تنزيل الأسئلة محلياً فور إضافتها
     try {
-      final res = await http.get(Uri.parse(directUrl)).timeout(const Duration(seconds: 12));
+      final Uri fetchUri = Uri.parse(directUrl).replace(
+        queryParameters: {
+          ...Uri.parse(directUrl).queryParameters,
+          '_t': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+      );
+      final res = await http.get(
+        fetchUri,
+        headers: {'Cache-Control': 'no-cache'},
+      ).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
-        await saveExamQuestionsLocally(docRef.id, utf8.decode(res.bodyBytes));
+        await saveExamQuestionsLocally(docRef.id, utf8.decode(res.bodyBytes), url: directUrl);
       }
     } catch (_) {}
   }
 
   Future<void> updateExam(SpecializedExamModel exam) async {
     final directUrl = normalizeGitHubUrl(exam.jsonUrl);
-    final examData = exam.copyWith(jsonUrl: directUrl);
+    final examData = exam.copyWith(
+      jsonUrl: directUrl,
+      updatedAt: DateTime.now(),
+    );
     await _examsRef.doc(exam.id).update(examData.toMap());
 
-    // تحديث الكاش المحلي أيضاً
+    // حذف الكاش القديم وتحديثه بالجديد
+    await clearExamCache(exam.id);
     try {
-      final res = await http.get(Uri.parse(directUrl)).timeout(const Duration(seconds: 12));
+      final Uri fetchUri = Uri.parse(directUrl).replace(
+        queryParameters: {
+          ...Uri.parse(directUrl).queryParameters,
+          '_t': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+      );
+      final res = await http.get(
+        fetchUri,
+        headers: {'Cache-Control': 'no-cache'},
+      ).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
-        await saveExamQuestionsLocally(exam.id, utf8.decode(res.bodyBytes));
+        await saveExamQuestionsLocally(exam.id, utf8.decode(res.bodyBytes), url: directUrl);
       }
     } catch (_) {}
   }
 
   Future<void> deleteExam(String examId) async {
     await _examsRef.doc(examId).delete();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('$_offlineExamPrefix$examId');
+    await clearExamCache(examId);
   }
 
   Future<void> toggleExamStatus(String examId, bool currentStatus) async {

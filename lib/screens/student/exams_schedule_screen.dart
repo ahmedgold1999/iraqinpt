@@ -66,11 +66,11 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
 
   final Map<String, String> _questionsUrls = {
     'arabic':
-    'https://raw.githubusercontent.com/ahmedgold1999/questionsinpt/refs/heads/main/arabic',
+    'https://raw.githubusercontent.com/ahmedgold1999/INQU/refs/heads/main/arabic/allquestions',
     'computer':
-    'https://raw.githubusercontent.com/ahmedgold1999/questionsinpt/refs/heads/main/computer_ar',
+    'https://raw.githubusercontent.com/ahmedgold1999/INQU/refs/heads/main/computer/allquestions',
     'english':
-    'https://raw.githubusercontent.com/ahmedgold1999/questionsinpt/refs/heads/main/english',
+    'https://raw.githubusercontent.com/ahmedgold1999/INQU/refs/heads/main/english/allquestions',
   };
 
   @override
