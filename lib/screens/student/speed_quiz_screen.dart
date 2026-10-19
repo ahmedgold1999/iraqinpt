@@ -43,8 +43,11 @@ class _SpeedQuizScreenState extends State<SpeedQuizScreen> with SingleTickerProv
       if (uid != null) {
         final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
         if (doc.exists && doc.data()?['isPremium'] == true) {
-          final expRaw = doc.data()!['expiryDate'];
-          if (expRaw == null || (expRaw is Timestamp && expRaw.toDate().isAfter(DateTime.now()))) {
+          final expRaw = doc.data()!['expiryDate'] ?? doc.data()!['premiumUntil'];
+          DateTime? exp;
+          if (expRaw is Timestamp) exp = expRaw.toDate();
+          if (expRaw is String) exp = DateTime.tryParse(expRaw);
+          if (exp == null || exp.isAfter(DateTime.now())) {
             isPremium = true;
           }
         }

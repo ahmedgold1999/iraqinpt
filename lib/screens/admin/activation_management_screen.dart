@@ -87,16 +87,23 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
     final userData = userDoc.data() as Map<String, dynamic>;
     final userId = userDoc.id;
     final bool isPremium = userData['isPremium'] ?? false;
-    final expiryDate = (userData['expiryDate'] as Timestamp?)?.toDate();
+    DateTime? expiryDate;
+    final dynamic rawExp = userData['expiryDate'] ?? userData['premiumUntil'];
+    if (rawExp is Timestamp) expiryDate = rawExp.toDate();
+    else if (rawExp is String) expiryDate = DateTime.tryParse(rawExp);
 
     String currentStatus = 'حساب غير مفعّل';
     if (isPremium) {
       if (expiryDate != null) {
-        final days = expiryDate.difference(DateTime.now()).inDays;
-        if (days > 365) {
-          currentStatus = 'تفعيل دائمي';
+        if (expiryDate.isBefore(DateTime.now())) {
+          currentStatus = 'منتهي الصلاحية (${DateFormat('yyyy/MM/dd').format(expiryDate)})';
         } else {
-          currentStatus = 'مُفعّل ينتهي في ${DateFormat('yyyy/MM/dd').format(expiryDate)}';
+          final days = expiryDate.difference(DateTime.now()).inDays;
+          if (days > 365) {
+            currentStatus = 'تفعيل دائمي';
+          } else {
+            currentStatus = 'مُفعّل ينتهي في ${DateFormat('yyyy/MM/dd').format(expiryDate)}';
+          }
         }
       } else {
         currentStatus = 'تفعيل ممتاز';
@@ -305,7 +312,13 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
                           final user = _users[index];
                           final data = user.data() as Map<String, dynamic>;
                           final bool isPremium = data['isPremium'] ?? false;
-                          final expiryDate = (data['expiryDate'] as Timestamp?)?.toDate();
+                          DateTime? expiryDate;
+                          final dynamic rawExp = data['expiryDate'] ?? data['premiumUntil'];
+                          if (rawExp is Timestamp) expiryDate = rawExp.toDate();
+                          else if (rawExp is String) expiryDate = DateTime.tryParse(rawExp);
+
+                          final bool isExpired = expiryDate != null && expiryDate.isBefore(DateTime.now());
+                          final bool isActuallyActive = isPremium && !isExpired;
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
@@ -313,8 +326,10 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(18),
                               border: Border.all(
-                                color: isPremium ? const Color(0xFF00C853) : const Color(0xFFE5E5EA),
-                                width: isPremium ? 1.5 : 1,
+                                color: isActuallyActive
+                                    ? const Color(0xFF00C853)
+                                    : (isExpired ? Colors.redAccent.withOpacity(0.5) : const Color(0xFFE5E5EA)),
+                                width: isActuallyActive || isExpired ? 1.5 : 1,
                               ),
                               boxShadow: [
                                 BoxShadow(
@@ -332,14 +347,16 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
                                 width: 42,
                                 height: 42,
                                 decoration: BoxDecoration(
-                                  color: isPremium ? const Color(0xFF00C853) : const Color(0xFFF2F2F7),
+                                  color: isActuallyActive
+                                      ? const Color(0xFF00C853)
+                                      : (isExpired ? Colors.redAccent : const Color(0xFFF2F2F7)),
                                   shape: BoxShape.circle,
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
                                   data['name']?[0]?.toUpperCase() ?? '?',
                                   style: TextStyle(
-                                    color: isPremium ? Colors.white : const Color(0xFF1C1C1E),
+                                    color: (isActuallyActive || isExpired) ? Colors.white : const Color(0xFF1C1C1E),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
                                   ),
@@ -361,10 +378,15 @@ class _ActivationManagementScreenState extends State<ActivationManagementScreen>
                                     _resolveUserEmail(data),
                                     style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontFamily: 'Tajawal'),
                                   ),
-                                  if (isPremium && expiryDate != null)
+                                  if (isActuallyActive && expiryDate != null)
                                     Text(
                                       'مُفعّل لغاية: ${DateFormat('yyyy/MM/dd').format(expiryDate)}',
                                       style: const TextStyle(color: Color(0xFF00C853), fontSize: 11.5, fontWeight: FontWeight.bold, fontFamily: 'Tajawal'),
+                                    )
+                                  else if (isExpired && expiryDate != null)
+                                    Text(
+                                      'منتهي الصلاحية: ${DateFormat('yyyy/MM/dd').format(expiryDate)} ⚠️',
+                                      style: const TextStyle(color: Colors.redAccent, fontSize: 11.5, fontWeight: FontWeight.bold, fontFamily: 'Tajawal'),
                                     ),
                                 ],
                               ),

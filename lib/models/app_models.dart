@@ -111,13 +111,14 @@ class UserModel {
     }
 
     DateTime? expiryDate;
-    if (data['expiryDate'] != null) {
-      if (data['expiryDate'] is Timestamp) {
-        expiryDate = (data['expiryDate'] as Timestamp).toDate();
-      } else if (data['expiryDate'] is String) {
-        expiryDate = DateTime.tryParse(data['expiryDate'] as String);
-      } else if (data['expiryDate'] is int) {
-        expiryDate = DateTime.fromMillisecondsSinceEpoch(data['expiryDate'] as int);
+    final dynamic rawExpiry = data['expiryDate'] ?? data['premiumUntil'];
+    if (rawExpiry != null) {
+      if (rawExpiry is Timestamp) {
+        expiryDate = rawExpiry.toDate();
+      } else if (rawExpiry is String) {
+        expiryDate = DateTime.tryParse(rawExpiry);
+      } else if (rawExpiry is int) {
+        expiryDate = DateTime.fromMillisecondsSinceEpoch(rawExpiry);
       }
     }
 

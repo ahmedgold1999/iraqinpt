@@ -744,15 +744,80 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   // =========================================================================
+  // مساعدات فحص الصلاحية والاشتراك
+  // =========================================================================
+  static DateTime? _extractUserExpiryDate(Map<String, dynamic> data) {
+    final rawExpiry = data['expiryDate'] ?? data['premiumUntil'];
+    if (rawExpiry == null) return null;
+    if (rawExpiry is Timestamp) {
+      return rawExpiry.toDate();
+    } else if (rawExpiry is String) {
+      return DateTime.tryParse(rawExpiry);
+    } else if (rawExpiry is int) {
+      return DateTime.fromMillisecondsSinceEpoch(rawExpiry);
+    }
+    return null;
+  }
+
+  static bool _isUserSubscriptionActive(Map<String, dynamic> data) {
+    final isPremium = data['isPremium'] == true;
+    if (!isPremium) return false;
+    final expiry = _extractUserExpiryDate(data);
+    if (expiry != null && DateTime.now().isAfter(expiry)) {
+      return false; // انتهت الصلاحية
+    }
+    return true;
+  }
+
+  // =========================================================================
   // نافذة تفاصيل الطالب وتعديل الاسم والاشتراك (Student Details & Editor Sheet)
   // =========================================================================
   void _showStudentDetailsSheet(BuildContext context, String uid, Map<String, dynamic> data) {
     final initialName = data['name'] ?? data['displayName'] ?? 'طالب';
     final TextEditingController nameEditController = TextEditingController(text: initialName);
     
-    // حساب مدة الاشتراك المحددة مبدئياً
-    bool isPremium = data['isPremium'] == true;
-    String selectedSubscription = isPremium ? '1_year' : 'none';
+    // استخراج تاريخ انتهاء الصلاحية بدقة وفحص الانتهاء
+    final expiryDate = _extractUserExpiryDate(data);
+    final bool isExpired = expiryDate != null && DateTime.now().isAfter(expiryDate);
+    final bool isPremium = (data['isPremium'] == true) && !isExpired;
+
+    // حساب نوع الاشتراك الفعلي
+    String selectedSubscription = 'none';
+    final savedPlan = (data['subscriptionPlan'] ?? data['plan'] ?? data['subscriptionType'])?.toString();
+
+    if (savedPlan != null && ['none', '1_month', '2_months', '3_months', '1_year', 'lifetime'].contains(savedPlan)) {
+      selectedSubscription = isExpired ? 'none' : savedPlan;
+    } else if (isPremium && expiryDate != null) {
+      final now = DateTime.now();
+      final daysLeft = expiryDate.difference(now).inDays;
+      
+      DateTime? startDate;
+      final dynamic rawStart = data['activatedAt'] ?? data['subscriptionDate'] ?? data['updatedAt'] ?? data['createdAt'];
+      if (rawStart is Timestamp) {
+        startDate = rawStart.toDate();
+      } else if (rawStart is String) {
+        startDate = DateTime.tryParse(rawStart);
+      }
+
+      int totalDays = daysLeft;
+      if (startDate != null && expiryDate.isAfter(startDate)) {
+        totalDays = expiryDate.difference(startDate).inDays;
+      }
+
+      if (totalDays > 730 || daysLeft > 500) {
+        selectedSubscription = 'lifetime';
+      } else if (totalDays >= 150 || daysLeft > 95) {
+        selectedSubscription = '1_year';
+      } else if (totalDays >= 75 || daysLeft > 62) {
+        selectedSubscription = '3_months';
+      } else if (totalDays >= 45 || daysLeft > 32) {
+        selectedSubscription = '2_months';
+      } else {
+        selectedSubscription = '1_month';
+      }
+    } else if (isPremium) {
+      selectedSubscription = '1_year';
+    }
 
     showModalBottomSheet(
       context: context,
@@ -773,11 +838,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           DateTime? createdAt;
           if (data['createdAt'] != null && data['createdAt'] is Timestamp) {
             createdAt = (data['createdAt'] as Timestamp).toDate();
-          }
-
-          DateTime? expiryDate;
-          if (data['premiumUntil'] != null && data['premiumUntil'] is Timestamp) {
-            expiryDate = (data['premiumUntil'] as Timestamp).toDate();
           }
 
           int daysLeft = 0;
@@ -989,6 +1049,59 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               ),
                             ),
                           ),
+                          const SizedBox(height: 10),
+                          // شريط توضيحي لحالة الاشتراك الحالية
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isExpired
+                                  ? Colors.red.withOpacity(0.08)
+                                  : (isPremium
+                                      ? const Color(0xFF16A34A).withOpacity(0.08)
+                                      : (isDark ? Colors.white.withOpacity(0.04) : Colors.grey.shade100)),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isExpired
+                                    ? Colors.red.withOpacity(0.3)
+                                    : (isPremium
+                                        ? const Color(0xFF16A34A).withOpacity(0.3)
+                                        : (isDark ? Colors.white10 : Colors.grey.shade300)),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isExpired
+                                      ? Icons.error_outline_rounded
+                                      : (isPremium ? Icons.check_circle_rounded : Icons.info_outline_rounded),
+                                  color: isExpired
+                                      ? Colors.red
+                                      : (isPremium ? const Color(0xFF16A34A) : Colors.grey.shade600),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    isExpired
+                                        ? '⚠️ هذا الحساب منتهي الصلاحية بتاريخ ${expiryDate != null ? DateFormat('yyyy/MM/dd').format(expiryDate) : ''}. يمكنك اختيار مدة جديدة وحفظ التعديل للتجديد.'
+                                        : (isPremium && expiryDate != null
+                                            ? '✅ الاشتراك نشط لغاية ${DateFormat('yyyy/MM/dd').format(expiryDate)} (متبقي $daysLeft يوم).'
+                                            : (isPremium ? '✅ اشتراك نشط (بدون انتهاء محدد).' : '🔒 الحساب حالياً غير مفعّل (مجاني).')),
+                                    style: TextStyle(
+                                      fontFamily: 'Tajawal',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: isExpired
+                                          ? Colors.red.shade700
+                                          : (isPremium
+                                              ? const Color(0xFF15803D)
+                                              : (isDark ? Colors.white70 : Colors.black87)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           const SizedBox(height: 18),
 
                           // 3. معلومات الطالب التفصيلية
@@ -1180,34 +1293,32 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                   'displayName': newName,
                                 };
 
+                                DateTime? newExpiry;
                                 if (selectedSubscription == 'none') {
                                   updates['isPremium'] = false;
+                                  updates['subscriptionPlan'] = 'none';
+                                  updates['expiryDate'] = null;
                                   updates['premiumUntil'] = null;
-                                } else if (selectedSubscription == '1_month') {
+                                } else {
+                                  int durationDays = 30;
+                                  if (selectedSubscription == '1_month') {
+                                    durationDays = 30;
+                                  } else if (selectedSubscription == '2_months') {
+                                    durationDays = 60;
+                                  } else if (selectedSubscription == '3_months') {
+                                    durationDays = 90;
+                                  } else if (selectedSubscription == '1_year') {
+                                    durationDays = 365;
+                                  } else if (selectedSubscription == 'lifetime') {
+                                    durationDays = 3650;
+                                  }
+
+                                  newExpiry = DateTime.now().add(Duration(days: durationDays));
                                   updates['isPremium'] = true;
-                                  updates['premiumUntil'] = Timestamp.fromDate(
-                                    DateTime.now().add(const Duration(days: 30)),
-                                  );
-                                } else if (selectedSubscription == '2_months') {
-                                  updates['isPremium'] = true;
-                                  updates['premiumUntil'] = Timestamp.fromDate(
-                                    DateTime.now().add(const Duration(days: 60)),
-                                  );
-                                } else if (selectedSubscription == '3_months') {
-                                  updates['isPremium'] = true;
-                                  updates['premiumUntil'] = Timestamp.fromDate(
-                                    DateTime.now().add(const Duration(days: 90)),
-                                  );
-                                } else if (selectedSubscription == '1_year') {
-                                  updates['isPremium'] = true;
-                                  updates['premiumUntil'] = Timestamp.fromDate(
-                                    DateTime.now().add(const Duration(days: 365)),
-                                  );
-                                } else if (selectedSubscription == 'lifetime') {
-                                  updates['isPremium'] = true;
-                                  updates['premiumUntil'] = Timestamp.fromDate(
-                                    DateTime.now().add(const Duration(days: 3650)),
-                                  );
+                                  updates['subscriptionPlan'] = selectedSubscription;
+                                  updates['expiryDate'] = newExpiry;
+                                  updates['premiumUntil'] = Timestamp.fromDate(newExpiry);
+                                  updates['activatedAt'] = FieldValue.serverTimestamp();
                                 }
 
                                 await _updateStudentData(uid, updates);
@@ -2006,16 +2117,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
       return timeB.compareTo(timeA); // الأحدث أولاً
     });
 
-    // 2. تصفية الاشتراكات: الكل / المميزون فقط / المجاني فقط
+    // 2. تصفية الاشتراكات: الكل / النشطون فقط / المنتهية / المجاني فقط
     if (_userFilter == 'premium') {
       filteredDocs = filteredDocs.where((doc) {
         final data = doc.data() as Map<String, dynamic>? ?? {};
-        return data['isPremium'] == true;
+        final expiry = _extractUserExpiryDate(data);
+        final isExpired = expiry != null && DateTime.now().isAfter(expiry);
+        return data['isPremium'] == true && !isExpired;
+      }).toList();
+    } else if (_userFilter == 'expired') {
+      filteredDocs = filteredDocs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>? ?? {};
+        final expiry = _extractUserExpiryDate(data);
+        final isExpired = expiry != null && DateTime.now().isAfter(expiry);
+        return (data['isPremium'] == true && isExpired) || (expiry != null && DateTime.now().isAfter(expiry));
       }).toList();
     } else if (_userFilter == 'free') {
       filteredDocs = filteredDocs.where((doc) {
         final data = doc.data() as Map<String, dynamic>? ?? {};
-        return data['isPremium'] != true;
+        final expiry = _extractUserExpiryDate(data);
+        final isExpired = expiry != null && DateTime.now().isAfter(expiry);
+        return data['isPremium'] != true && !isExpired;
       }).toList();
     }
 
@@ -2094,20 +2216,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  _buildFilterChip('الكل (${_userDocs.length})', 'all', isDark),
-                  const SizedBox(width: 6),
-                  _buildFilterChip('⭐ المميزون', 'premium', isDark),
-                  const SizedBox(width: 6),
-                  _buildFilterChip('🔓 المجاني', 'free', isDark),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    onPressed: () => _fetchUsers(isRefresh: true),
-                    tooltip: 'تحديث القائمة',
-                  ),
-                ],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _buildFilterChip('الكل (${_userDocs.length})', 'all', isDark),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('⭐ النشطون', 'premium', isDark),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('⌛ المنتهية', 'expired', isDark),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('🔓 المجاني', 'free', isDark),
+                    const SizedBox(width: 10),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      onPressed: () => _fetchUsers(isRefresh: true),
+                      tooltip: 'تحديث القائمة',
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -2144,13 +2272,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             data['name'] ?? data['displayName'] ?? 'طالب';
                         final email = _resolveUserEmail(data);
                         final username = _resolveUsername(data);
-                        final isPremium = data['isPremium'] == true;
 
-                        DateTime? expiryDate;
-                        if (data['premiumUntil'] != null &&
-                            data['premiumUntil'] is Timestamp) {
-                          expiryDate =
-                              (data['premiumUntil'] as Timestamp).toDate();
+                        final expiryDate = _extractUserExpiryDate(data);
+                        final bool isExpired = expiryDate != null && DateTime.now().isAfter(expiryDate);
+                        final bool isActuallyPremium = (data['isPremium'] == true) && !isExpired;
+
+                        // إذا كان الحساب مسجلاً كـ isPremium في الداتابيز لكن انتهت صلاحيته فعلياً، نحدث الداتابيز في الخلفية
+                        if (data['isPremium'] == true && isExpired) {
+                          FirebaseFirestore.instance.collection('users').doc(uid).update({
+                            'isPremium': false,
+                          }).catchError((_) => null);
                         }
 
                         return _buildCompactStudentItem(
@@ -2159,7 +2290,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           name: name,
                           email: email,
                           username: username,
-                          isPremium: isPremium,
+                          isPremium: isActuallyPremium,
+                          isExpired: isExpired,
                           expiryDate: expiryDate,
                           isDark: isDark,
                         );
@@ -2199,12 +2331,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
     required String email,
     String? username,
     required bool isPremium,
+    required bool isExpired,
     DateTime? expiryDate,
     required bool isDark,
   }) {
-    String statusText = isPremium ? 'مفعل ⭐' : 'مجاني';
-    if (isPremium && expiryDate != null) {
-      statusText = '${expiryDate.year}/${expiryDate.month}/${expiryDate.day}';
+    String statusText = 'مجاني';
+    Color statusColor = const Color(0xFF64748B);
+    Color borderColor = isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0);
+    Color avatarColor = const Color(0xFF2563EB);
+
+    if (isExpired) {
+      statusText = expiryDate != null
+          ? 'منتهي (${DateFormat('yyyy/MM/dd').format(expiryDate)}) ⚠️'
+          : 'منتهي الصلاحية ⚠️';
+      statusColor = const Color(0xFFEF4444);
+      borderColor = const Color(0xFFEF4444).withOpacity(0.4);
+      avatarColor = const Color(0xFFEF4444);
+    } else if (isPremium) {
+      if (expiryDate != null) {
+        final days = expiryDate.difference(DateTime.now()).inDays;
+        if (days > 365 * 2) {
+          statusText = 'دائمي 👑';
+        } else {
+          statusText = 'مفعل (${DateFormat('yyyy/MM/dd').format(expiryDate)}) ⭐';
+        }
+      } else {
+        statusText = 'مفعل ⭐';
+      }
+      statusColor = const Color(0xFF16A34A);
+      borderColor = const Color(0xFF16A34A).withOpacity(0.35);
+      avatarColor = const Color(0xFF16A34A);
     }
 
     return Container(
@@ -2212,13 +2368,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF131C31) : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isPremium
-              ? const Color(0xFF16A34A).withOpacity(0.35)
-              : (isDark
-                  ? Colors.white.withOpacity(0.06)
-                  : const Color(0xFFE2E8F0)),
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Material(
         color: Colors.transparent,
@@ -2232,9 +2382,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: isPremium
-                      ? const Color(0xFF16A34A)
-                      : const Color(0xFF2563EB),
+                  backgroundColor: avatarColor,
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : 'ط',
                     style: const TextStyle(
@@ -2267,22 +2415,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1),
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: isPremium
-                                  ? const Color(0xFF16A34A).withOpacity(0.15)
-                                  : const Color(0xFF64748B).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(5),
+                              color: statusColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               statusText,
                               style: TextStyle(
-                                fontSize: 9,
+                                fontSize: 9.5,
                                 fontWeight: FontWeight.bold,
                                 fontFamily: 'Tajawal',
-                                color: isPremium
-                                    ? const Color(0xFF16A34A)
-                                    : const Color(0xFF64748B),
+                                color: statusColor,
                               ),
                             ),
                           ),

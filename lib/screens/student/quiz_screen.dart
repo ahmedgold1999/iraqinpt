@@ -1705,11 +1705,12 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
         final data = doc.data();
         final bool isPremium = data?['isPremium'] == true;
-        final expiryRaw = data?['expiryDate'];
+        final expiryRaw = data?['expiryDate'] ?? data?['premiumUntil'];
         bool isValid = isPremium;
         if (isPremium && expiryRaw != null) {
           DateTime? expiry;
           if (expiryRaw is Timestamp) expiry = expiryRaw.toDate();
+          if (expiryRaw is String) expiry = DateTime.tryParse(expiryRaw);
           if (expiry != null && expiry.isBefore(DateTime.now())) {
             isValid = false; // انتهت صلاحية الاشتراك
           }
