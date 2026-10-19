@@ -10,6 +10,8 @@ import 'quiz_screen.dart';
 import 'smart_vault_screen.dart';
 import 'notifications_screen.dart';
 import 'subscription_screen.dart';
+import 'subject_exams_screen.dart';
+import '../../services/specialized_exam_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/subscription_service.dart';
@@ -376,30 +378,18 @@ class StudentHomeScreen extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: () {
-            if (isLocked) {
-              if (defaultTargetPlatform == TargetPlatform.iOS) {
-                _showNonPremiumDialog(context);
-              } else {
-                if (!user.isPremium) {
-                  _showNonPremiumDialog(context);
-                } else {
-                  _showActivationDialog(context);
-                }
-              }
-              return;
-            }
-
-            if (subject['key'] == 'arabic' && !user.isPremium) {
-              _showFreeArabicDialog(
-                  context, subject['name'] as String, subject['key'] as String);
-            } else {
-              _showQuestionsCountDialog(
-                context,
-                subject['name'] as String,
-                subject['key'] as String,
-                user,
-              );
-            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SubjectExamsScreen(
+                  subjectName: subject['name'] as String,
+                  subjectKey: subject['key'] as String,
+                  subjectIcon: subject['icon'] as IconData,
+                  subjectColor: subject['color'] as Color,
+                  user: user,
+                ),
+              ),
+            );
           },
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -459,22 +449,22 @@ class StudentHomeScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                // زر سهم الانتقال / القفل الفاخر
+                // زر سهم الانتقال الفاخر
                 Container(
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isLocked ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+                    color: base.withOpacity(0.1),
                     border: Border.all(
-                      color: isLocked ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
+                      color: base.withOpacity(0.25),
                       width: 0.8,
                     ),
                   ),
                   child: Icon(
-                    isLocked ? Icons.lock_rounded : Icons.arrow_forward_ios_rounded,
+                    Icons.arrow_forward_ios_rounded,
                     size: 14,
-                    color: isLocked ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                    color: base,
                   ),
                 ),
               ],
@@ -488,10 +478,12 @@ class StudentHomeScreen extends StatelessWidget {
   String _getSubjectStatus(String subjectKey, bool isLocked) {
     if (subjectKey == 'arabic') {
       return isLocked
-          ? '30 سؤال مجاني • اشترك لفتح 100 سؤال'
-          : 'جاهز للامتحان • اضغط للبدء';
+          ? 'الامتحان العام والتخصصي • تجربة مجانية'
+          : 'الامتحان العام والتخصصي • متاح للبدء';
     }
-    return isLocked ? 'يجب الاشتراك للبدء' : 'جاهز للامتحان • اضغط للبدء';
+    return isLocked
+        ? 'الامتحان العام والتخصصي • باقة VIP'
+        : 'الامتحان العام والتخصصي • متاح للبدء';
   }
 
   Color _getStatusColor(String subjectKey, bool isLocked) {

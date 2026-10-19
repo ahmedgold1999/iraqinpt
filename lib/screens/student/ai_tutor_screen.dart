@@ -98,14 +98,100 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
     );
   }
 
+  void _showNonPremiumPrompt() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: const Color(0xFF0F172A),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFACC15), Color(0xFFEAB308)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF0F172A), size: 36),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'الأستاذ الذكي متاح للمشتركين فقط 🔒',
+                style: GoogleFonts.notoKufiArabic(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFFACC15),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'ميزة التحدث والاستفسار مع الأستاذ الذكي AI مخصصة لمشتركي باقة VIP. اشترك الآن للاستفادة من شروحات فورية غير محدودة لكافة المواد والأسئلة الوزارية.',
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontSize: 13,
+                  color: Colors.white70,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('إغلاق', style: TextStyle(fontFamily: 'Tajawal', color: Colors.white70)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFACC15),
+                        foregroundColor: const Color(0xFF0F172A),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _navigateToSubscriptionWithSlide();
+                      },
+                      child: const Text(
+                        'ترقية واشتراك 👑',
+                        style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleSubmitted(String text) async {
     final cleanText = text.trim();
     if (cleanText.isEmpty || _isLoading) return;
 
     final isPremium = _currentUser?.isPremium ?? false;
 
-    if (!isPremium && _remainingFreeQueries <= 0) {
-      _showQuotaExceededDialog();
+    if (!isPremium) {
+      _showNonPremiumPrompt();
       return;
     }
 
@@ -395,7 +481,7 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
       ),
       body: Column(
         children: [
-          // شريط معلومات الباقة والرصيد اليومي
+          // شريط معلومات الباقة
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -403,14 +489,14 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
               color: _cardDark,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isPremium ? _gold.withOpacity(0.4) : Colors.white.withOpacity(0.08),
+                color: isPremium ? _gold.withOpacity(0.4) : Colors.redAccent.withOpacity(0.25),
               ),
             ),
             child: Row(
               children: [
                 Icon(
-                  isPremium ? Icons.workspace_premium_rounded : Icons.bolt_rounded,
-                  color: isPremium ? _gold : const Color(0xFF38BDF8),
+                  isPremium ? Icons.workspace_premium_rounded : Icons.lock_outline_rounded,
+                  color: isPremium ? _gold : Colors.redAccent,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -418,7 +504,7 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                   child: Text(
                     isPremium
                         ? 'أنت مشترك في VIP: استخدام غير محدود للأستاذ الذكي 👑'
-                        : 'الرصيد المجاني اليومي: متبقي $_remainingFreeQueries من ${GeminiService.freeDailyLimit} أسئلة',
+                        : 'ميزة الأستاذ الذكي مخصصة للمشتركين المفعلين فقط 🔒',
                     style: TextStyle(
                       fontFamily: 'Tajawal',
                       fontSize: 12.5,
@@ -493,7 +579,13 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
                         color: Colors.white70,
                       ),
                     ),
-                    onPressed: () => _handleSubmitted(prompt),
+                    onPressed: () {
+                      if (!isPremium) {
+                        _showNonPremiumPrompt();
+                      } else {
+                        _handleSubmitted(prompt);
+                      }
+                    },
                   );
                 },
               ),
@@ -669,6 +761,76 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
   }
 
   Widget _buildInputBar() {
+    final bool isPremium = _currentUser?.isPremium ?? false;
+
+    if (!isPremium) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: _cardDark,
+          border: Border(
+            top: BorderSide(color: Colors.white.withOpacity(0.08)),
+          ),
+        ),
+        child: SafeArea(
+          child: InkWell(
+            onTap: _showNonPremiumPrompt,
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: _inputDark.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.redAccent.withOpacity(0.35)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.lock_rounded, size: 16, color: Colors.redAccent),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'حقل الكتابة غير مفعل (مخصص للمشتركين 🔒)',
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white60,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFACC15), Color(0xFFEAB308)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'تفعيل الآن 👑',
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(

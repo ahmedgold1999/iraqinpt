@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -1226,10 +1227,7 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
 
   // ================= وظائف التحكم =================
   void _resetZoom() {
-    setState(() {
-      _currentZoom = 1.0;
-      _transformationController.value = Matrix4.identity();
-    });
+    _pdfViewController?.setScale(1.0);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('تمت إعادة حجم الصفحة إلى الوضع الأصلي (100%)', style: TextStyle(fontFamily: 'Tajawal')),
@@ -1780,48 +1778,36 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
           children: [
             // ================= قارئ PDF الرئيسي وطبقات التظليل =================
             Positioned.fill(
-              child: GestureDetector(
-                onTap: () {
-                  if (!_isPenActive) {
-                    setState(() => _showBars = !_showBars);
-                  }
-                },
-                child: InteractiveViewer(
-                  transformationController: _transformationController,
-                  minScale: 1.0,
-                  maxScale: 4.0,
-                  panEnabled: _currentZoom > 1.01 && !_isPenActive,
-                  scaleEnabled: !_isPenActive,
-                  onInteractionUpdate: (details) {
-                    final scale = _transformationController.value.getMaxScaleOnAxis();
-                    if ((scale - _currentZoom).abs() > 0.05) {
-                      setState(() => _currentZoom = scale);
-                    }
-                  },
-                  child: Stack(
-                    children: [
-                      if (kIsWeb)
-                        InAppWebView(
-                          initialUrlRequest: URLRequest(url: WebUri(widget.fileOrUrl)),
-                          initialSettings: InAppWebViewSettings(
-                            javaScriptEnabled: true,
-                            supportMultipleWindows: false,
-                            allowsInlineMediaPlayback: true,
-                          ),
-                        )
-                      else if (_localFilePath != null && File(_localFilePath!).existsSync())
-                        PDFView(
-                          key: ValueKey('pdf_${widget.fileOrUrl}_${_swipeHorizontal}_$_colorTheme'),
-                          filePath: _localFilePath!,
-                          enableSwipe: true,
-                          swipeHorizontal: _swipeHorizontal,
-                          autoSpacing: true,
-                          pageFling: true,
-                          pageSnap: _swipeHorizontal,
-                          defaultPage: _currentPage,
-                          fitPolicy: FitPolicy.BOTH,
-                          preventLinkNavigation: false,
-                          nightMode: _colorTheme == 'night',
+              child: Stack(
+                children: [
+                  if (kIsWeb)
+                    InAppWebView(
+                      initialUrlRequest: URLRequest(url: WebUri(widget.fileOrUrl)),
+                      initialSettings: InAppWebViewSettings(
+                        javaScriptEnabled: true,
+                        supportMultipleWindows: false,
+                        allowsInlineMediaPlayback: true,
+                      ),
+                    )
+                  else if (_localFilePath != null && File(_localFilePath!).existsSync())
+                    PDFView(
+                      key: ValueKey('pdf_${widget.fileOrUrl}_${_swipeHorizontal}_$_colorTheme'),
+                      filePath: _localFilePath!,
+                      enableSwipe: true,
+                      swipeHorizontal: _swipeHorizontal,
+                      autoSpacing: _swipeHorizontal,
+                      pageFling: _swipeHorizontal,
+                      pageSnap: _swipeHorizontal,
+                      defaultPage: _currentPage,
+                      fitPolicy: _swipeHorizontal ? FitPolicy.BOTH : FitPolicy.WIDTH,
+                      preventLinkNavigation: false,
+                      nightMode: _colorTheme == 'night',
+                      showScrollIndicators: true,
+                      maxZoom: 4.0,
+                      minZoom: 1.0,
+                      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                        Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+                      },
                           onRender: (pages) {
                             if (mounted) {
                               setState(() {
@@ -1959,8 +1945,6 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
                     ],
                   ),
                 ),
-              ),
-            ),
 
             // ================= شريط علوي أنيق قابل للإخفاء =================
             if (_showBars)
@@ -2028,7 +2012,56 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
                           });
                         },
                       ),
+
+                      // زر إخفاء الأشرطة للقراءة الغامرة
+                      IconButton(
+                        icon: const Icon(Icons.fullscreen_rounded, color: Colors.white70, size: 22),
+                        tooltip: 'إخفاء الأشرطة',
+                        onPressed: () => setState(() => _showBars = false),
+                      ),
                     ],
+                  ),
+                ),
+              ),
+
+            // زر إظهار أشرطة الأدوات عندما تكون مخفية
+            if (!_showBars && !_isLoading && _localFilePath != null)
+              Positioned(
+                top: 12,
+                left: 12,
+                child: InkWell(
+                  onTap: () => setState(() => _showBars = true),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withOpacity(0.88),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _gold.withOpacity(0.4)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.tune_rounded, color: _gold, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'أدوات القراءة',
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

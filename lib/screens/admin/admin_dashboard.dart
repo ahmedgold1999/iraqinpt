@@ -19,6 +19,7 @@ import '../../services/notification_service.dart';
 import '../../services/dynamic_app_icon_service.dart';
 import '../../routes.dart';
 import 'leaderboard_management_screen.dart';
+import 'specialized_exams_management_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -1572,6 +1573,38 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   _buildTabButton(7, '🔥 استضافة وسيرفر Firebase', isDark),
                   const SizedBox(width: 6),
                   _buildTabButton(8, '🎨 أيقونة التطبيق الحية', isDark),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SpecializedExamsManagementScreen()),
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.flash_on_rounded, size: 14, color: Color(0xFFF59E0B)),
+                          SizedBox(width: 5),
+                          Text(
+                            '🎯 الاختبارات التخصصية (GitHub JSON)',
+                            style: TextStyle(
+                              fontFamily: 'Tajawal',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1687,12 +1720,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildAppleKpiCard(
-                  title: 'بنك الأسئلة',
-                  value: '300+',
-                  icon: Icons.cloud_done_rounded,
+                  title: 'الاختبارات التخصصية',
+                  value: 'GitHub JSON',
+                  icon: Icons.flash_on_rounded,
                   color: const Color(0xFF7C3AED),
-                  subtitle: 'سؤال رسمي جاهز',
+                  subtitle: 'إدارة وحفظ أوفلاين',
                   isDark: isDark,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SpecializedExamsManagementScreen()),
+                  ),
                 ),
               ),
             ],

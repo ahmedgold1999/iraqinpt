@@ -15,6 +15,7 @@ import '../../services/auth_service.dart';
 import '../../services/config_service.dart';
 import '../../services/app_update_service.dart';
 import '../../services/daily_reminder_service.dart';
+import '../../services/specialized_exam_service.dart';
 
 class StudentMainShell extends StatefulWidget {
   const StudentMainShell({super.key});
@@ -35,6 +36,7 @@ class _StudentMainShellState extends State<StudentMainShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppUpdateService.checkUpdateOnStartup(context);
       DailyReminderService.checkAndDispatchTodayNotification();
+      SpecializedExamService().syncAllExamsOffline();
     });
   }
 
