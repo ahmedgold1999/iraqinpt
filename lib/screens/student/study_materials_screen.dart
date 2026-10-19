@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import 'package:flutter_windowmanager/flutter_windowmanager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import '../../routes.dart';
@@ -24,6 +25,8 @@ class StudyMaterial {
   final String pdfUrl;
   final String category;
   final DateTime createdAt;
+  final String? fileSize;
+  final int? pageCount;
 
   StudyMaterial({
     required this.id,
@@ -32,6 +35,8 @@ class StudyMaterial {
     required this.pdfUrl,
     required this.category,
     required this.createdAt,
+    this.fileSize,
+    this.pageCount,
   });
 
   factory StudyMaterial.fromFirestore(DocumentSnapshot doc) {
@@ -43,6 +48,10 @@ class StudyMaterial {
       pdfUrl: data['pdfUrl'] ?? '',
       category: data['category'] ?? 'computer',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      fileSize: data['fileSize'],
+      pageCount: data['pageCount'] is int
+          ? data['pageCount']
+          : (data['pageCount'] != null ? int.tryParse(data['pageCount'].toString()) : null),
     );
   }
 }
@@ -205,17 +214,830 @@ class SubscriptionRequiredDialog extends StatelessWidget {
   }
 }
 
+// ==================== رسم وتظليل قلم التمييز الأصفر ====================
+class HighlightStroke {
+  final int page;
+  final List<Offset> points;
+  final Color color;
+  final double strokeWidth;
+
+  HighlightStroke({
+    required this.page,
+    required this.points,
+    this.color = const Color(0x66FFEB3B), // أصفر شفاف كقلم التمييز
+    this.strokeWidth = 22.0,
+  });
+}
+
+class HighlighterPainter extends CustomPainter {
+  final List<HighlightStroke> strokes;
+  final List<Offset> activePoints;
+  final Color activeColor;
+  final double activeWidth;
+
+  HighlighterPainter({
+    required this.strokes,
+    required this.activePoints,
+    this.activeColor = const Color(0x66FFEB3B),
+    this.activeWidth = 22.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // رسم التحديدات السابقة
+    for (final stroke in strokes) {
+      if (stroke.points.isEmpty) continue;
+      final paint = Paint()
+        ..color = stroke.color
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = stroke.strokeWidth
+        ..style = PaintingStyle.stroke;
+
+      if (stroke.points.length == 1) {
+        canvas.drawCircle(stroke.points.first, stroke.strokeWidth / 2, paint);
+      } else {
+        final path = Path();
+        path.moveTo(stroke.points.first.dx, stroke.points.first.dy);
+        for (int i = 1; i < stroke.points.length; i++) {
+          path.lineTo(stroke.points[i].dx, stroke.points[i].dy);
+        }
+        canvas.drawPath(path, paint);
+      }
+    }
+
+    // رسم السكتة الحالية أثناء سحب الإصبع
+    if (activePoints.isNotEmpty) {
+      final paint = Paint()
+        ..color = activeColor
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = activeWidth
+        ..style = PaintingStyle.stroke;
+
+      if (activePoints.length == 1) {
+        canvas.drawCircle(activePoints.first, activeWidth / 2, paint);
+      } else {
+        final path = Path();
+        path.moveTo(activePoints.first.dx, activePoints.first.dy);
+        for (int i = 1; i < activePoints.length; i++) {
+          path.lineTo(activePoints[i].dx, activePoints[i].dy);
+        }
+        canvas.drawPath(path, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant HighlighterPainter oldDelegate) => true;
+}
+
+// ==================== واجهة تفاصيل وغلاف الملزمة الفاخرة ====================
+class MaterialDetailScreen extends StatefulWidget {
+  final StudyMaterial material;
+  final bool isDownloaded;
+  final String? localFilePath;
+  final bool isPremium;
+  final VoidCallback onDownloadRequested;
+  final Function(String path, bool isLocal) onReadRequested;
+
+  const MaterialDetailScreen({
+    super.key,
+    required this.material,
+    required this.isDownloaded,
+    this.localFilePath,
+    required this.isPremium,
+    required this.onDownloadRequested,
+    required this.onReadRequested,
+  });
+
+  @override
+  State<MaterialDetailScreen> createState() => _MaterialDetailScreenState();
+}
+
+class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
+  static const _gold = Color(0xFFFACC15);
+  String _fileSizeStr = 'جاري الحساب...';
+  int? _pageCount;
+  bool _isLoadingMeta = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMetadata();
+  }
+
+  Future<void> _fetchMetadata() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedPages = prefs.getInt('pages_${widget.material.id}');
+    final cachedSize = prefs.getString('size_${widget.material.id}');
+
+    if (cachedPages != null) {
+      _pageCount = cachedPages;
+    } else if (widget.material.pageCount != null) {
+      _pageCount = widget.material.pageCount;
+    }
+
+    if (widget.isDownloaded && widget.localFilePath != null) {
+      try {
+        final file = File(widget.localFilePath!);
+        if (await file.exists()) {
+          final bytes = await file.length();
+          _fileSizeStr = _formatBytes(bytes);
+          await prefs.setString('size_${widget.material.id}', _fileSizeStr);
+          if (mounted) setState(() => _isLoadingMeta = false);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    if (cachedSize != null) {
+      _fileSizeStr = cachedSize;
+      if (mounted) setState(() => _isLoadingMeta = false);
+      return;
+    }
+
+    if (widget.material.fileSize != null && widget.material.fileSize!.isNotEmpty) {
+      _fileSizeStr = widget.material.fileSize!;
+      if (mounted) setState(() => _isLoadingMeta = false);
+      return;
+    }
+
+    // استعلام سريع لخادم الملف لمعرفة الحجم الدقيق
+    try {
+      final cleanUrl = widget.material.pdfUrl.trim();
+      final uri = Uri.tryParse(cleanUrl);
+      if (uri != null) {
+        final res = await http.head(uri).timeout(const Duration(seconds: 4));
+        final cl = res.headers['content-length'];
+        if (cl != null) {
+          final bytes = int.tryParse(cl) ?? 0;
+          if (bytes > 0) {
+            _fileSizeStr = _formatBytes(bytes);
+            await prefs.setString('size_${widget.material.id}', _fileSizeStr);
+          } else {
+            _fileSizeStr = 'ملف عالي الدقة';
+          }
+        } else {
+          _fileSizeStr = 'ملف رسمي معتمد';
+        }
+      }
+    } catch (_) {
+      _fileSizeStr = 'ملف PDF متكامل';
+    }
+
+    if (mounted) {
+      setState(() => _isLoadingMeta = false);
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return 'ملف متكامل';
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} ميغابايت';
+    }
+    return '${(bytes / 1024).toStringAsFixed(0)} كيلوبايت';
+  }
+
+  Color _getCategoryThemeColor() {
+    switch (widget.material.category.toLowerCase()) {
+      case 'computer':
+        return const Color(0xFF2563EB);
+      case 'arabic':
+        return const Color(0xFFD97706);
+      case 'english':
+        return const Color(0xFF059669);
+      default:
+        return const Color(0xFF6366F1);
+    }
+  }
+
+  String _getCategoryArabicName() {
+    switch (widget.material.category.toLowerCase()) {
+      case 'computer':
+        return 'الحاسوب وتقنية المعلومات';
+      case 'arabic':
+        return 'اللغة العربية وفنونها';
+      case 'english':
+        return 'اللغة الإنكليزية';
+      default:
+        return 'المناهج العامة';
+    }
+  }
+
+  IconData _getCategoryIcon() {
+    switch (widget.material.category.toLowerCase()) {
+      case 'computer':
+        return Icons.computer_rounded;
+      case 'arabic':
+        return Icons.menu_book_rounded;
+      case 'english':
+        return Icons.language_rounded;
+      default:
+        return Icons.auto_stories_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final catColor = _getCategoryThemeColor();
+    final catName = _getCategoryArabicName();
+    final catIcon = _getCategoryIcon();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B1220),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0F172A),
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _gold, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'تفاصيل وغلاف الملزمة',
+          style: GoogleFonts.notoKufiArabic(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          children: [
+            // ================= غلاف الملزمة ثلاثي الأبعاد الفاخر =================
+            Center(
+              child: Container(
+                width: 195,
+                height: 275,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(16),
+                    bottomRight: Radius.circular(16),
+                    topLeft: Radius.circular(6),
+                    bottomLeft: Radius.circular(6),
+                  ),
+                  gradient: LinearGradient(
+                    colors: [
+                      catColor,
+                      catColor.withOpacity(0.85),
+                      const Color(0xFF0B1220),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: catColor.withOpacity(0.35),
+                      blurRadius: 28,
+                      offset: const Offset(0, 14),
+                      spreadRadius: 2,
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.7),
+                      blurRadius: 16,
+                      offset: const Offset(4, 8),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: _gold.withOpacity(0.4),
+                    width: 1.5,
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    // تأثير كعب الكتاب من اليسار (Spine effect)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 14,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(6),
+                            bottomLeft: Radius.circular(6),
+                          ),
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.2),
+                              Colors.black.withOpacity(0.5),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // إطار ذهبي داخلي مزدوج
+                    Positioned.fill(
+                      left: 18,
+                      top: 10,
+                      right: 10,
+                      bottom: 10,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _gold.withOpacity(0.3), width: 1),
+                        ),
+                      ),
+                    ),
+
+                    // محتوى الغلاف
+                    Positioned.fill(
+                      left: 20,
+                      top: 14,
+                      right: 14,
+                      bottom: 14,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // شعار الامتحان الوطني العلوي
+                          Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.4),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: _gold.withOpacity(0.5), width: 0.8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.stars_rounded, color: _gold, size: 12),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'دليل الامتحان الوطني',
+                                      style: TextStyle(
+                                        fontFamily: 'Tajawal',
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: _gold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.12),
+                                  border: Border.all(color: _gold.withOpacity(0.6), width: 1.2),
+                                ),
+                                child: Icon(catIcon, color: _gold, size: 24),
+                              ),
+                            ],
+                          ),
+
+                          // اسم الملزمة بمنتصف الغلاف
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Column(
+                              children: [
+                                Text(
+                                  widget.material.name,
+                                  style: GoogleFonts.notoKufiArabic(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    height: 1.35,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  width: 40,
+                                  height: 2,
+                                  decoration: BoxDecoration(
+                                    color: _gold,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // شريط أسفل الغلاف
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'نسخة رسمية معتمدة 4K',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // شريط العلامة المرجعية المتدلي
+                    Positioned(
+                      top: 0,
+                      right: 28,
+                      child: Container(
+                        width: 14,
+                        height: 28,
+                        decoration: const BoxDecoration(
+                          color: _gold,
+                          borderRadius: BorderRadius.only(
+                            bottomLeft: Radius.circular(4),
+                            bottomRight: Radius.circular(4),
+                          ),
+                        ),
+                        child: const Icon(Icons.bookmark_rounded, color: Color(0xFF0F172A), size: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ================= اسم الملزمة والتصنيف =================
+            Text(
+              widget.material.name,
+              style: GoogleFonts.notoKufiArabic(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: catColor.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: catColor.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(catIcon, color: catColor, size: 14),
+                      const SizedBox(width: 5),
+                      Text(
+                        catName,
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: catColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: widget.isDownloaded
+                        ? const Color(0xFF10B981).withOpacity(0.18)
+                        : Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: widget.isDownloaded
+                          ? const Color(0xFF10B981).withOpacity(0.5)
+                          : Colors.white.withOpacity(0.15),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        widget.isDownloaded ? Icons.check_circle_rounded : Icons.cloud_done_rounded,
+                        color: widget.isDownloaded ? const Color(0xFF10B981) : Colors.white70,
+                        size: 13,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.isDownloaded ? 'محفوظة أوفلاين' : 'جاهزة للمطالعة',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: widget.isDownloaded ? const Color(0xFF10B981) : Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // ================= بار التفاصيل الفخم =================
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B).withOpacity(0.85),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: _gold.withOpacity(0.35), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // حجم الملف
+                  Expanded(
+                    child: _buildDetailStatTile(
+                      icon: Icons.sd_storage_rounded,
+                      iconColor: const Color(0xFF38BDF8),
+                      title: 'حجم الملف',
+                      value: _fileSizeStr,
+                    ),
+                  ),
+                  Container(width: 1, height: 42, color: Colors.white.withOpacity(0.1)),
+
+                  // عدد الصفحات
+                  Expanded(
+                    child: _buildDetailStatTile(
+                      icon: Icons.auto_stories_rounded,
+                      iconColor: _gold,
+                      title: 'عدد الصفحات',
+                      value: _pageCount != null ? '$_pageCount صفحة' : 'شاملة الفصول',
+                    ),
+                  ),
+                  Container(width: 1, height: 42, color: Colors.white.withOpacity(0.1)),
+
+                  // التنسيق
+                  Expanded(
+                    child: _buildDetailStatTile(
+                      icon: Icons.picture_as_pdf_rounded,
+                      iconColor: const Color(0xFFEF4444),
+                      title: 'التنسيق',
+                      value: 'PDF عالي الدقة',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ================= نبذة عن الملزمة =================
+            if (widget.material.description.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B).withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded, color: _gold, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'عن هذا المحتوى الدراسي',
+                          style: GoogleFonts.notoKufiArabic(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.material.description,
+                      style: const TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 13,
+                        color: Colors.white70,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ================= مميزات القارئ المتكامل الذكي =================
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B).withOpacity(0.4),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'مزايا تجربة القراءة المتكاملة 🌟',
+                    style: GoogleFonts.notoKufiArabic(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: _gold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildFeatureRow(Icons.auto_stories_rounded, 'تصفح كالكتاب (تقليب أفقي) أو تمرير متصل عمودياً'),
+                  _buildFeatureRow(Icons.wb_sunny_rounded, 'أوضاع قراءة مريحة للعين: نهاري، دافئ (Sepia)، وليلي'),
+                  _buildFeatureRow(Icons.border_color_rounded, 'قلم تظليل وتمييز أصفر ذكي لحفظ أهم النقاط بالملزمة'),
+                  _buildFeatureRow(Icons.grid_view_rounded, 'شبكة تصفح سريعة لجميع الصفحات (3 في كل صف) وعلامات مرجعية'),
+                  _buildFeatureRow(Icons.security_rounded, 'حماية متقدمة للمحتوى مشغلة تلقائياً بدون إعلانات'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 26),
+
+            // ================= أزرار الإجراءات الرئيسية =================
+            // زر القراءة الفورية
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _gold,
+                  foregroundColor: const Color(0xFF0F172A),
+                  elevation: 6,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: () {
+                  if (widget.isDownloaded && widget.localFilePath != null) {
+                    widget.onReadRequested(widget.localFilePath!, true);
+                  } else {
+                    widget.onReadRequested(widget.material.pdfUrl, false);
+                  }
+                },
+                icon: const Icon(Icons.menu_book_rounded, size: 22),
+                label: Text(
+                  'قراءة الملزمة الآن',
+                  style: GoogleFonts.notoKufiArabic(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // زر التحميل للأوفلاين
+            if (!widget.isDownloaded)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.25), width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: widget.onDownloadRequested,
+                  icon: const Icon(Icons.download_for_offline_rounded, color: _gold, size: 20),
+                  label: const Text(
+                    'تحميل الملزمة للمذاكرة بدون إنترنت ⚡',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                    SizedBox(width: 6),
+                    Text(
+                      'الملزمة محفوظة على هاتفك ومتاحة للقراءة أوفلاين',
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF10B981),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailStatTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String value,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: iconColor, size: 22),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: GoogleFonts.notoKufiArabic(
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          title,
+          style: const TextStyle(
+            fontFamily: 'Tajawal',
+            fontSize: 10,
+            color: Color(0xFF94A3B8),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: _gold, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 12,
+                color: Colors.white70,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ==================== عارض PDF فاخر ومتكامل داخل التطبيق ====================
 class LuxuryPdfViewerScreen extends StatefulWidget {
   final String title;
   final String fileOrUrl;
   final bool isLocalFile;
+  final String? materialId;
 
   const LuxuryPdfViewerScreen({
     super.key,
     required this.title,
     required this.fileOrUrl,
     required this.isLocalFile,
+    this.materialId,
   });
 
   @override
@@ -230,7 +1052,23 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
   double _downloadProgress = 0.0;
   String? _localFilePath;
   String? _errorMessage;
-  bool _isNightMode = false;
+
+  // إعدادات العرض الفاخرة
+  bool _swipeHorizontal = false; // false = تتابع عمودي متصل، true = تقليب أفقي كالكتاب
+  String _colorTheme = 'light'; // 'light' (فاتح), 'warm' (دافئ Sepia), 'night' (ليلي)
+  bool _showBars = true; // وضع القراءة الغامرة
+
+  // أدوات التكبير والتصغير
+  final TransformationController _transformationController = TransformationController();
+  double _currentZoom = 1.0;
+
+  // قلم التظليل والتمييز الأصفر
+  bool _isPenActive = false;
+  final List<HighlightStroke> _highlights = [];
+  final List<Offset> _activeStrokePoints = [];
+
+  // العلامات المرجعية المحفوظة
+  final Set<int> _bookmarkedPages = {};
 
   static const _gold = Color(0xFFFACC15);
 
@@ -238,7 +1076,29 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
   void initState() {
     super.initState();
     _enableScreenProtection();
+    _loadSavedBookmarks();
     _preparePdfFile();
+  }
+
+  Future<void> _loadSavedBookmarks() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'bookmarks_${widget.materialId ?? widget.title.hashCode}';
+      final list = prefs.getStringList(key);
+      if (list != null && mounted) {
+        setState(() {
+          _bookmarkedPages.addAll(list.map((e) => int.tryParse(e) ?? 0));
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveBookmarks() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'bookmarks_${widget.materialId ?? widget.title.hashCode}';
+      await prefs.setStringList(key, _bookmarkedPages.map((e) => e.toString()).toList());
+    } catch (_) {}
   }
 
   Future<void> _enableScreenProtection() async {
@@ -253,6 +1113,7 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
 
   @override
   void dispose() {
+    _transformationController.dispose();
     _disableScreenProtection();
     super.dispose();
   }
@@ -281,7 +1142,7 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
       return;
     }
 
-    // إذا كان الملف من أصول المشروع (Assets)
+    // ملفات من المشروع assets
     if (widget.fileOrUrl.startsWith('assets/')) {
       try {
         final byteData = await rootBundle.load(widget.fileOrUrl);
@@ -301,7 +1162,7 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
       }
     }
 
-    // إذا كان الرابط عن بعد، نقوم بتنزيله مؤقتاً في الكاش لفتحه بسلاسة وبدون شاشة سوداء
+    // تنزيل مؤقت للرابط عن بعد
     try {
       final cleanUrl = widget.fileOrUrl.trim();
       final dir = await getTemporaryDirectory();
@@ -363,46 +1224,147 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
     }
   }
 
-  final TransformationController _transformationController = TransformationController();
-  double _currentZoom = 1.0;
-
-  void _zoomIn() {
-    setState(() {
-      _currentZoom = (_currentZoom + 0.35).clamp(1.0, 5.0);
-      _transformationController.value = Matrix4.identity()..scale(_currentZoom);
-    });
-  }
-
-  void _zoomOut() {
-    setState(() {
-      _currentZoom = (_currentZoom - 0.35).clamp(1.0, 5.0);
-      _transformationController.value = Matrix4.identity()..scale(_currentZoom);
-    });
-  }
-
+  // ================= وظائف التحكم =================
   void _resetZoom() {
     setState(() {
       _currentZoom = 1.0;
       _transformationController.value = Matrix4.identity();
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تمت إعادة حجم الصفحة إلى الوضع الأصلي (100%)', style: TextStyle(fontFamily: 'Tajawal')),
+        duration: Duration(milliseconds: 1200),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
-  void _toggleNightMode() {
+  void _toggleSwipeMode() {
     setState(() {
-      _isNightMode = !_isNightMode;
+      _swipeHorizontal = !_swipeHorizontal;
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _swipeHorizontal ? 'تم التبديل إلى: تقليب أفقي كالكتاب 📖' : 'تم التبديل إلى: تتابع عمودي متصل 📜',
+          style: const TextStyle(fontFamily: 'Tajawal'),
+        ),
+        duration: const Duration(milliseconds: 1400),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
-  void _goToPrevPage() {
-    if (_currentPage > 0) {
-      _pdfViewController?.setPage(_currentPage - 1);
-    }
+  void _showThemeSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'اختر نمط إضاءة ولون الصفحة',
+                style: GoogleFonts.notoKufiArabic(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              _buildThemeOptionTile(
+                id: 'light',
+                title: 'الوضع الفاتح (النهاري الأصلي)',
+                subtitle: 'صفحات بيضاء واضحة بأعلى دقة',
+                icon: Icons.wb_sunny_rounded,
+                iconColor: Colors.amber,
+              ),
+              const SizedBox(height: 10),
+              _buildThemeOptionTile(
+                id: 'warm',
+                title: 'الوضع الدافئ (حماية العين - Sepia)',
+                subtitle: 'إضاءة كهرمانية دافئة ومريحة للقراءة المطولة',
+                icon: Icons.coffee_rounded,
+                iconColor: const Color(0xFFD97706),
+              ),
+              const SizedBox(height: 10),
+              _buildThemeOptionTile(
+                id: 'night',
+                title: 'الوضع الليلي (عالي التباين)',
+                subtitle: 'خلفية سوداء لتقليل إجهاد العين بالظلام',
+                icon: Icons.nightlight_round,
+                iconColor: _gold,
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  void _goToNextPage() {
-    if (_totalPages > 0 && _currentPage < _totalPages - 1) {
-      _pdfViewController?.setPage(_currentPage + 1);
-    }
+  Widget _buildThemeOptionTile({
+    required String id,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    final isSelected = _colorTheme == id;
+    return InkWell(
+      onTap: () {
+        setState(() => _colorTheme = id);
+        Navigator.pop(context);
+      },
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? _gold.withOpacity(0.12) : const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? _gold : Colors.white10,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: iconColor.withOpacity(0.15), shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? _gold : Colors.white,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.white60),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected) const Icon(Icons.check_circle_rounded, color: _gold, size: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showJumpToPageDialog() {
@@ -412,19 +1374,40 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E293B),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('الانتقال إلى صفحة', style: TextStyle(fontFamily: 'Tajawal', color: Colors.white)),
-        content: TextField(
-          controller: textController,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white, fontFamily: 'Tajawal'),
-          decoration: InputDecoration(
-            hintText: 'اكتب رقم الصفحة (1 - $_totalPages)',
-            hintStyle: const TextStyle(color: Colors.white54, fontFamily: 'Tajawal'),
-            filled: true,
-            fillColor: const Color(0xFF0F172A),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+        title: Row(
+          children: [
+            const Icon(Icons.pin_outlined, color: _gold, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'انتقال إلى صفحة معينة',
+              style: GoogleFonts.notoKufiArabic(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'أدخل رقم الصفحة المراد الانتقال إليها مباشرة (1 - $_totalPages):',
+              style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12.5, color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: textController,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                hintText: 'مثال: 15',
+                hintStyle: const TextStyle(color: Colors.white38, fontFamily: 'Tajawal'),
+                filled: true,
+                fillColor: const Color(0xFF0F172A),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _gold, width: 1.5)),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -444,332 +1427,864 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
               }
               Navigator.pop(ctx);
             },
-            child: const Text('انتقال', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
+            child: const Text('انتقال فوري', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
           ),
         ],
       ),
     );
   }
 
+  // ================= منبثقة المحتويات والفهرس والعلامات وشبكة الصفحات =================
+  void _showContentsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (bottomSheetContext, setModalState) {
+          return DefaultTabController(
+            length: 2,
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height * 0.78,
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 44,
+                    height: 4.5,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(3)),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // عنوان النافذة
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'محتويات الملزمة وتصفح الصفحات',
+                          style: GoogleFonts.notoKufiArabic(fontSize: 14.5, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white60, size: 20),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // شريط التبويب
+                  TabBar(
+                    indicatorColor: _gold,
+                    labelColor: _gold,
+                    unselectedLabelColor: Colors.white60,
+                    labelStyle: GoogleFonts.notoKufiArabic(fontSize: 12, fontWeight: FontWeight.bold),
+                    tabs: [
+                      Tab(
+                        icon: const Icon(Icons.grid_view_rounded, size: 18),
+                        text: 'شبكة الصفحات ($_totalPages)',
+                      ),
+                      Tab(
+                        icon: const Icon(Icons.bookmark_rounded, size: 18),
+                        text: 'العلامات (${_bookmarkedPages.length})',
+                      ),
+                    ],
+                  ),
+
+                  // محتوى التبويبات
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        // التبويب الأول: شبكة الصفحات (كل صف به 3 صفحات)
+                        _totalPages == 0
+                            ? const Center(child: CircularProgressIndicator(color: _gold))
+                            : GridView.builder(
+                                padding: const EdgeInsets.all(16),
+                                physics: const BouncingScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 14,
+                                  childAspectRatio: 0.72,
+                                ),
+                                itemCount: _totalPages,
+                                itemBuilder: (context, index) {
+                                  final isCurrent = index == _currentPage;
+                                  final isBookmarked = _bookmarkedPages.contains(index);
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.pop(ctx);
+                                      _pdfViewController?.setPage(index);
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: isCurrent
+                                            ? _gold.withOpacity(0.18)
+                                            : const Color(0xFF1E293B),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: isCurrent
+                                              ? _gold
+                                              : (isBookmarked ? Colors.amber.withOpacity(0.7) : Colors.white12),
+                                          width: isCurrent ? 2 : 1,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.3),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          // خطوط تمثيل محاكاة الورقة
+                                          Center(
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.description_rounded,
+                                                  color: isCurrent ? _gold : Colors.white38,
+                                                  size: 30,
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Text(
+                                                  'صفحة ${index + 1}',
+                                                  style: TextStyle(
+                                                    fontFamily: 'Tajawal',
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isCurrent ? _gold : Colors.white,
+                                                  ),
+                                                ),
+                                                if (isCurrent) ...[
+                                                  const SizedBox(height: 4),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: _gold,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: const Text(
+                                                      'أنت هنا',
+                                                      style: TextStyle(
+                                                        fontFamily: 'Tajawal',
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Color(0xFF0F172A),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+
+                                          // شارة العلامة المرجعية
+                                          if (isBookmarked)
+                                            Positioned(
+                                              top: 6,
+                                              right: 6,
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.amber,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.bookmark_rounded, size: 10, color: Color(0xFF0F172A)),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                        // التبويب الثاني: العلامات المرجعية والصفحات المميزة
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              // زر إضافة / إزالة تمييز الصفحة الحالية
+                              SizedBox(
+                                width: double.infinity,
+                                height: 46,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _bookmarkedPages.contains(_currentPage)
+                                        ? const Color(0xFFEF4444)
+                                        : _gold,
+                                    foregroundColor: _bookmarkedPages.contains(_currentPage)
+                                        ? Colors.white
+                                        : const Color(0xFF0F172A),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (_bookmarkedPages.contains(_currentPage)) {
+                                        _bookmarkedPages.remove(_currentPage);
+                                      } else {
+                                        _bookmarkedPages.add(_currentPage);
+                                      }
+                                      _saveBookmarks();
+                                    });
+                                    setModalState(() {});
+                                  },
+                                  icon: Icon(
+                                    _bookmarkedPages.contains(_currentPage)
+                                        ? Icons.bookmark_remove_rounded
+                                        : Icons.bookmark_add_rounded,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    _bookmarkedPages.contains(_currentPage)
+                                        ? 'إزالة تمييز الصفحة الحالية (${_currentPage + 1})'
+                                        : 'تمييز الصفحة الحالية (${_currentPage + 1}) كعلامة ⭐',
+                                    style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // قائمة العلامات
+                              Expanded(
+                                child: _bookmarkedPages.isEmpty
+                                    ? Center(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.bookmark_border_rounded, size: 48, color: Colors.white.withOpacity(0.2)),
+                                            const SizedBox(height: 10),
+                                            const Text(
+                                              'لا توجد علامات مرجعية مضافة بعد',
+                                              style: TextStyle(fontFamily: 'Tajawal', color: Colors.white60, fontSize: 13.5),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            const Text(
+                                              'يمكنك تمييز أي صفحة للرجوع إليها سريعاً بنقرة واحدة',
+                                              style: TextStyle(fontFamily: 'Tajawal', color: Colors.white38, fontSize: 11),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : ListView(
+                                        physics: const BouncingScrollPhysics(),
+                                        children: (_bookmarkedPages.toList()..sort()).map((page) {
+                                          return Container(
+                                            margin: const EdgeInsets.only(bottom: 8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF1E293B),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.white12),
+                                            ),
+                                            child: ListTile(
+                                              leading: const Icon(Icons.bookmark_rounded, color: _gold),
+                                              title: Text(
+                                                'الصفحة ${page + 1}',
+                                                style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, color: Colors.white),
+                                              ),
+                                              subtitle: Text(
+                                                page == _currentPage ? 'الصفحة الحالية' : 'انقر للانتقال الفوري',
+                                                style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.white60),
+                                              ),
+                                              trailing: IconButton(
+                                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _bookmarkedPages.remove(page);
+                                                    _saveBookmarks();
+                                                  });
+                                                  setModalState(() {});
+                                                },
+                                              ),
+                                              onTap: () {
+                                                Navigator.pop(ctx);
+                                                _pdfViewController?.setPage(page);
+                                              },
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ================= أدوات قلم التمييز بالأصفر =================
+  void _togglePen() {
+    setState(() {
+      _isPenActive = !_isPenActive;
+    });
+    if (_isPenActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تفعيل قلم التمييز بالأصفر ✍️ - اسحب بإصبعك لتحديد أي سطر', style: TextStyle(fontFamily: 'Tajawal')),
+          duration: Duration(milliseconds: 1600),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _undoHighlight() {
+    setState(() {
+      final index = _highlights.lastIndexWhere((s) => s.page == _currentPage);
+      if (index != -1) {
+        _highlights.removeAt(index);
+      }
+    });
+  }
+
+  void _clearPageHighlights() {
+    setState(() {
+      _highlights.removeWhere((s) => s.page == _currentPage);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم مسح جميع التحديدات في هذه الصفحة', style: TextStyle(fontFamily: 'Tajawal')),
+        duration: Duration(milliseconds: 1000),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    Color scaffoldBg = const Color(0xFF0F172A);
+    if (_colorTheme == 'warm') {
+      scaffoldBg = const Color(0xFF231E17);
+    } else if (_colorTheme == 'night') {
+      scaffoldBg = Colors.black;
+    }
+
     return Scaffold(
-      backgroundColor: _isNightMode ? Colors.black : const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _gold, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+      backgroundColor: scaffoldBg,
+      body: SafeArea(
+        child: Stack(
           children: [
-            Text(
-              widget.title,
-              style: GoogleFonts.notoKufiArabic(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            // ================= قارئ PDF الرئيسي وطبقات التظليل =================
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  if (!_isPenActive) {
+                    setState(() => _showBars = !_showBars);
+                  }
+                },
+                child: InteractiveViewer(
+                  transformationController: _transformationController,
+                  minScale: 1.0,
+                  maxScale: 4.0,
+                  panEnabled: _currentZoom > 1.01 && !_isPenActive,
+                  scaleEnabled: !_isPenActive,
+                  onInteractionUpdate: (details) {
+                    final scale = _transformationController.value.getMaxScaleOnAxis();
+                    if ((scale - _currentZoom).abs() > 0.05) {
+                      setState(() => _currentZoom = scale);
+                    }
+                  },
+                  child: Stack(
+                    children: [
+                      if (kIsWeb)
+                        InAppWebView(
+                          initialUrlRequest: URLRequest(url: WebUri(widget.fileOrUrl)),
+                          initialSettings: InAppWebViewSettings(
+                            javaScriptEnabled: true,
+                            supportMultipleWindows: false,
+                            allowsInlineMediaPlayback: true,
+                          ),
+                        )
+                      else if (_localFilePath != null && File(_localFilePath!).existsSync())
+                        PDFView(
+                          key: ValueKey('pdf_${widget.fileOrUrl}_${_swipeHorizontal}_$_colorTheme'),
+                          filePath: _localFilePath!,
+                          enableSwipe: true,
+                          swipeHorizontal: _swipeHorizontal,
+                          autoSpacing: true,
+                          pageFling: true,
+                          pageSnap: _swipeHorizontal,
+                          defaultPage: _currentPage,
+                          fitPolicy: FitPolicy.BOTH,
+                          preventLinkNavigation: false,
+                          nightMode: _colorTheme == 'night',
+                          onRender: (pages) {
+                            if (mounted) {
+                              setState(() {
+                                _totalPages = pages ?? 0;
+                                _isLoading = false;
+                              });
+                              if (widget.materialId != null && pages != null) {
+                                SharedPreferences.getInstance().then((prefs) {
+                                  prefs.setInt('pages_${widget.materialId}', pages);
+                                });
+                              }
+                            }
+                          },
+                          onError: (error) {
+                            if (mounted) {
+                              setState(() {
+                                _errorMessage = error.toString();
+                                _isLoading = false;
+                              });
+                            }
+                          },
+                          onPageError: (page, error) {
+                            if (mounted) {
+                              setState(() {
+                                _errorMessage = 'خطأ في الصفحة $page: $error';
+                              });
+                            }
+                          },
+                          onViewCreated: (PDFViewController pdfViewController) {
+                            _pdfViewController = pdfViewController;
+                          },
+                          onPageChanged: (int? page, int? total) {
+                            if (mounted) {
+                              setState(() {
+                                _currentPage = page ?? 0;
+                                _totalPages = total ?? 0;
+                              });
+                            }
+                          },
+                        )
+                      else if (_errorMessage != null)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _errorMessage!,
+                                  style: const TextStyle(fontFamily: 'Tajawal', color: Colors.white70, fontSize: 13.5),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isLoading = true;
+                                      _errorMessage = null;
+                                    });
+                                    _preparePdfFile();
+                                  },
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  label: const Text('إعادة المحاولة', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _gold,
+                                    foregroundColor: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      // طبقة الوضع الدافئ (Sepia)
+                      if (_colorTheme == 'warm')
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Container(
+                              color: const Color(0xFFFBF0D9).withOpacity(0.32),
+                            ),
+                          ),
+                        ),
+
+                      // طبقة قلم التمييز الأصفر
+                      if (_isPenActive)
+                        Positioned.fill(
+                          child: GestureDetector(
+                            onPanStart: (details) {
+                              setState(() {
+                                _activeStrokePoints.clear();
+                                _activeStrokePoints.add(details.localPosition);
+                              });
+                            },
+                            onPanUpdate: (details) {
+                              setState(() {
+                                _activeStrokePoints.add(details.localPosition);
+                              });
+                            },
+                            onPanEnd: (details) {
+                              setState(() {
+                                if (_activeStrokePoints.isNotEmpty) {
+                                  _highlights.add(
+                                    HighlightStroke(
+                                      page: _currentPage,
+                                      points: List.from(_activeStrokePoints),
+                                    ),
+                                  );
+                                  _activeStrokePoints.clear();
+                                }
+                              });
+                            },
+                            child: CustomPaint(
+                              painter: HighlighterPainter(
+                                strokes: _highlights.where((s) => s.page == _currentPage).toList(),
+                                activePoints: _activeStrokePoints,
+                              ),
+                              size: Size.infinite,
+                            ),
+                          ),
+                        )
+                      else
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: HighlighterPainter(
+                                strokes: _highlights.where((s) => s.page == _currentPage).toList(),
+                                activePoints: const [],
+                              ),
+                              size: Size.infinite,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-            if (_totalPages > 0)
-              Text(
-                'صفحة ${_currentPage + 1} من $_totalPages',
-                style: const TextStyle(
-                  fontFamily: 'Tajawal',
-                  fontSize: 11,
-                  color: Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w600,
+
+            // ================= شريط علوي أنيق قابل للإخفاء =================
+            if (_showBars)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withOpacity(0.92),
+                    border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.08))),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _gold, size: 20),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: GoogleFonts.notoKufiArabic(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (_totalPages > 0)
+                              Text(
+                                'صفحة ${_currentPage + 1} من $_totalPages • ${_swipeHorizontal ? "كتاب أفقي" : "تتابع عمودي"}',
+                                style: const TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontSize: 10.5,
+                                  color: Color(0xFF94A3B8),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      // زر العلامة المرجعية السريع
+                      IconButton(
+                        icon: Icon(
+                          _bookmarkedPages.contains(_currentPage) ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                          color: _bookmarkedPages.contains(_currentPage) ? _gold : Colors.white70,
+                          size: 22,
+                        ),
+                        tooltip: 'تمييز الصفحة',
+                        onPressed: () {
+                          setState(() {
+                            if (_bookmarkedPages.contains(_currentPage)) {
+                              _bookmarkedPages.remove(_currentPage);
+                            } else {
+                              _bookmarkedPages.add(_currentPage);
+                            }
+                            _saveBookmarks();
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // ================= شريط أدوات قلم التمييز إذا كان نشطاً =================
+            if (_isPenActive)
+              Positioned(
+                top: _showBars ? 60 : 12,
+                left: 16,
+                right: 16,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.amber, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(color: Colors.amber.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 3)),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.border_color_rounded, color: Colors.amber, size: 16),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'تظليل أصفر ✍️',
+                          style: TextStyle(fontFamily: 'Tajawal', fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.amber),
+                        ),
+                        const SizedBox(width: 10),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          icon: const Icon(Icons.undo_rounded, color: Colors.white, size: 18),
+                          tooltip: 'تراجع',
+                          onPressed: _undoHighlight,
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                          tooltip: 'مسح صفحة',
+                          onPressed: _clearPageHighlights,
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: _togglePen,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: _gold, borderRadius: BorderRadius.circular(10)),
+                            child: const Text(
+                              'تم ✓',
+                              style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+            // ================= شريط الأزرار المتكامل السفلي الفاخر =================
+            if (_showBars && !_isLoading && _localFilePath != null)
+              Positioned(
+                bottom: 14,
+                left: 12,
+                right: 12,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withOpacity(0.94),
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(color: _gold.withOpacity(0.35), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 20,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // زر المحتويات والفهرس
+                          _buildBottomBarAction(
+                            icon: Icons.menu_book_rounded,
+                            label: 'المحتويات',
+                            onTap: _showContentsBottomSheet,
+                          ),
+
+                          _buildDivider(),
+
+                          // زر طريقة العرض (عمودي متصل / كتاب أفقي)
+                          _buildBottomBarAction(
+                            icon: _swipeHorizontal ? Icons.auto_stories_rounded : Icons.swap_vert_rounded,
+                            label: _swipeHorizontal ? 'كتاب أفقي' : 'متصل عمودي',
+                            onTap: _toggleSwipeMode,
+                            isActive: _swipeHorizontal,
+                          ),
+
+                          _buildDivider(),
+
+                          // زر لون وثيم الصفحة
+                          _buildBottomBarAction(
+                            icon: _colorTheme == 'warm'
+                                ? Icons.coffee_rounded
+                                : (_colorTheme == 'night' ? Icons.nightlight_round : Icons.wb_sunny_rounded),
+                            label: _colorTheme == 'warm' ? 'دافئ' : (_colorTheme == 'night' ? 'ليلي' : 'فاتح'),
+                            onTap: _showThemeSelector,
+                          ),
+
+                          _buildDivider(),
+
+                          // زر إعادة الحجم الأصلي 100%
+                          _buildBottomBarAction(
+                            icon: Icons.restart_alt_rounded,
+                            label: '${(_currentZoom * 100).toInt()}%',
+                            onTap: _resetZoom,
+                            isActive: _currentZoom > 1.05,
+                          ),
+
+                          _buildDivider(),
+
+                          // زر انتقال لصفحة معينة
+                          _buildBottomBarAction(
+                            icon: Icons.pin_outlined,
+                            label: _totalPages > 0 ? '${_currentPage + 1}/$_totalPages' : 'انتقال',
+                            onTap: _showJumpToPageDialog,
+                          ),
+
+                          _buildDivider(),
+
+                          // زر قلم التمييز الأصفر
+                          _buildBottomBarAction(
+                            icon: Icons.border_color_rounded,
+                            label: 'تظليل',
+                            onTap: _togglePen,
+                            isActive: _isPenActive,
+                            activeColor: Colors.amber,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // مؤشر التحميل والتجهيز المتقدم
+            if (_isLoading)
+              Container(
+                color: const Color(0xFF0F172A),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(_gold),
+                          strokeWidth: 3.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        _downloadProgress > 0
+                            ? 'جاري تجهيز وقراءة الملزمة (${(_downloadProgress * 100).toInt()}%)...'
+                            : 'جاري فتح وقراءة الملزمة...',
+                        style: GoogleFonts.notoKufiArabic(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'يتم تشغيل قارئ PDF عالي الدقة بدون استهلاك إضافي للإنترنت ⚡',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontSize: 12,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                      if (_downloadProgress > 0) ...[
+                        const SizedBox(height: 18),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 50),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: LinearProgressIndicator(
+                              value: _downloadProgress,
+                              backgroundColor: Colors.white10,
+                              color: _gold,
+                              minHeight: 6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
           ],
         ),
-        actions: [
-          // كبسولة تقليب الصفحات لأعلى ولأسفل بالأعلى
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.15)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  icon: const Icon(Icons.keyboard_arrow_up_rounded, color: _gold, size: 24),
-                  tooltip: 'الصفحة السابقة ⬆️',
-                  onPressed: _currentPage > 0 ? _goToPrevPage : null,
-                ),
-                GestureDetector(
-                  onTap: _totalPages > 1 ? _showJumpToPageDialog : null,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      _totalPages > 0 ? '${_currentPage + 1}/$_totalPages' : '...',
-                      style: const TextStyle(
-                        fontFamily: 'Tajawal',
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: _gold, size: 24),
-                  tooltip: 'الصفحة التالية ⬇️',
-                  onPressed: (_totalPages > 0 && _currentPage < _totalPages - 1) ? _goToNextPage : null,
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: Icon(
-              _isNightMode ? Icons.light_mode_rounded : Icons.nightlight_round,
-              color: _isNightMode ? _gold : Colors.white70,
-              size: 20,
-            ),
-            tooltip: _isNightMode ? 'الوضع النهاري' : 'الوضع الليلي (قراءة مريحة)',
-            onPressed: _toggleNightMode,
-          ),
-        ],
       ),
-      body: Stack(
-        children: [
-          if (kIsWeb)
-            InAppWebView(
-              initialUrlRequest: URLRequest(url: WebUri(widget.fileOrUrl)),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                supportMultipleWindows: false,
-                allowsInlineMediaPlayback: true,
-              ),
-            )
-          else if (_localFilePath != null && File(_localFilePath!).existsSync())
-            PDFView(
-              filePath: _localFilePath!,
-              enableSwipe: true,
-              swipeHorizontal: false,
-              autoSpacing: true,
-              pageFling: true,
-              pageSnap: false,
-              defaultPage: _currentPage,
-              fitPolicy: FitPolicy.BOTH,
-              preventLinkNavigation: false,
-              nightMode: _isNightMode,
-              onRender: (pages) {
-                if (mounted) {
-                  setState(() {
-                    _totalPages = pages ?? 0;
-                    _isLoading = false;
-                  });
-                }
-              },
-              onError: (error) {
-                if (mounted) {
-                  setState(() {
-                    _errorMessage = error.toString();
-                    _isLoading = false;
-                  });
-                }
-              },
-              onPageError: (page, error) {
-                if (mounted) {
-                  setState(() {
-                    _errorMessage = 'خطأ في الصفحة $page: $error';
-                  });
-                }
-              },
-              onViewCreated: (PDFViewController pdfViewController) {
-                _pdfViewController = pdfViewController;
-              },
-              onPageChanged: (int? page, int? total) {
-                if (mounted) {
-                  setState(() {
-                    _currentPage = page ?? 0;
-                    _totalPages = total ?? 0;
-                  });
-                }
-              },
-            )
-          else if (_errorMessage != null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
-                    const SizedBox(height: 12),
-                    Text(
-                      _errorMessage!,
-                      style: const TextStyle(fontFamily: 'Tajawal', color: Colors.white70, fontSize: 13.5),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _isLoading = true;
-                          _errorMessage = null;
-                        });
-                        _preparePdfFile();
-                      },
-                      icon: const Icon(Icons.refresh_rounded, size: 18),
-                      label: const Text('إعادة المحاولة', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _gold,
-                        foregroundColor: const Color(0xFF0F172A),
-                      ),
-                    ),
-                  ],
-                ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      width: 1,
+      height: 24,
+      margin: const EdgeInsets.symmetric(horizontal: 3),
+      color: Colors.white.withOpacity(0.12),
+    );
+  }
+
+  Widget _buildBottomBarAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isActive = false,
+    Color activeColor = _gold,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? activeColor.withOpacity(0.2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isActive ? activeColor : Colors.white70, size: 19),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
+                color: isActive ? activeColor : Colors.white70,
               ),
             ),
-
-          // شريط أدوات التكبير والتصغير العائم السفلي
-          if (!_isLoading && _localFilePath != null)
-            Positioned(
-              bottom: 24,
-              right: 16,
-              left: 16,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A).withOpacity(0.92),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: _gold.withOpacity(0.4), width: 1.2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 18,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // زر التصغير
-                      IconButton(
-                        onPressed: _currentZoom > 1.01 ? _zoomOut : null,
-                        icon: const Icon(Icons.remove_rounded, color: Colors.white, size: 20),
-                        tooltip: 'تصغير',
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      const SizedBox(width: 4),
-
-                      // مؤشر نسبة التكبير وزر إعادة التعيين
-                      GestureDetector(
-                        onTap: _resetZoom,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _currentZoom > 1.05 ? _gold.withOpacity(0.2) : Colors.white.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${(_currentZoom * 100).toInt()}%',
-                                style: TextStyle(
-                                  fontFamily: 'Tajawal',
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: _currentZoom > 1.05 ? _gold : Colors.white,
-                                ),
-                              ),
-                              if (_currentZoom > 1.05) ...[
-                                const SizedBox(width: 4),
-                                const Icon(Icons.refresh_rounded, color: _gold, size: 13),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-
-                      // زر التكبير
-                      IconButton(
-                        onPressed: _currentZoom < 4.99 ? _zoomIn : null,
-                        icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                        tooltip: 'تكبير',
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // مؤشر التحميل والتجهيز المتقدم
-          if (_isLoading)
-            Container(
-              color: const Color(0xFF0F172A),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(
-                      width: 50,
-                      height: 50,
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(_gold),
-                        strokeWidth: 3.5,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      _downloadProgress > 0
-                          ? 'جاري تجهيز وقراءة الملزمة (${(_downloadProgress * 100).toInt()}%)...'
-                          : 'جاري فتح وقراءة الملزمة...',
-                      style: GoogleFonts.notoKufiArabic(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'يتم تشغيل قارئ PDF عالي الدقة بدون استهلاك إضافي للإنترنت ⚡',
-                      style: TextStyle(
-                        fontFamily: 'Tajawal',
-                        fontSize: 12,
-                        color: Color(0xFF94A3B8),
-                      ),
-                    ),
-                    if (_downloadProgress > 0) ...[
-                      const SizedBox(height: 18),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 50),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: _downloadProgress,
-                            backgroundColor: Colors.white10,
-                            color: _gold,
-                            minHeight: 6,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1157,7 +2672,7 @@ class _StudyMaterialsScreenState extends State<StudyMaterialsScreen>
     }
   }
 
-  void _openPdfViewer(String title, String pathOrUrl, bool isLocal) {
+  void _openPdfViewer(String title, String pathOrUrl, bool isLocal, {String? materialId}) {
     if (!_checkSubscription()) return;
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -1165,6 +2680,29 @@ class _StudyMaterialsScreenState extends State<StudyMaterialsScreen>
           title: title,
           fileOrUrl: pathOrUrl,
           isLocalFile: isLocal,
+          materialId: materialId,
+        ),
+      ),
+    );
+  }
+
+  void _openMaterialDetails(StudyMaterial material) {
+    if (!_checkSubscription()) return;
+    final isDownloaded = _downloadedFiles.containsKey(material.id);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MaterialDetailScreen(
+          material: material,
+          isDownloaded: isDownloaded,
+          localFilePath: _downloadedFiles[material.id],
+          isPremium: _currentUser?.isPremium == true,
+          onDownloadRequested: () => _downloadMaterial(material),
+          onReadRequested: (path, isLocal) => _openPdfViewer(
+            material.name,
+            path,
+            isLocal,
+            materialId: material.id,
+          ),
         ),
       ),
     );
@@ -1586,13 +3124,7 @@ class _StudyMaterialsScreenState extends State<StudyMaterialsScreen>
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          onTap: () {
-            if (isDownloaded) {
-              _openPdfViewer(material.name, _downloadedFiles[material.id]!, true);
-            } else {
-              _downloadMaterial(material);
-            }
-          },
+          onTap: () => _openMaterialDetails(material),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.all(14),
