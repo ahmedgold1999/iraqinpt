@@ -9,11 +9,11 @@ class QuestionService {
   // بنك روابط الأسئلة الرسمية (جلب عبر GitHub لتوفير موارد الفايربيس بنسبة 100%)
   static const Map<String, String> defaultSubjectUrls = {
     'arabic':
-        'https://raw.githubusercontent.com/ahmedgold1999/questionsinpt/refs/heads/main/arabic',
+        'https://inptiq.ahmeedgold1000.workers.dev/arabic/allquestions',
     'computer':
-        'https://raw.githubusercontent.com/ahmedgold1999/questionsinpt/refs/heads/main/computer_ar',
+        'https://inptiq.ahmeedgold1000.workers.dev/computer/allquestions',
     'english':
-        'https://raw.githubusercontent.com/ahmedgold1999/questionsinpt/refs/heads/main/english',
+        'https://inptiq.ahmeedgold1000.workers.dev/english/allquestions',
   };
 
   /// تحميل الأسئلة مع دعم الوضع غير المتصل (Offline First)

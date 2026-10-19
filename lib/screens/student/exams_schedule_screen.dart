@@ -66,11 +66,11 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
 
   final Map<String, String> _questionsUrls = {
     'arabic':
-    'https://raw.githubusercontent.com/ahmedgold1999/INQU/refs/heads/main/arabic/allquestions',
+    'https://inptiq.ahmeedgold1000.workers.dev/arabic/allquestions',
     'computer':
-    'https://raw.githubusercontent.com/ahmedgold1999/INQU/refs/heads/main/computer/allquestions',
+    'https://inptiq.ahmeedgold1000.workers.dev/computer/allquestions',
     'english':
-    'https://raw.githubusercontent.com/ahmedgold1999/INQU/refs/heads/main/english/allquestions',
+    'https://inptiq.ahmeedgold1000.workers.dev/english/allquestions',
   };
 
   @override
@@ -277,7 +277,10 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
 
   Future<void> _loadQuestionsCount(String key, String url) async {
     try {
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'x-app-key': 'INQU_SECURE_KEY_2026'},
+      );
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
         final List<dynamic> questions = data['questions'];
