@@ -21,8 +21,10 @@ import 'screens/student/delete_account_screen.dart';
 import 'screens/student/motivational_quotes_screen.dart';
 import 'screens/student/competitive_calculator_screen.dart';
 import 'screens/student/exam_schedule_viewer_screen.dart';
+import 'screens/common/onboarding_screen.dart';
 
 class AppRoutes {
+  static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String home = '/home';
   static const String studentHome = '/student-home';
@@ -49,6 +51,9 @@ class AppRoutes {
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case onboarding:
+        return MaterialPageRoute(builder: (_) => const OnboardingScreen());
+
       case aiTutor:
         return MaterialPageRoute(builder: (_) => const AiTutorScreen());
 
@@ -102,6 +107,7 @@ class AppRoutes {
         return MaterialPageRoute(
           builder: (_) => QuizScreen(
             subject: args['subject'] ?? '',
+            subjectKey: args['subjectKey'],
             questionsUrl: args['questionsUrl'] ?? '',
           ),
         );

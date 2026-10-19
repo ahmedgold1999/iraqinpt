@@ -1240,6 +1240,7 @@ class StudentHomeScreen extends StatelessWidget {
       MaterialPageRoute(
         builder: (context) => QuizScreen(
           subject: subjectName,
+          subjectKey: subjectKey,
           questionsUrl: questionsUrls[subjectKey]!,
           questionsCount: questionsCount,
           showAnswersDuringExam: showAnswersDuringExam,

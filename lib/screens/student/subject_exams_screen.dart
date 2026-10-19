@@ -735,6 +735,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
       MaterialPageRoute(
         builder: (_) => QuizScreen(
           subject: widget.subjectName,
+          subjectKey: widget.subjectKey,
           questionsUrl: url,
           questionsCount: count,
           showAnswersDuringExam: showAnswers,
@@ -969,6 +970,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
           MaterialPageRoute(
             builder: (_) => QuizScreen(
               subject: '${widget.subjectName} - ${exam.title}',
+              subjectKey: widget.subjectKey,
               questionsUrl: exam.jsonUrl,
               questionsCount: questions.length,
               initialQuestions: questions,

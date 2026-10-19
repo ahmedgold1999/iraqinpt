@@ -1087,6 +1087,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           ),
                           Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
                           _buildActionTile(
+                            icon: Icons.explore_rounded,
+                            color: const Color(0xFF8B5CF6),
+                            title: 'جولة تعريفية في التطبيق ✨',
+                            subtitle: 'استعراض مميزات وبوابات الامتحان الوطني والذكاء الاصطناعي',
+                            isDark: isDark,
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.onboarding),
+                          ),
+                          Divider(height: 1, color: isDark ? Colors.white10 : const Color(0xFFF1F5F9)),
+                          _buildActionTile(
                             icon: Icons.support_agent_rounded,
                             color: const Color(0xFF10B981),
                             title: 'الدعم الفني والمساعدة',

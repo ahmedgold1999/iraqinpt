@@ -24,10 +24,12 @@ import 'services/device_service.dart';
 import 'services/dynamic_app_icon_service.dart';
 import 'services/sound_effects_service.dart';
 import 'utils/web_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/common/vpn_block_screen.dart';
 import 'screens/common/maintenance_screen.dart';
 import 'screens/common/device_limit_screen.dart';
+import 'screens/common/onboarding_screen.dart';
 import 'models/app_models.dart';
 import 'widgets/luxury_loading.dart';
 import 'firebase_options.dart';
@@ -136,6 +138,7 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
   bool _isInitialized = false;
   bool _isVpnActive = false;
   bool _isDeviceLimitReached = false;
+  bool _hasSeenOnboarding = true;
   UserModel? _currentUser;
 
   late AnimationController _animationController;
@@ -231,6 +234,12 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
           }).catchError((_) => null);
         }
       }
+
+      // فحص هل رأى المستخدم شاشة التعريف Onboarding مسبقاً
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _hasSeenOnboarding = prefs.getBool('seen_onboarding') ?? false;
+      } catch (_) {}
     } catch (e) {
       debugPrint('App Init Error: $e');
     } finally {
@@ -314,9 +323,16 @@ class _MyAppState extends State<MyApp> with SingleTickerProviderStateMixin {
     }
 
     // الدخول الطبيعي للتطبيق
-    return _currentUser != null 
-        ? RedirectScreen(user: _currentUser!) 
-        : const LoginScreen();
+    if (_currentUser != null) {
+      return RedirectScreen(user: _currentUser!);
+    }
+
+    // إذا لم يسبق للمستخدم رؤية شاشة التعريف والترحيب
+    if (!_hasSeenOnboarding) {
+      return const OnboardingScreen();
+    }
+
+    return const LoginScreen();
   }
 
   Widget _buildLuxuryLoadingScreen() {

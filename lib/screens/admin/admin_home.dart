@@ -911,6 +911,7 @@ class AdminHomeScreen extends StatelessWidget {
       MaterialPageRoute(
         builder: (context) => QuizScreen(
           subject: subjectName,
+          subjectKey: subjectKey,
           questionsUrl: questionsUrls[subjectKey]!,
           questionsCount: questionsCount,
           showAnswersDuringExam: showAnswersDuringExam, // ⭐ تمرير الخيار
@@ -1210,6 +1211,7 @@ class AdminHomeScreen extends StatelessWidget {
                               MaterialPageRoute(
                                 builder: (context) => QuizScreen(
                                   subject: subjectName,
+                                  subjectKey: subjectKey,
                                   questionsUrl: questionsUrls[subjectKey]!,
                                   questionsCount: questionsCount,
                                 ),
@@ -1355,6 +1357,7 @@ class AdminHomeScreen extends StatelessWidget {
                               MaterialPageRoute(
                                 builder: (context) => QuizScreen(
                                   subject: subjectName,
+                                  subjectKey: subjectKey,
                                   questionsUrl: questionsUrls[subjectKey]!,
                                   questionsCount: questionsCount,
                                 ),

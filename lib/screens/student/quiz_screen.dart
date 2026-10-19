@@ -269,6 +269,7 @@ class QuizResultsScreen extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) => QuizScreen(
                             subject: subject,
+                            subjectKey: subjectKey,
                             questionsUrl: "",
                             questionsCount: totalQuestions,
                           ),
@@ -283,6 +284,7 @@ class QuizResultsScreen extends StatelessWidget {
                           builder: (_) => WrongAnswersScreen(
                             questions: questions,
                             userAnswers: userAnswers,
+                            subjectKey: subjectKey,
                           ),
                         ),
                       );
@@ -1346,12 +1348,21 @@ class _FancyButton extends StatelessWidget {
 class WrongAnswersScreen extends StatelessWidget {
   final List<Question> questions;
   final Map<int, int> userAnswers;
+  final String? subjectKey;
 
   const WrongAnswersScreen({
     super.key,
     required this.questions,
     required this.userAnswers,
+    this.subjectKey,
   });
+
+  bool get _isLtr {
+    final key = (subjectKey ?? '').trim().toLowerCase();
+    if (key == 'english' || key == 'computer') return true;
+    if (key == 'arabic') return false;
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1399,7 +1410,12 @@ class WrongAnswersScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               itemCount: wrongItems.length,
               separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemBuilder: (context, i) => _WrongCard(item: wrongItems[i]),
+              itemBuilder: (context, i) => _WrongCard(
+                item: wrongItems[i],
+                isLtr: subjectKey != null && (subjectKey == 'english' || subjectKey == 'computer' || subjectKey == 'arabic')
+                    ? _isLtr
+                    : null,
+              ),
             ),
     );
   }
@@ -1419,13 +1435,21 @@ class _WrongItem {
 
 class _WrongCard extends StatelessWidget {
   final _WrongItem item;
+  final bool? isLtr;
 
-  const _WrongCard({required this.item});
+  const _WrongCard({required this.item, this.isLtr});
+
+  static bool _detectLtr(String text) {
+    final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(text);
+    if (!hasArabic && RegExp(r'[a-zA-Z]').hasMatch(text)) return true;
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final q = item.question;
+    final ltr = isLtr ?? _detectLtr(q.question);
 
     return Card(
       elevation: 0,
@@ -1464,11 +1488,18 @@ class _WrongCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              q.question,
-              style: _QuizUI.title.copyWith(
-                fontSize: 18,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
+            Directionality(
+              textDirection: ltr ? TextDirection.ltr : TextDirection.rtl,
+              child: SizedBox(
+                width: double.infinity,
+                child: Text(
+                  q.question,
+                  textAlign: ltr ? TextAlign.left : TextAlign.right,
+                  style: _QuizUI.title.copyWith(
+                    fontSize: 18,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -1476,18 +1507,21 @@ class _WrongCard extends StatelessWidget {
               label: 'اختيارك:',
               answer: q.options[item.userAnswerIndex],
               color: Colors.red,
+              isLtr: ltr,
             ),
             const SizedBox(height: 12),
             _AnswerBox(
               label: 'الإجابة الصحيحة:',
               answer: q.originalAnswer,
               color: Colors.green,
+              isLtr: ltr,
             ),
             // ⭐ إضافة التفسير إذا كان موجوداً
             if (q.explanation != null && q.explanation!.isNotEmpty) ...[
               const SizedBox(height: 12),
               _ExplanationBox(
                 explanation: q.explanation!,
+                isLtr: ltr,
               ),
             ],
           ],
@@ -1500,8 +1534,9 @@ class _WrongCard extends StatelessWidget {
 // ⭐ إضافة كلاس جديد لعرض التفسير
 class _ExplanationBox extends StatelessWidget {
   final String explanation;
+  final bool isLtr;
 
-  const _ExplanationBox({required this.explanation});
+  const _ExplanationBox({required this.explanation, this.isLtr = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1532,14 +1567,21 @@ class _ExplanationBox extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            explanation,
-            style: TextStyle(
-              fontFamily: _QuizUI.font,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.blue.shade800,
-              height: 1.5,
+          Directionality(
+            textDirection: isLtr ? TextDirection.ltr : TextDirection.rtl,
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                explanation,
+                textAlign: isLtr ? TextAlign.left : TextAlign.right,
+                style: TextStyle(
+                  fontFamily: isLtr ? null : _QuizUI.font,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue.shade800,
+                  height: 1.5,
+                ),
+              ),
             ),
           ),
         ],
@@ -1552,11 +1594,13 @@ class _AnswerBox extends StatelessWidget {
   final String label;
   final String answer;
   final Color color;
+  final bool isLtr;
 
   const _AnswerBox({
     required this.label,
     required this.answer,
     required this.color,
+    this.isLtr = false,
   });
 
   @override
@@ -1584,8 +1628,10 @@ class _AnswerBox extends StatelessWidget {
           ),
           child: Text(
             answer,
+            textDirection: isLtr ? TextDirection.ltr : TextDirection.rtl,
+            textAlign: isLtr ? TextAlign.left : TextAlign.right,
             style: TextStyle(
-              fontFamily: _QuizUI.font,
+              fontFamily: isLtr ? null : _QuizUI.font,
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: color,
@@ -1601,6 +1647,7 @@ class _AnswerBox extends StatelessWidget {
 /// ==================== شاشة الاختبار الرئيسية ====================
 class QuizScreen extends StatefulWidget {
   final String subject;
+  final String? subjectKey; // ⭐ مفتاح المادة لتحديد اتجاه النص وخصائص المادة
   final String questionsUrl;
   final int questionsCount;
   final bool showAnswersDuringExam; // ⭐ أضف هذا
@@ -1612,6 +1659,7 @@ class QuizScreen extends StatefulWidget {
   const QuizScreen({
     super.key,
     required this.subject,
+    this.subjectKey,
     required this.questionsUrl,
     this.questionsCount = 100,
     this.showAnswersDuringExam = false, // ⭐ افتراضي false
@@ -1647,6 +1695,28 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   // ⭐ المتغيرات الجديدة
   bool _showFeedback = false;
   Timer? _feedbackTimer;
+
+  // 🌐 تحديد اتجاه النص (يسار لليمين للحاسوب والإنكليزي، يمين لليسار للعربي)
+  bool get _isCurrentQuestionLtr {
+    // 1. فحص مفتاح المادة المباشر
+    final key = (widget.subjectKey ?? '').trim().toLowerCase();
+    if (key == 'english' || key == 'computer') return true;
+    if (key == 'arabic') return false;
+
+    // 2. فحص اسم المادة
+    final sub = widget.subject.toLowerCase();
+    if (sub.contains('إنجليز') || sub.contains('انجليز') || sub.contains('english')) return true;
+    if (sub.contains('حاسوب') || sub.contains('computer')) return true;
+    if (sub.contains('عرب') || sub.contains('arabic')) return false;
+
+    // 3. فحص نص السؤال الحالي في الاختبارات العامة أو المراجعة الذكية
+    if (_randomQuestions.isNotEmpty && _currentQuestionIndex < _randomQuestions.length) {
+      final qText = _randomQuestions[_currentQuestionIndex].question.trim();
+      final hasArabic = RegExp(r'[\u0600-\u06FF]').hasMatch(qText);
+      if (!hasArabic && RegExp(r'[a-zA-Z]').hasMatch(qText)) return true;
+    }
+    return false;
+  }
 
   @override
   void initState() {
@@ -2143,6 +2213,9 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   }
 
   String _getSubjectKey(String subject) {
+    if (widget.subjectKey != null && widget.subjectKey!.isNotEmpty) {
+      return widget.subjectKey!;
+    }
     final s = subject.toLowerCase();
     if (s.contains('عرب') || s.contains('arab')) return 'arabic';
     if (s.contains('حاس') || s.contains('comp')) return 'computer';
@@ -2514,19 +2587,26 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Text(
-                            q.question,
-                            style: TextStyle(
-                              fontFamily: _QuizUI.font,
-                              fontWeight: FontWeight.bold,
-                              fontSize: _fontSize + 1,
-                              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
-                              height: 1.5,
+                          Directionality(
+                            textDirection: _isCurrentQuestionLtr ? TextDirection.ltr : TextDirection.rtl,
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: Text(
+                                q.question,
+                                textAlign: _isCurrentQuestionLtr ? TextAlign.left : TextAlign.right,
+                                style: TextStyle(
+                                  fontFamily: _isCurrentQuestionLtr ? null : _QuizUI.font,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: _fontSize + 1,
+                                  color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                                  height: 1.5,
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 20),
 
-                          // الخيارات بنمط iOS
+                          // الخيارات بنمط iOS (LTR للإنجليزي والحاسوب، RTL للعربي)
                           ...List.generate(q.options.length, (index) {
                             final option = q.options[index];
                             final isSelected = _userAnswers[_currentQuestionIndex] == index;
@@ -2569,44 +2649,48 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                       width: isSelected ? 1.8 : 1,
                                     ),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 32,
-                                        height: 32,
-                                        decoration: BoxDecoration(
-                                          color: isSelected
-                                              ? const Color(0xFF00C853)
-                                              : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          '${index + 1}',
-                                          style: TextStyle(
-                                            fontFamily: _QuizUI.font,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF1C1C1E)),
+                                  child: Directionality(
+                                    textDirection: _isCurrentQuestionLtr ? TextDirection.ltr : TextDirection.rtl,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: isSelected
+                                                ? const Color(0xFF00C853)
+                                                : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            _isCurrentQuestionLtr ? String.fromCharCode(65 + index) : '${index + 1}',
+                                            style: TextStyle(
+                                              fontFamily: _isCurrentQuestionLtr ? null : _QuizUI.font,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF1C1C1E)),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          option,
-                                          style: TextStyle(
-                                            fontFamily: _QuizUI.font,
-                                            fontSize: _fontSize,
-                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                            color: isDark ? Colors.white : const Color(0xFF1C1C1E),
-                                            height: 1.3,
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            option,
+                                            textAlign: _isCurrentQuestionLtr ? TextAlign.left : TextAlign.right,
+                                            style: TextStyle(
+                                              fontFamily: _isCurrentQuestionLtr ? null : _QuizUI.font,
+                                              fontSize: _fontSize,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                              color: isDark ? Colors.white : const Color(0xFF1C1C1E),
+                                              height: 1.3,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                      if (isSelected)
-                                        const Icon(Icons.check_circle_rounded, color: Color(0xFF00C853), size: 22),
-                                    ],
+                                        if (isSelected)
+                                          const Icon(Icons.check_circle_rounded, color: Color(0xFF00C853), size: 22),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2702,8 +2786,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                               const SizedBox(height: 4),
                                               Text(
                                                 _randomQuestions[_currentQuestionIndex].originalAnswer,
+                                                textDirection: _isCurrentQuestionLtr ? TextDirection.ltr : TextDirection.rtl,
+                                                textAlign: _isCurrentQuestionLtr ? TextAlign.left : TextAlign.right,
                                                 style: TextStyle(
-                                                  fontFamily: 'Tajawal',
+                                                  fontFamily: _isCurrentQuestionLtr ? null : 'Tajawal',
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.bold,
                                                   color: isDark ? Colors.white : const Color(0xFF1C1C1E),
@@ -2747,8 +2833,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                                 const SizedBox(height: 4),
                                                 Text(
                                                   _randomQuestions[_currentQuestionIndex].explanation!,
+                                                  textDirection: _isCurrentQuestionLtr ? TextDirection.ltr : TextDirection.rtl,
+                                                  textAlign: _isCurrentQuestionLtr ? TextAlign.left : TextAlign.right,
                                                   style: TextStyle(
-                                                    fontFamily: 'Tajawal',
+                                                    fontFamily: _isCurrentQuestionLtr ? null : 'Tajawal',
                                                     fontSize: 13,
                                                     fontWeight: FontWeight.w500,
                                                     color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E3A8A),
@@ -2765,8 +2853,8 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 12),
                           ],
+                          const SizedBox(height: 12),
 
                           const SizedBox(height: 6),
                           Align(

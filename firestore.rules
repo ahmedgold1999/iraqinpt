@@ -15,6 +15,7 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // وثائق المستخدمين (منع الطالب من ترقية حسابه بنفسه)
     match /users/{userId} {
       allow read: if isAuthenticated();
       
@@ -43,7 +44,7 @@ service cloud.firestore {
     }
 
     match /fcm_tokens/{tokenId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
 
     match /system_settings/{docId} {
@@ -70,8 +71,8 @@ service cloud.firestore {
     }
 
     match /leaderboard/{docId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+     allow read: if true;
+     allow write: if isAuthenticated() && (request.auth.uid == docId || isAdmin());
     }
 
     match /questions/{docId} {
