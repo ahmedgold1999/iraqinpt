@@ -2278,15 +2278,6 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                                         color: const Color(0xFFFACC15).withOpacity(0.2),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: const Text(
-                                        'جديد',
-                                        style: TextStyle(
-                                          color: Color(0xFFFACC15),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Tajawal',
-                                        ),
-                                      ),
                                     ),
                                   ],
                                 ),
@@ -2376,15 +2367,6 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                                         color: const Color(0xFF10B981),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: const Text(
-                                        'جديد 🔥',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Tajawal',
-                                        ),
-                                      ),
                                     ),
                                   ],
                                 ),
@@ -2470,15 +2452,6 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFF59E0B),
                                         borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text(
-                                        '⚡ برق',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Tajawal',
-                                        ),
                                       ),
                                     ),
                                   ],

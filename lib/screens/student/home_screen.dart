@@ -1547,15 +1547,6 @@ class StudentHomeScreen extends StatelessWidget {
                               color: const Color(0xFFFACC15),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
-                              'جديد ✨',
-                              style: TextStyle(
-                                fontFamily: 'Tajawal',
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
                           ),
                         ],
                       ),

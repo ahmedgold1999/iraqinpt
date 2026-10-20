@@ -303,7 +303,10 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                                     if (validationSuccess) {
                                       final count = res['count'] as int;
                                       countController.text = count.toString();
-                                      validationMessage = '✅ تم فحص الملف بنجاح! تم العثور على $count سؤالاً جاهزاً.';
+                                      // ⏱️ حساب الوقت بالدقائق تلقائياً: كل سؤال 40 ثانية
+                                      final calculatedMinutes = count > 0 ? (count * 40 / 60).ceil() : 0;
+                                      durationController.text = calculatedMinutes.toString();
+                                      validationMessage = '✅ تم فحص الملف بنجاح! تم العثور على $count سؤالاً ($calculatedMinutes دقيقة بمعدل 40 ثانية لكل سؤال).';
                                       sampleData = res;
                                     } else {
                                       validationMessage = '❌ ${res['error']}';
@@ -395,6 +398,13 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                             icon: Icons.format_list_numbered_rounded,
                             isDark: isDark,
                             keyboardType: TextInputType.number,
+                            onChanged: (val) {
+                              final count = int.tryParse(val.trim());
+                              if (count != null && count > 0) {
+                                final calculatedMinutes = (count * 40 / 60).ceil();
+                                durationController.text = calculatedMinutes.toString();
+                              }
+                            },
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -402,7 +412,7 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                           child: _buildTextField(
                             controller: durationController,
                             label: 'المدة (بالدقائق)',
-                            hint: '30',
+                            hint: 'محسوبة تلقائياً',
                             icon: Icons.timer_outlined,
                             isDark: isDark,
                             keyboardType: TextInputType.number,
@@ -473,7 +483,8 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                               final title = titleController.text.trim();
                               final jsonUrl = urlController.text.trim();
                               final count = int.tryParse(countController.text.trim()) ?? 0;
-                              final duration = int.tryParse(durationController.text.trim()) ?? 30;
+                              final duration = int.tryParse(durationController.text.trim()) ??
+                                  (count > 0 ? (count * 40 / 60).ceil() : 30);
                               final order = int.tryParse(orderController.text.trim()) ?? 0;
 
                               if (title.isEmpty || jsonUrl.isEmpty) {

@@ -67,7 +67,7 @@ class _CertificateVerificationScreenState
             ),
             const SizedBox(height: 2),
             const Text(
-              'جامعة بغداد · منظومة التحقق من الوثائق (QR)',
+              'منظومة التحقق من الوثائق (QR)',
               style: TextStyle(
                 fontFamily: 'Tajawal',
                 fontSize: 11,
