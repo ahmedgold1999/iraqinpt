@@ -1104,7 +1104,7 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
 
   Future<void> _enableScreenProtection() async {
     try {
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
       }
     } catch (e) {
@@ -1121,7 +1121,7 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
 
   Future<void> _disableScreenProtection() async {
     try {
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
       }
     } catch (e) {
@@ -2526,7 +2526,7 @@ class _StudyMaterialsScreenState extends State<StudyMaterialsScreen>
 
   Future<void> _enableScreenProtection() async {
     try {
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
       }
     } catch (e) {
@@ -2543,7 +2543,7 @@ class _StudyMaterialsScreenState extends State<StudyMaterialsScreen>
 
   Future<void> _disableScreenProtection() async {
     try {
-      if (Platform.isAndroid) {
+      if (!kIsWeb && Platform.isAndroid) {
         await FlutterWindowManager.clearFlags(FlutterWindowManager.FLAG_SECURE);
       }
     } catch (e) {
