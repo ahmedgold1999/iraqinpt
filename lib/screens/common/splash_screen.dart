@@ -17,7 +17,8 @@ import 'maintenance_screen.dart';
 import 'onboarding_screen.dart';
 
 /// =========================================================================
-/// شاشة البداية الملكية والتقديمية العصرية الفاخرة (App Intro Splash Screen)
+/// شاشة البداية بأسلوب أبل المينيمال الفاخر (Apple Minimal Luxury Splash)
+/// تصميم نقي، هادئ، فخم، بدون أي تعقيد أو إطارات زائدة
 /// =========================================================================
 class AppIntroSplashScreen extends StatefulWidget {
   const AppIntroSplashScreen({super.key});
@@ -28,187 +29,135 @@ class AppIntroSplashScreen extends StatefulWidget {
 
 class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
     with TickerProviderStateMixin {
-  // ألوان الهوية الملكية العصرية
-  static const Color _bgDark = Color(0xFF070B14);
+  // ألوان أبل المينيمال الفاخرة (درجات مات هادئة ونقية)
+  static const Color _bgCanvas = Color(0xFF090D16);
   static const Color _gold = Color(0xFFFACC15);
-  static const Color _goldAmber = Color(0xFFF59E0B);
-  static const Color _goldGlow = Color(0xFFFFE066);
+  static const Color _textColor = Color(0xFFF1F5F9);
 
-  // متحكمات الحركة
-  late AnimationController _iconController;
+  // متحكمات حركة الأيقونة
+  late AnimationController _iconAnimController;
   late Animation<double> _iconScale;
-  late Animation<double> _iconFade;
+  late Animation<double> _iconOpacity;
 
-  late AnimationController _ambientGlowController;
-  late Animation<double> _ambientGlowAnimation;
-
-  late AnimationController _questionMarkController;
+  // متحكم حركة علامة الاستفهام المدمجة بانسيابية
+  late AnimationController _questionMarkAnimController;
   late Animation<double> _questionMarkScale;
-  late Animation<double> _questionMarkRotate;
-
-  late AnimationController _burstRingController;
-  late Animation<double> _burstRingScale;
-  late Animation<double> _burstRingOpacity;
-
-  late AnimationController _subtextController;
-  late Animation<double> _subtextFade;
-  late Animation<double> _subtextSlide;
+  late Animation<double> _questionMarkOpacity;
 
   // نص العبارة المطلوب
-  static const String _fullText = 'ليش تحير بالامتحان الوطني وتطبيقنه موجود';
-  String _displayedText = '';
-  int _charIndex = 0;
+  static const String _mainSentence = 'ليش تحير بالامتحان الوطني وتطبيقنه موجود';
+  String _typedText = '';
+  int _charPointer = 0;
   Timer? _typewriterTimer;
 
-  bool _isTypingComplete = false;
+  bool _isTypingDone = false;
   bool _showQuestionMark = false;
-  bool _showCursor = true;
+  bool _cursorBlink = true;
   Timer? _cursorTimer;
 
-  // منطق الانتقال والتهيئة في الخلفية
-  Widget? _destinationScreen;
-  bool _isInitDone = false;
-  bool _isAnimationDone = false;
-  bool _hasNavigated = false;
+  // منطق التهيئة والانتقال
+  Widget? _nextScreen;
+  bool _isInitFinished = false;
+  bool _isAnimationFinished = false;
+  bool _hasTransitioned = false;
 
   @override
   void initState() {
     super.initState();
-    _initAnimations();
-    _startPresentationTimeline();
-    _runBackgroundAppInit();
+    _setupAnimations();
+    _startFlowTimeline();
+    _executeAppWarmup();
   }
 
-  void _initAnimations() {
-    // 1. حركة دخول الأيقونة
-    _iconController = AnimationController(
+  void _setupAnimations() {
+    // 1. حركة الأيقونة: ظهور هادئ وناعم يشبه شاشات آبل (Fade + subtle micro-zoom)
+    _iconAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 800),
     );
-    _iconScale = Tween<double>(begin: 0.65, end: 1.0).animate(
-      CurvedAnimation(parent: _iconController, curve: Curves.easeOutBack),
+    _iconScale = Tween<double>(begin: 0.90, end: 1.0).animate(
+      CurvedAnimation(parent: _iconAnimController, curve: Curves.easeOutCubic),
     );
-    _iconFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _iconController, curve: const Interval(0.0, 0.7, curve: Curves.easeOut)),
+    _iconOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _iconAnimController, curve: Curves.easeOut),
     );
 
-    // 2. توهج خلفي هادئ يتنفس
-    _ambientGlowController = AnimationController(
+    // 2. حركة علامة الاستفهام: ظهور ارتدادي ممتع ومدمج مع النص بدون أي صناديق أو إطارات
+    _questionMarkAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-    _ambientGlowAnimation = Tween<double>(begin: 0.85, end: 1.2).animate(
-      CurvedAnimation(parent: _ambientGlowController, curve: Curves.easeInOut),
-    );
-
-    // 3. حركة ظهور علامة الاستفهام بفرقعة وتأرجح ارتدادي فاخر
-    _questionMarkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 550),
     );
     _questionMarkScale = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _questionMarkController, curve: Curves.elasticOut),
+      CurvedAnimation(parent: _questionMarkAnimController, curve: Curves.elasticOut),
     );
-    _questionMarkRotate = Tween<double>(begin: -0.2, end: 0.0).animate(
-      CurvedAnimation(parent: _questionMarkController, curve: Curves.easeOutBack),
-    );
-
-    // 4. حلقة الصدمة الضوئية (Shockwave Ring) الذهبية عند ظهور علامة الاستفهام
-    _burstRingController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _burstRingScale = Tween<double>(begin: 0.2, end: 2.2).animate(
-      CurvedAnimation(parent: _burstRingController, curve: Curves.easeOutCubic),
-    );
-    _burstRingOpacity = Tween<double>(begin: 0.8, end: 0.0).animate(
-      CurvedAnimation(parent: _burstRingController, curve: Curves.easeOutQuad),
+    _questionMarkOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _questionMarkAnimController, curve: Curves.easeIn),
     );
 
-    // 5. حركة ظهور العناصر التكميلية (النص الفرعي ومؤشر التقدم)
-    _subtextController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _subtextFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _subtextController, curve: Curves.easeOut),
-    );
-    _subtextSlide = Tween<double>(begin: 12.0, end: 0.0).animate(
-      CurvedAnimation(parent: _subtextController, curve: Curves.easeOutQuad),
-    );
-
-    // وميض مؤشر الكتابة |
-    _cursorTimer = Timer.periodic(const Duration(milliseconds: 380), (timer) {
-      if (mounted && !_isTypingComplete) {
-        setState(() => _showCursor = !_showCursor);
+    // وميض المؤشر الرقيق
+    _cursorTimer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
+      if (mounted && !_isTypingDone) {
+        setState(() => _cursorBlink = !_cursorBlink);
       }
     });
   }
 
-  /// الجدول الزمني للعرض السينمائي المبهر
-  void _startPresentationTimeline() async {
-    // بدء دخول الأيقونة
-    await Future.delayed(const Duration(milliseconds: 150));
+  void _startFlowTimeline() async {
+    // ظهور الأيقونة أولاً بنعومة
+    await Future.delayed(const Duration(milliseconds: 180));
     if (!mounted) return;
-    _iconController.forward();
+    _iconAnimController.forward();
 
-    // بدء طباعة النص حرفاً حرفاً بسرعة رشيقة وغير مملة (~38 ميلي ثانية لكل حرف)
-    await Future.delayed(const Duration(milliseconds: 600));
+    // بدء طباعة النص بحركة سريعة وممتعة (34ms لكل حرف)
+    await Future.delayed(const Duration(milliseconds: 550));
     if (!mounted) return;
 
-    _typewriterTimer = Timer.periodic(const Duration(milliseconds: 38), (timer) {
+    _typewriterTimer = Timer.periodic(const Duration(milliseconds: 34), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
-      if (_charIndex < _fullText.length) {
+      if (_charPointer < _mainSentence.length) {
         setState(() {
-          _displayedText += _fullText[_charIndex];
-          _charIndex++;
+          _typedText += _mainSentence[_charPointer];
+          _charPointer++;
         });
       } else {
         timer.cancel();
         setState(() {
-          _isTypingComplete = true;
-          _showCursor = false;
+          _isTypingDone = true;
+          _cursorBlink = false;
         });
-        _triggerQuestionMarkPop();
+        _popQuestionMark();
       }
     });
   }
 
-  /// إطلاق ظهور علامة الاستفهام مع صوت الطقة والاهتزاز ولمعان الصدمة الذهبية
-  Future<void> _triggerQuestionMarkPop() async {
-    // وقفة ذكية قصيرة جداً (120ms) لتجهيز الأثر النفسي للعلامة
-    await Future.delayed(const Duration(milliseconds: 120));
+  /// ظهور علامة الاستفهام بنعومة طبيعية كجزء من النص مع صوت الطقة والاهتزاز اللمسي
+  Future<void> _popQuestionMark() async {
+    // وقفة ذكية قصيرة (100ms) لإعطاء أثر ترقب سينمائي
+    await Future.delayed(const Duration(milliseconds: 100));
     if (!mounted) return;
 
     setState(() {
       _showQuestionMark = true;
     });
 
-    // 🔊 تشغيل صوت الطقة فوراً + اهتزاز فيزيائي بالهاتف
+    // صوت الطقة والاهتزاز الخفيف
     SoundEffectsService.playClickSound();
-    HapticFeedback.heavyImpact();
+    HapticFeedback.lightImpact();
 
-    // تشغيل حركات الانفجار الضوئي والتأرجح
-    _burstRingController.forward(from: 0.0);
-    _questionMarkController.forward(from: 0.0);
+    _questionMarkAnimController.forward(from: 0.0);
 
-    // ظهور النص الترحيبي الفرعي الأنيق بعد ظهور العلامة
-    await Future.delayed(const Duration(milliseconds: 250));
+    // مهلة قصيرة لإتاحة قراءة العبارة كاملة قبل الانتقال
+    await Future.delayed(const Duration(milliseconds: 700));
     if (!mounted) return;
-    _subtextController.forward();
-
-    // إنهاء جدول العرض التقديمي والانتقال
-    await Future.delayed(const Duration(milliseconds: 650));
-    if (!mounted) return;
-    _isAnimationDone = true;
-    _checkAndNavigate();
+    _isAnimationFinished = true;
+    _checkTransitionReady();
   }
 
-  /// التهيئة الشاملة للتطبيق بالخلفية بالتوازي مع العرض
-  Future<void> _runBackgroundAppInit() async {
+  /// فحص الحساب والصيانة بالخلفية أثناء عمل الأنيميشن
+  Future<void> _executeAppWarmup() async {
     try {
       NotificationService.enableNotifications().catchError((_) => null);
 
@@ -236,81 +185,75 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
         }
       }
 
-      // فحص حالة الصيانة
       final bool isMaintenance = ConfigService().isMaintenanceOn;
 
-      // فحص شاشة التعريف
       bool hasSeenOnboarding = true;
       try {
         final prefs = await SharedPreferences.getInstance();
         hasSeenOnboarding = prefs.getBool('seen_onboarding') ?? false;
       } catch (_) {}
 
-      // تحديد الشاشة التالية بدقة
       if (isDeviceLimitReached) {
-        _destinationScreen = const DeviceLimitScreen();
+        _nextScreen = const DeviceLimitScreen();
       } else if (isMaintenance && (currentUser == null || currentUser.role != UserRole.admin)) {
-        _destinationScreen = const MaintenanceScreen();
+        _nextScreen = const MaintenanceScreen();
       } else if (currentUser != null) {
-        _destinationScreen = _RedirectDispatcher(user: currentUser);
+        _nextScreen = _RedirectDispatcher(user: currentUser);
       } else if (!hasSeenOnboarding) {
-        _destinationScreen = const OnboardingScreen();
+        _nextScreen = const OnboardingScreen();
       } else {
-        _destinationScreen = const LoginScreen();
+        _nextScreen = const LoginScreen();
       }
     } catch (e) {
-      debugPrint('Splash Init Error: $e');
-      _destinationScreen = const LoginScreen();
+      debugPrint('App Warmup Error: $e');
+      _nextScreen = const LoginScreen();
     } finally {
-      _isInitDone = true;
-      _checkAndNavigate();
+      _isInitFinished = true;
+      _checkTransitionReady();
     }
   }
 
-  /// التحقق من اكتمال الرسوم والتهيئة ثم الانتقال بسلاسة
-  void _checkAndNavigate() {
-    if (!mounted || _hasNavigated) return;
-    if (_isInitDone && _isAnimationDone) {
-      _hasNavigated = true;
-      _navigateToDestination();
+  void _checkTransitionReady() {
+    if (!mounted || _hasTransitioned) return;
+    if (_isInitFinished && _isAnimationFinished) {
+      _hasTransitioned = true;
+      _performSmoothTransition();
     }
   }
 
-  /// إمكانية التخطي الفوري عند النقر
-  void _skipIntro() {
-    if (_hasNavigated) return;
+  /// تخطي فوري عند لمس الشاشة
+  void _onScreenTapped() {
+    if (_hasTransitioned) return;
 
-    if (!_isTypingComplete) {
+    if (!_isTypingDone) {
       _typewriterTimer?.cancel();
       setState(() {
-        _displayedText = _fullText;
-        _isTypingComplete = true;
+        _typedText = _mainSentence;
+        _isTypingDone = true;
         _showQuestionMark = true;
-        _showCursor = false;
+        _cursorBlink = false;
       });
-      _questionMarkController.value = 1.0;
-      _subtextController.value = 1.0;
+      _questionMarkAnimController.value = 1.0;
       SoundEffectsService.playClickSound();
       HapticFeedback.selectionClick();
     }
 
-    _isAnimationDone = true;
-    if (_isInitDone) {
-      _hasNavigated = true;
-      _navigateToDestination();
+    _isAnimationFinished = true;
+    if (_isInitFinished) {
+      _hasTransitioned = true;
+      _performSmoothTransition();
     }
   }
 
-  void _navigateToDestination() {
-    final next = _destinationScreen ?? const LoginScreen();
+  void _performSmoothTransition() {
+    final destination = _nextScreen ?? const LoginScreen();
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (context, animation, secondaryAnimation) => next,
+        transitionDuration: const Duration(milliseconds: 500),
+        pageBuilder: (context, animation, secondaryAnimation) => destination,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final curved = CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic);
           return FadeTransition(
-            opacity: curved,
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeInOut),
             child: child,
           );
         },
@@ -322,334 +265,121 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
   void dispose() {
     _cursorTimer?.cancel();
     _typewriterTimer?.cancel();
-    _iconController.dispose();
-    _ambientGlowController.dispose();
-    _questionMarkController.dispose();
-    _burstRingController.dispose();
-    _subtextController.dispose();
+    _iconAnimController.dispose();
+    _questionMarkAnimController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
-      backgroundColor: _bgDark,
+      backgroundColor: _bgCanvas,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: _skipIntro,
-        child: Stack(
-          children: [
-            // ================= 1. الخلفية الملكية ذات التدرج الفاخر =================
-            Container(
-              width: size.width,
-              height: size.height,
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(0, -0.15),
-                  radius: 1.1,
-                  colors: [
-                    Color(0xFF131D38),
-                    Color(0xFF0B1224),
-                    _bgDark,
-                  ],
-                  stops: [0.0, 0.55, 1.0],
-                ),
-              ),
-            ),
+        onTap: _onScreenTapped,
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Spacer(flex: 3),
 
-            // ================= 2. هالة التوهج الذهبي خلف الأيقونة =================
-            Center(
-              child: Transform.translate(
-                offset: const Offset(0, -45),
-                child: AnimatedBuilder(
-                  animation: _ambientGlowAnimation,
-                  builder: (context, child) {
-                    return Container(
-                      width: 220 * _ambientGlowAnimation.value,
-                      height: 220 * _ambientGlowAnimation.value,
+                // ================= 1. أيقونة التطبيق (نقية، راقية، بأسلوب آبل المينيمال) =================
+                FadeTransition(
+                  opacity: _iconOpacity,
+                  child: ScaleTransition(
+                    scale: _iconScale,
+                    child: Container(
+                      width: 125,
+                      height: 125,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            _gold.withValues(alpha: 0.16 * _ambientGlowAnimation.value),
-                            _goldAmber.withValues(alpha: 0.05),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-
-            // ================= 3. حلقة الانفجار الضوئي عند علامة الاستفهام =================
-            Center(
-              child: Transform.translate(
-                offset: const Offset(0, 48),
-                child: AnimatedBuilder(
-                  animation: _burstRingController,
-                  builder: (context, child) {
-                    if (!_showQuestionMark || _burstRingOpacity.value <= 0.01) {
-                      return const SizedBox.shrink();
-                    }
-                    return Opacity(
-                      opacity: _burstRingOpacity.value,
-                      child: Container(
-                        width: 70 * _burstRingScale.value,
-                        height: 70 * _burstRingScale.value,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: _goldGlow.withValues(alpha: _burstRingOpacity.value),
-                            width: 2.0,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            blurRadius: 28,
+                            offset: const Offset(0, 10),
                           ),
-                        ),
+                        ],
                       ),
-                    );
-                  },
+                      child: Image.asset(
+                        'assets/icons/appwithoutbackground.png',
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Image.asset(
+                            'assets/icons/app_icon.png',
+                            fit: BoxFit.contain,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
 
-            // ================= 4. المحتوى المركزي (الأيقونة والنص) =================
-            SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
+                const SizedBox(height: 28),
+
+                // ================= 2. العبارة النصية المينيمال المنسابة بحرية =================
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
                       children: [
-                        // --- أيقونة التطبيق الفاخرة بدون خلفية ---
-                        ScaleTransition(
-                          scale: _iconScale,
-                          child: FadeTransition(
-                            opacity: _iconFade,
-                            child: Hero(
-                              tag: 'app_main_logo',
-                              child: Container(
-                                width: 145,
-                                height: 145,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _gold.withValues(alpha: 0.25),
-                                      blurRadius: 36,
-                                      spreadRadius: 4,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.6),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                  ],
-                                ),
-                                child: Image.asset(
-                                  'assets/icons/appwithoutbackground.png',
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.high,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    // بديل آمن إن لم يوجد المسار
-                                    return Image.asset(
-                                      'assets/icons/app_icon.png',
-                                      fit: BoxFit.contain,
-                                    );
-                                  },
+                        // النص الأساسي المكتوب حرفاً حرفاً
+                        Flexible(
+                          child: Text(
+                            _typedText,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.cairo(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: _textColor,
+                              height: 1.4,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+
+                        // وميض المؤشر الذهبي الخفيف أثناء الكتابة
+                        if (!_isTypingDone && _cursorBlink)
+                          Container(
+                            margin: const EdgeInsets.only(right: 3, top: 4),
+                            width: 2.0,
+                            height: 18,
+                            color: _gold,
+                          ),
+
+                        // علامة الاستفهام الذهبية المندمجة بانسيابية كحرف طبيعي فخم (بدون أي كبسولات أو إطارات)
+                        if (_showQuestionMark)
+                          FadeTransition(
+                            opacity: _questionMarkOpacity,
+                            child: ScaleTransition(
+                              scale: _questionMarkScale,
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                ' ؟!',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: _gold,
+                                  height: 1.4,
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 34),
-
-                        // --- السطر التعبيري الرئيسي مع حركة الآلة الكاتبة وعلامة الاستفهام ---
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Directionality(
-                            textDirection: TextDirection.rtl,
-                            child: Wrap(
-                              alignment: WrapAlignment.center,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                // نص العبارة التدريجي
-                                Text(
-                                  _displayedText,
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.cairo(
-                                    fontSize: 19.5,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.45,
-                                    color: Colors.white,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withValues(alpha: 0.6),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // وميض مؤشر الكتابة أثناء الطباعة
-                                if (!_isTypingComplete && _showCursor)
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                                    width: 2.5,
-                                    height: 22,
-                                    decoration: BoxDecoration(
-                                      color: _gold,
-                                      borderRadius: BorderRadius.circular(2),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: _gold.withValues(alpha: 0.7),
-                                          blurRadius: 6,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                // علامة الاستفهام الفاخرة المنبثقة بقوة
-                                if (_showQuestionMark)
-                                  ScaleTransition(
-                                    scale: _questionMarkScale,
-                                    child: RotationTransition(
-                                      turns: _questionMarkRotate,
-                                      child: Container(
-                                        margin: const EdgeInsets.only(right: 6, bottom: 2),
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [_gold, _goldAmber],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          ),
-                                          borderRadius: BorderRadius.circular(10),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: _gold.withValues(alpha: 0.6),
-                                              blurRadius: 14,
-                                              spreadRadius: 1,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Text(
-                                          '؟! ⚡',
-                                          style: GoogleFonts.cairo(
-                                            fontSize: 18.5,
-                                            fontWeight: FontWeight.w900,
-                                            color: const Color(0xFF070B14),
-                                            letterSpacing: 1.2,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-
-                        // --- النص الترحيبي الفرعي المكمل للفخامة والبساطة ---
-                        AnimatedBuilder(
-                          animation: _subtextController,
-                          builder: (context, child) {
-                            return Opacity(
-                              opacity: _subtextFade.value,
-                              child: Transform.translate(
-                                offset: Offset(0, _subtextSlide.value),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: _gold.withValues(alpha: 0.2),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.verified_rounded,
-                                        color: _gold,
-                                        size: 15,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'دليلك الرسمي المعتمد للتفوق والنجاح • 2026',
-                                        style: GoogleFonts.tajawal(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: const Color(0xFFCBD5E1),
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            ),
 
-            // ================= 5. خط التحميل السفلي فائق النحافة والأناقة =================
-            Positioned(
-              bottom: 24,
-              left: 48,
-              right: 48,
-              child: AnimatedBuilder(
-                animation: _subtextController,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _subtextFade.value,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            height: 2.2,
-                            width: double.infinity,
-                            color: Colors.white.withValues(alpha: 0.08),
-                            child: const LinearProgressIndicator(
-                              backgroundColor: Colors.transparent,
-                              valueColor: AlwaysStoppedAnimation<Color>(_gold),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'جاري تجهيز عالمك التعليمي...',
-                          style: GoogleFonts.tajawal(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white38,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                const Spacer(flex: 4),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -668,9 +398,13 @@ class _RedirectDispatcher extends StatelessWidget {
       Navigator.of(context).pushReplacementNamed(route);
     });
     return const Scaffold(
-      backgroundColor: Color(0xFF070B14),
+      backgroundColor: Color(0xFF090D16),
       body: Center(
-        child: CircularProgressIndicator(color: Color(0xFFFACC15), strokeWidth: 2.5),
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(color: Color(0xFFFACC15), strokeWidth: 2),
+        ),
       ),
     );
   }
