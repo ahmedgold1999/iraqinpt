@@ -22,8 +22,10 @@ import 'screens/student/motivational_quotes_screen.dart';
 import 'screens/student/competitive_calculator_screen.dart';
 import 'screens/student/exam_schedule_viewer_screen.dart';
 import 'screens/common/onboarding_screen.dart';
+import 'screens/common/splash_screen.dart';
 
 class AppRoutes {
+  static const String splash = '/splash';
   static const String onboarding = '/onboarding';
   static const String login = '/login';
   static const String home = '/home';
@@ -51,6 +53,9 @@ class AppRoutes {
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case splash:
+        return MaterialPageRoute(builder: (_) => const AppIntroSplashScreen());
+
       case onboarding:
         return MaterialPageRoute(builder: (_) => const OnboardingScreen());
 

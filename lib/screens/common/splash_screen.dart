@@ -1,10 +1,7 @@
 import 'dart:async';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/app_models.dart';
@@ -18,7 +15,6 @@ import '../auth/login_screen.dart';
 import 'device_limit_screen.dart';
 import 'maintenance_screen.dart';
 import 'onboarding_screen.dart';
-import 'vpn_block_screen.dart';
 
 /// =========================================================================
 /// شاشة البداية الملكية والتقديمية العصرية الفاخرة (App Intro Splash Screen)
@@ -34,7 +30,6 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
     with TickerProviderStateMixin {
   // ألوان الهوية الملكية العصرية
   static const Color _bgDark = Color(0xFF070B14);
-  static const Color _bgDeep = Color(0xFF0F172A);
   static const Color _gold = Color(0xFFFACC15);
   static const Color _goldAmber = Color(0xFFF59E0B);
   static const Color _goldGlow = Color(0xFFFFE066);
@@ -241,18 +236,6 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
         }
       }
 
-      // فحص الـ VPN (معطل افتراضياً)
-      const bool enableVpnCheck = false;
-      bool isVpnActive = false;
-      if (enableVpnCheck) {
-        try {
-          final connectivityResult = await Connectivity().checkConnectivity();
-          if (connectivityResult.contains(ConnectivityResult.vpn)) {
-            isVpnActive = true;
-          }
-        } catch (_) {}
-      }
-
       // فحص حالة الصيانة
       final bool isMaintenance = ConfigService().isMaintenanceOn;
 
@@ -264,9 +247,7 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
       } catch (_) {}
 
       // تحديد الشاشة التالية بدقة
-      if (enableVpnCheck && isVpnActive) {
-        _destinationScreen = VpnBlockScreen(onRefresh: () async {});
-      } else if (isDeviceLimitReached) {
+      if (isDeviceLimitReached) {
         _destinationScreen = const DeviceLimitScreen();
       } else if (isMaintenance && (currentUser == null || currentUser.role != UserRole.admin)) {
         _destinationScreen = const MaintenanceScreen();
