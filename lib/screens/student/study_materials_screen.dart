@@ -321,11 +321,103 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
   String _fileSizeStr = 'جاري الحساب...';
   int? _pageCount;
   bool _isLoadingMeta = true;
+  bool _isDownloaded = false;
+  String? _localFilePath;
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
 
   @override
   void initState() {
     super.initState();
+    _isDownloaded = widget.isDownloaded;
+    _localFilePath = widget.localFilePath;
     _fetchMetadata();
+  }
+
+  Future<void> _startDownload() async {
+    if (_isDownloading || _isDownloaded) return;
+    if (kIsWeb) {
+      widget.onDownloadRequested();
+      return;
+    }
+
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.05;
+    });
+
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final materialsDir = Directory('\/materials');
+      if (!await materialsDir.exists()) {
+        await materialsDir.create(recursive: true);
+      }
+
+      final savePath = '\/\.pdf';
+      final file = File(savePath);
+
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(widget.material.pdfUrl));
+      final response = await client.send(request);
+
+      final totalBytes = response.contentLength ?? 0;
+      int receivedBytes = 0;
+      final List<int> bytes = [];
+
+      response.stream.listen(
+        (chunk) {
+          bytes.addAll(chunk);
+          receivedBytes += chunk.length;
+          if (totalBytes > 0 && mounted) {
+            setState(() {
+              _downloadProgress = (receivedBytes / totalBytes).clamp(0.0, 1.0);
+            });
+          }
+        },
+        onDone: () async {
+          await file.writeAsBytes(bytes);
+          if (mounted) {
+            setState(() {
+              _isDownloading = false;
+              _isDownloaded = true;
+              _localFilePath = savePath;
+              _downloadProgress = 1.0;
+            });
+            widget.onDownloadRequested();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'تم تحميل \ بنجاح للقراءة بدون إنترنت ✅',
+                  style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                ),
+                backgroundColor: const Color(0xFF10B981),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+          }
+        },
+        onError: (e) {
+          if (mounted) {
+            setState(() {
+              _isDownloading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('تعذر إكمال التحميل: ', style: const TextStyle(fontFamily: 'Tajawal')),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+        cancelOnError: true,
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
   }
 
   Future<void> _fetchMetadata() async {
@@ -891,8 +983,8 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 onPressed: () {
-                  if (widget.isDownloaded && widget.localFilePath != null) {
-                    widget.onReadRequested(widget.localFilePath!, true);
+                  if (_isDownloaded && (_localFilePath != null || widget.localFilePath != null)) {
+                    widget.onReadRequested(_localFilePath ?? widget.localFilePath!, true);
                   } else {
                     widget.onReadRequested(widget.material.pdfUrl, false);
                   }
@@ -909,8 +1001,78 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
             ),
             const SizedBox(height: 12),
 
-            // زر التحميل للأوفلاين
-            if (!widget.isDownloaded)
+            // زر التحميل للأوفلاين مع أنميشن عداد التنزيل
+            if (_isDownloading)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _gold.withOpacity(0.5), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _gold.withOpacity(0.18),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                valueColor: AlwaysStoppedAnimation<Color>(_gold),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'جاري تحميل وحفظ الملزمة...',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // عداد النسبة المئوية المتحرك
+                        Text(
+                          '\%',
+                          style: const TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: _gold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // شريط التقدم الانسيابي
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: _downloadProgress > 0 ? _downloadProgress : null,
+                        minHeight: 7,
+                        backgroundColor: Colors.white.withOpacity(0.1),
+                        valueColor: const AlwaysStoppedAnimation<Color>(_gold),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (!_isDownloaded)
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -920,7 +1082,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                     side: BorderSide(color: Colors.white.withOpacity(0.25), width: 1.2),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  onPressed: widget.onDownloadRequested,
+                  onPressed: _startDownload,
                   icon: const Icon(Icons.download_for_offline_rounded, color: _gold, size: 20),
                   label: const Text(
                     'تحميل الملزمة للمذاكرة بدون إنترنت ⚡',
@@ -935,22 +1097,22 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
               )
             else
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                  color: const Color(0xFF10B981).withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
-                    SizedBox(width: 6),
+                    Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                    SizedBox(width: 8),
                     Text(
-                      'الملزمة محفوظة على هاتفك ومتاحة للقراءة أوفلاين',
+                      'الملزمة محفوظة على هاتفك ومتاحة للقراءة أوفلاين ✅',
                       style: TextStyle(
                         fontFamily: 'Tajawal',
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF10B981),
                       ),
@@ -1505,7 +1667,7 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
                                   crossAxisCount: 3,
                                   crossAxisSpacing: 12,
                                   mainAxisSpacing: 14,
-                                  childAspectRatio: 0.72,
+                                  childAspectRatio: 0.65,
                                 ),
                                 itemCount: _totalPages,
                                 itemBuilder: (context, index) {
@@ -1518,84 +1680,159 @@ class _LuxuryPdfViewerScreenState extends State<LuxuryPdfViewerScreen> {
                                       _pdfViewController?.setPage(index);
                                     },
                                     child: Container(
+                                      padding: const EdgeInsets.fromLTRB(6, 6, 6, 8),
                                       decoration: BoxDecoration(
                                         color: isCurrent
-                                            ? _gold.withOpacity(0.18)
+                                            ? _gold.withOpacity(0.14)
                                             : const Color(0xFF1E293B),
                                         borderRadius: BorderRadius.circular(14),
                                         border: Border.all(
                                           color: isCurrent
                                               ? _gold
                                               : (isBookmarked ? Colors.amber.withOpacity(0.7) : Colors.white12),
-                                          width: isCurrent ? 2 : 1,
+                                          width: isCurrent ? 1.8 : 1,
                                         ),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.3),
+                                            color: Colors.black.withOpacity(0.25),
                                             blurRadius: 6,
                                             offset: const Offset(0, 3),
                                           ),
                                         ],
                                       ),
-                                      child: Stack(
+                                      child: Column(
                                         children: [
-                                          // خطوط تمثيل محاكاة الورقة
-                                          Center(
-                                            child: Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  Icons.description_rounded,
-                                                  color: isCurrent ? _gold : Colors.white38,
-                                                  size: 30,
+                                          // شكل الصفحة الفعلية ثلاثية الأبعاد لمحاكاة ورقة الكتاب
+                                          Expanded(
+                                            child: Container(
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: isCurrent ? _gold : const Color(0xFFE2E8F0),
+                                                  width: isCurrent ? 1.5 : 0.8,
                                                 ),
-                                                const SizedBox(height: 6),
-                                                Text(
-                                                  'صفحة ${index + 1}',
-                                                  style: TextStyle(
-                                                    fontFamily: 'Tajawal',
-                                                    fontSize: 12.5,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: isCurrent ? _gold : Colors.white,
-                                                  ),
-                                                ),
-                                                if (isCurrent) ...[
-                                                  const SizedBox(height: 4),
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: _gold,
-                                                      borderRadius: BorderRadius.circular(6),
-                                                    ),
-                                                    child: const Text(
-                                                      'أنت هنا',
-                                                      style: TextStyle(
-                                                        fontFamily: 'Tajawal',
-                                                        fontSize: 9,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: Color(0xFF0F172A),
-                                                      ),
-                                                    ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: isCurrent
+                                                        ? _gold.withOpacity(0.35)
+                                                        : Colors.black.withOpacity(0.18),
+                                                    blurRadius: 4,
+                                                    offset: const Offset(0, 2),
                                                   ),
                                                 ],
-                                              ],
-                                            ),
-                                          ),
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(5),
+                                                child: Stack(
+                                                  children: [
+                                                    // محاكاة خطوط نصوص وفقرات الصفحة الفعلية
+                                                    Padding(
+                                                      padding: const EdgeInsets.all(6.0),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          // عنوان ترويسة الصفحة
+                                                          Row(
+                                                            children: [
+                                                              Container(
+                                                                height: 3.5,
+                                                                width: 22,
+                                                                decoration: BoxDecoration(
+                                                                  color: isCurrent ? _gold : const Color(0xFF64748B),
+                                                                  borderRadius: BorderRadius.circular(2),
+                                                                ),
+                                                              ),
+                                                              const Spacer(),
+                                                              Container(
+                                                                height: 2.5,
+                                                                width: 8,
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(0xFF94A3B8),
+                                                                  borderRadius: BorderRadius.circular(2),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(height: 5),
+                                                          // خطوط أسطر النصوص للمحاكاة
+                                                          Container(height: 2, width: double.infinity, color: const Color(0xFFCBD5E1)),
+                                                          const SizedBox(height: 3),
+                                                          FractionallySizedBox(widthFactor: 0.85, child: Container(height: 2, color: const Color(0xFFCBD5E1))),
+                                                          const SizedBox(height: 3),
+                                                          FractionallySizedBox(widthFactor: 0.95, child: Container(height: 2, color: const Color(0xFFCBD5E1))),
+                                                          const SizedBox(height: 3),
+                                                          FractionallySizedBox(widthFactor: 0.70, child: Container(height: 2, color: const Color(0xFFCBD5E1))),
+                                                          const SizedBox(height: 5),
+                                                          // فقرة إضافية
+                                                          Container(height: 2, width: double.infinity, color: const Color(0xFFE2E8F0)),
+                                                          const SizedBox(height: 3),
+                                                          FractionallySizedBox(widthFactor: 0.78, child: Container(height: 2, color: const Color(0xFFE2E8F0))),
+                                                          const SizedBox(height: 3),
+                                                          FractionallySizedBox(widthFactor: 0.60, child: Container(height: 2, color: const Color(0xFFE2E8F0))),
+                                                        ],
+                                                      ),
+                                                    ),
 
-                                          // شارة العلامة المرجعية
-                                          if (isBookmarked)
-                                            Positioned(
-                                              top: 6,
-                                              right: 6,
-                                              child: Container(
-                                                padding: const EdgeInsets.all(4),
-                                                decoration: const BoxDecoration(
-                                                  color: Colors.amber,
-                                                  shape: BoxShape.circle,
+                                                    // شريط العلامة المرجعية في أعلى زاوية الصفحة
+                                                    if (isBookmarked)
+                                                      Positioned(
+                                                        top: 0,
+                                                        right: 5,
+                                                        child: Container(
+                                                          width: 8,
+                                                          height: 13,
+                                                          decoration: const BoxDecoration(
+                                                            color: Colors.amber,
+                                                            borderRadius: BorderRadius.vertical(bottom: Radius.circular(2)),
+                                                            boxShadow: [
+                                                              BoxShadow(color: Colors.black26, blurRadius: 2, offset: Offset(0, 1)),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+
+                                                    // شارة أنت هنا عند الصفحة المفتوحة حالياً
+                                                    if (isCurrent)
+                                                      Positioned(
+                                                        bottom: 3,
+                                                        left: 3,
+                                                        right: 3,
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(vertical: 1.5),
+                                                          decoration: BoxDecoration(
+                                                            color: _gold,
+                                                            borderRadius: BorderRadius.circular(3),
+                                                          ),
+                                                          child: const Text(
+                                                            'أنت هنا',
+                                                            textAlign: TextAlign.center,
+                                                            style: TextStyle(
+                                                              fontFamily: 'Tajawal',
+                                                              fontSize: 8,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: Color(0xFF0F172A),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
                                                 ),
-                                                child: const Icon(Icons.bookmark_rounded, size: 10, color: Color(0xFF0F172A)),
                                               ),
                                             ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          // رقم الصفحة أسفل شكل الورقة
+                                          Text(
+                                            '',
+                                            style: TextStyle(
+                                              fontFamily: 'Tajawal',
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.bold,
+                                              color: isCurrent ? _gold : Colors.white,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),

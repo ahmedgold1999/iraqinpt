@@ -2139,6 +2139,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         final isExpired = expiry != null && DateTime.now().isAfter(expiry);
         return data['isPremium'] != true && !isExpired;
       }).toList();
+    } else if (_userFilter == 'admins') {
+      filteredDocs = filteredDocs.where((doc) {
+        final data = doc.data() as Map<String, dynamic>? ?? {};
+        final role = (data['role'] ?? '').toString().toLowerCase();
+        return role == 'admin' || data['isAdmin'] == true;
+      }).toList();
     }
 
     // 3. تصفية البحث الذكية والمطابقة الدقيقة للحروف والهمزات العربية
@@ -2228,6 +2234,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     _buildFilterChip('⌛ المنتهية', 'expired', isDark),
                     const SizedBox(width: 6),
                     _buildFilterChip('🔓 المجاني', 'free', isDark),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('🛡️ المشرفين', 'admins', isDark),
                     const SizedBox(width: 10),
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded, size: 18),

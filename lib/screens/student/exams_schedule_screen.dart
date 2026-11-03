@@ -2271,14 +2271,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFACC15).withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                    ),
+
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -2360,14 +2353,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF10B981),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                    ),
+
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -2446,14 +2432,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF59E0B),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                    ),
+
                                   ],
                                 ),
                                 const SizedBox(height: 2),

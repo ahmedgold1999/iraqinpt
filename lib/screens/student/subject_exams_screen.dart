@@ -1057,7 +1057,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
               final messenger = ScaffoldMessenger.of(context);
               messenger.showSnackBar(
                 const SnackBar(
-                  content: Text('جاري فحص وتحديث أحدث الأسئلة من GitHub... ⚡', style: TextStyle(fontFamily: 'Tajawal')),
+                  content: Text('جاري تحديث وجلب أحدث الأسئلة ⚡', style: TextStyle(fontFamily: 'Tajawal')),
                   duration: Duration(seconds: 1),
                 ),
               );

@@ -976,11 +976,11 @@ class AdminHomeScreen extends StatelessWidget {
                         color: Colors.white, size: 34),
                   ),
                   const SizedBox(height: 16),
-                  Text('تفعيل الاشتراك',
+                  Text('عضوية الحساب المميز 👑',
                       style: _t(20, w: FontWeight.w900, c: _gold, ls: 0.6)),
                   const SizedBox(height: 12),
                   Text(
-                    'تفعيل الاشتراك يتم مباشرة عن طريق التواصل مع الدعم الفني للإدارة. قم باختيار إحدى الوسائل التالية للترقية:',
+                    'للحصول على اشتراكك وتفعيل حسابك للوصول الكامل لكافة المواد والامتحانات، يرجى مراسلة إدارة المنصة لإتمام التفعيل فوراً:',
                     style: _t(13.5, w: FontWeight.w600, c: Colors.white70, h: 1.5),
                     textAlign: TextAlign.center,
                   ),
@@ -998,12 +998,12 @@ class AdminHomeScreen extends StatelessWidget {
                           ),
                           onPressed: () async {
                             await launchUrl(
-                                Uri.parse('https://wa.me/9647824255360'),
+                                Uri.parse('https://wa.me/9647824255360?text=${Uri.encodeComponent('مرحباً، أود تفعيل اشتراكي في تطبيق دليل الامتحان الوطني')}'),
                                 mode: LaunchMode.externalApplication);
                           },
                           icon: const Icon(Icons.chat_rounded,
                               color: Colors.white, size: 20),
-                          label: Text('واتساب',
+                          label: Text('واتساب الإدارة',
                               style: _t(13.5,
                                   w: FontWeight.w900, c: Colors.white)),
                         ),
@@ -1019,12 +1019,12 @@ class AdminHomeScreen extends StatelessWidget {
                             elevation: 0,
                           ),
                           onPressed: () async {
-                            await launchUrl(Uri.parse('https://t.me/XG0LDX'),
+                            await launchUrl(Uri.parse('https://t.me/XG0LDX?text=${Uri.encodeComponent('مرحباً، أود تفعيل اشتراكي في تطبيق دليل الامتحان الوطني')}'),
                                 mode: LaunchMode.externalApplication);
                           },
                           icon: const Icon(Icons.send_rounded,
                               color: Colors.white, size: 20),
-                          label: Text('تليجرام',
+                          label: Text('تليجرام الإدارة',
                               style: _t(13.5,
                                   w: FontWeight.w900, c: Colors.white)),
                         ),

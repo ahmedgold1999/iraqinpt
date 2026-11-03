@@ -67,7 +67,7 @@ class LuxuryBottomNav extends StatelessWidget {
                   _buildNavItem(
                     1,
                     isIosReview ? Icons.school_rounded : Icons.stars_rounded,
-                    isIosReview ? 'الدليل' : (defaultTargetPlatform == TargetPlatform.iOS ? 'العضوية' : 'التفعيل'),
+                    isIosReview ? 'الدليل' : 'العضوية',
                     const Color(0xFFD4AF37),
                     isDark,
                   ),
