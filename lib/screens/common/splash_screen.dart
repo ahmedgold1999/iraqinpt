@@ -200,11 +200,11 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
     if (!mounted) return;
     _shimmerController.forward(from: 0.0);
 
-    // 3. بدء كتابة الجملة حرفاً حرفاً بإيقاع رشيق وسريع (32ms لكل حرف)
-    await Future.delayed(const Duration(milliseconds: 200));
+    // 3. بدء كتابة الجملة حرفاً حرفاً بإيقاع انسيابي مريح للعين (45ms لكل حرف)
+    await Future.delayed(const Duration(milliseconds: 250));
     if (!mounted) return;
 
-    _typewriterTimer = Timer.periodic(const Duration(milliseconds: 32), (timer) {
+    _typewriterTimer = Timer.periodic(const Duration(milliseconds: 45), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -227,8 +227,8 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
 
   /// لحظة الذروة السينمائية: انبثاق علامة الاستفهام مع صوت الطقة والموجة الضوئية
   Future<void> _fireQuestionMarkClimax() async {
-    // وقفة تشويقية محسوبة (90ms)
-    await Future.delayed(const Duration(milliseconds: 90));
+    // وقفة تشويقية محسوبة (120ms)
+    await Future.delayed(const Duration(milliseconds: 120));
     if (!mounted) return;
 
     setState(() {
@@ -243,12 +243,12 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
     _questionMarkController.forward(from: 0.0);
 
     // إظهار النص الترحيبي الفرعي الأنيق
-    await Future.delayed(const Duration(milliseconds: 220));
+    await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     _taglineController.forward();
 
-    // إتاحة فرصة مريحة للعين لمشاهدة اكتمال الشاشة قبل الانتقال
-    await Future.delayed(const Duration(milliseconds: 650));
+    // إتاحة فرصة مريحة وفخمة للعين لقراءة الجملة كاملة والتمتع بالواجهة قبل الانتقال (2.2 ثانية)
+    await Future.delayed(const Duration(milliseconds: 2200));
     if (!mounted) return;
     _isAnimationComplete = true;
     _proceedIfReady();

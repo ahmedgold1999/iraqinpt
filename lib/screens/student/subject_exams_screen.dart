@@ -157,7 +157,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
                 const SizedBox(height: 6),
                 Text(
                   message ??
-                      'اشترك في باقة VIP وافتح كافة بنوك الأسئلة والاختبارات التخصصية لضمان تفوقك في الامتحان الوطني.',
+                      'احصل على الاعتماد الأكاديمي وافتح كافة بنوك الأسئلة والاختبارات التخصصية لضمان تفوقك في الامتحان الوطني.',
                   style: TextStyle(
                     fontFamily: 'Tajawal',
                     fontSize: 13,
@@ -363,7 +363,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
         _showLuxurySubscriptionPrompt(
           title: 'لقد استهلكت تجربتك المجانية ✨',
           message:
-              'نأمل أن تكون التجربة قد نالت إعجابك! للاستمرار في إجراء الاختبارات والوصول إلى كافة المواد والميزات، اشترك الآن في باقة VIP.',
+              'نأمل أن تكون التجربة قد نالت إعجابك! للاستمرار في إجراء الاختبارات والوصول إلى كافة المواد والميزات، تفضل بالتواصل مع المشرف الأكاديمي.',
         );
         return;
       }
@@ -375,7 +375,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
       _showLuxurySubscriptionPrompt(
         title: 'مادة ${widget.subjectName} مخصصة للمشتركين 🔒',
         message:
-            'امتحانات مادة ${widget.subjectName} متاحة ضمن اشتراك VIP. اشترك الآن وافتح كافة بنوك الأسئلة والاختبارات التخصصية فوراً.',
+            'امتحانات مادة ${widget.subjectName} متاحة ضمن الحساب المعتمد. تفضل بالتواصل مع المشرف الأكاديمي لفتح كافة بنوك الأسئلة والاختبارات فوراً.',
       );
       return;
     }
@@ -753,7 +753,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
     if (!widget.user.isPremium) {
       _showLuxurySubscriptionPrompt(
         title: 'اختبار تخصصي VIP 🔒',
-        message: 'اختبار "${exam.title}" مخصص للمشتركين فقط. اشترك الآن وافتحه بدون قيود.',
+        message: 'اختبار "${exam.title}" مخصص للحسابات المعتمدة. تفضل بالاطلاع على التفاصيل لفتحه بدون قيود.',
       );
       return;
     }

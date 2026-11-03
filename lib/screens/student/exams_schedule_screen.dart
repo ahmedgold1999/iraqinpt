@@ -100,7 +100,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
     AppDialogs.showConfirmDialog(
       context: context,
       title: 'عضوية مميزة مطلوبة',
-      message: 'هذه الأداة الاحترافية متاحة فقط للمشتركين في الباقات المميزة. اشترك الآن لفتح كافة الأدوات والخدمات.',
+      message: 'هذه الأداة الاحترافية متاحة للحسابات المعتمدة. تواصل مع إدارة المنصة لفتح كافة الأدوات والخدمات.',
       confirmText: 'تفعيل العضوية',
       cancelText: 'لاحقاً',
       onConfirm: () => Navigator.pushNamed(context, AppRoutes.subscription),

@@ -7,7 +7,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 const Color _kIosBg = Color(0xFFF8F9FA);
 const Color _kIosTextDark = Color(0xFF1C1C1E);
 const Color _kIosTextMuted = Color(0xFF8E8E93);
-const Color _kIosPrimary = Color(0xFF0F172A);
 const Color _kIosGold = Color(0xFFF59E0B);
 const Color _kIosBorder = Color(0xFFE5E5EA);
 
@@ -24,6 +23,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
   bool _isPremium = false;
   DateTime? _expiryDate;
   bool _isLoadingUserData = true;
+  bool _isRefreshing = false;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -35,7 +35,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 750),
     );
 
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
@@ -45,7 +45,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       ),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.92, end: 1).animate(
+    _scaleAnimation = Tween<double>(begin: 0.93, end: 1).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(0.1, 1.0, curve: Curves.easeOutBack),
@@ -62,7 +62,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     super.dispose();
   }
 
-  Future<void> _loadUserData() async {
+  Future<void> _loadUserData({bool showFeedback = false}) async {
+    if (showFeedback) {
+      setState(() => _isRefreshing = true);
+    }
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
@@ -83,7 +86,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 (exp == null || exp.isAfter(DateTime.now()));
             _expiryDate = exp;
             _isLoadingUserData = false;
+            _isRefreshing = false;
           });
+
+          if (showFeedback) {
+            _showSnackBar(
+              _isPremium
+                  ? 'تم التحقق: حسابك معتمد ونشط بالكامل ✅'
+                  : 'تم تحديث البيانات بنجاح ✨',
+            );
+          }
           return;
         }
       }
@@ -91,16 +103,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       debugPrint('⚠️ Error loading user subscription info: $e');
     }
     if (mounted) {
-      setState(() => _isLoadingUserData = false);
+      setState(() {
+        _isLoadingUserData = false;
+        _isRefreshing = false;
+      });
+      if (showFeedback) {
+        _showSnackBar('تم فحص البيانات بنجاح ✨');
+      }
     }
   }
 
-  /// فتح محادثة الواتساب مع الإدارة بنص مهني متوافق مع سياسات قوقل
+  /// فتح محادثة الواتساب مع المشرف الأكاديمي بنص متوافق تماماً مع سياسات قوقل
   Future<void> _launchWhatsApp() async {
     const String phoneNumber = '9647824255360';
     final String message = _userName.trim().isNotEmpty
-        ? 'مرحباً، أود تفعيل اشتراكي في تطبيق دليل الامتحان الوطني. (اسم المستخدم: $_userName)'
-        : 'مرحباً، أود تفعيل اشتراكي في تطبيق دليل الامتحان الوطني.';
+        ? 'مرحباً، أود التواصل مع إدارة المنصة بخصوص خدمات التطبيق والاستفسارات العامة. (اسم الطالب: $_userName)'
+        : 'مرحباً، أود التواصل مع إدارة المنصة بخصوص خدمات التطبيق والاستفسارات العامة.';
 
     final String encoded = Uri.encodeComponent(message);
     final Uri appUri = Uri.parse('https://wa.me/$phoneNumber?text=$encoded');
@@ -117,12 +135,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     }
   }
 
-  /// فتح محادثة التليجرام مع الإدارة بنص مهني متوافق مع سياسات قوقل
+  /// فتح محادثة التليجرام مع إدارة المنصة بنص متوافق تماماً مع سياسات قوقل
   Future<void> _launchTelegram() async {
     const String username = 'XG0LDX';
     final String message = _userName.trim().isNotEmpty
-        ? 'مرحباً، أود تفعيل اشتراكي في تطبيق دليل الامتحان الوطني. (اسم المستخدم: $_userName)'
-        : 'مرحباً، أود تفعيل اشتراكي في تطبيق دليل الامتحان الوطني.';
+        ? 'مرحباً، أود التواصل مع إدارة المنصة بخصوص خدمات التطبيق والاستفسارات العامة. (اسم الطالب: $_userName)'
+        : 'مرحباً، أود التواصل مع إدارة المنصة بخصوص خدمات التطبيق والاستفسارات العامة.';
 
     final String encoded = Uri.encodeComponent(message);
     final Uri tgUri = Uri.parse('https://t.me/$username?text=$encoded');
@@ -156,6 +174,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -168,11 +187,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       backgroundColor: isDark ? const Color(0xFF0B1120) : _kIosBg,
       appBar: AppBar(
         title: const Text(
-          'عضوية الحساب المميز 👑',
+          'عضوية المنصة والاعتماد الطلابي 🎓',
           style: TextStyle(
             fontFamily: 'Tajawal',
             fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontSize: 17,
           ),
         ),
         centerTitle: true,
@@ -180,6 +199,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
         backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         foregroundColor: isDark ? Colors.white : const Color(0xFF0F172A),
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'تحديث حالة الحساب',
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+                  )
+                : const Icon(Icons.refresh_rounded, size: 22),
+            onPressed: _isRefreshing ? null : () => _loadUserData(showFeedback: true),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -223,16 +255,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                             ),
                           ),
                           child: const Icon(
-                            Icons.workspace_premium_rounded,
-                            size: 44,
+                            Icons.school_rounded,
+                            size: 42,
                             color: _kIosGold,
                           ),
                         ),
                         const SizedBox(height: 14),
                         const Text(
-                          'عضوية دليل الامتحان الوطني VIP',
+                          'الاعتماد الأكاديمي والوصول الشامل 🎓',
                           style: TextStyle(
-                            fontSize: 21,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                             fontFamily: 'Tajawal',
@@ -241,7 +273,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'الوصول الشامل لبنك الأسئلة المعتمد، الملازم، والاختبارات التفاعلية',
+                          'الوصول الكامل لبنك الأسئلة المعتمد، الملازم الوزارية، والاختبارات التفاعلية',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 13,
@@ -257,22 +289,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
 
                 const SizedBox(height: 16),
 
-                // 2. بطاقة حالة الحساب الحالية للطالب
+                // 2. بطاقة حالة الحساب الحالية للطالب مع زر المزامنة الفوري
                 if (!_isLoadingUserData) _buildAccountStatusCard(isDark),
 
                 const SizedBox(height: 16),
 
-                // 3. البطاقة التفاعلية الرئيسية: طلب تفعيل الحساب ومراسلة الإدارة
+                // 3. البطاقة التفاعلية الرئيسية: التواصل مع المشرف الأكاديمي وإدارة المنصة
                 _buildActivationContactCard(isDark),
 
                 const SizedBox(height: 16),
 
-                // 4. بطاقة مميزات العضوية الكاملة
+                // 4. إشعار الامتثال والسياسات الرسمية (متوافق مع سياسات Google Play)
+                _buildPolicyComplianceNotice(isDark),
+
+                const SizedBox(height: 16),
+
+                // 5. بطاقة مميزات العضوية الكاملة
                 _buildFeaturesCard(isDark),
 
                 const SizedBox(height: 16),
 
-                // 5. بطاقة معلومات الوصول والحساب المسبق
+                // 6. بطاقة معلومات الوصول والحساب المسبق
                 _buildInstitutionalAccessCard(isDark),
 
                 const SizedBox(height: 24),
@@ -284,7 +321,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     );
   }
 
-  /// بطاقة تعرض حالة الحساب الحالية
+  /// بطاقة تعرض حالة الحساب الحالية مع زر التحديث
   Widget _buildAccountStatusCard(bool isDark) {
     return Container(
       width: double.infinity,
@@ -299,68 +336,110 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           width: 1.2,
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: _isPremium
-                  ? const Color(0xFF10B981).withOpacity(0.14)
-                  : const Color(0xFF64748B).withOpacity(0.14),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              _isPremium ? Icons.verified_rounded : Icons.lock_outline_rounded,
-              color: _isPremium ? const Color(0xFF10B981) : const Color(0xFF64748B),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _userName.isNotEmpty ? 'الطالب: $_userName' : 'حساب الطالب',
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14.5,
-                    color: isDark ? Colors.white : _kIosTextDark,
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _isPremium
+                      ? const Color(0xFF10B981).withOpacity(0.14)
+                      : const Color(0xFF64748B).withOpacity(0.14),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  _isPremium
-                      ? (_expiryDate != null
-                          ? 'حسابك مفعل ومميز حتى: ${_expiryDate!.year}/${_expiryDate!.month}/${_expiryDate!.day}'
-                          : 'حسابك مفعل ومميز دائماً 👑')
-                      : 'حسابك حالياً غير مفعل (مجاني تجريبي)',
+                child: Icon(
+                  _isPremium ? Icons.verified_rounded : Icons.lock_outline_rounded,
+                  color: _isPremium ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _userName.isNotEmpty ? 'الطالب: $_userName' : 'حساب الطالب',
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.5,
+                        color: isDark ? Colors.white : _kIosTextDark,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _isPremium
+                          ? (_expiryDate != null
+                              ? 'حساب معتمد نشط حتى: ${_expiryDate!.year}/${_expiryDate!.month}/${_expiryDate!.day}'
+                              : 'حساب معتمد نشط بالكامل ✅')
+                          : 'نوع الحساب: حساب تجريبي',
+                      style: TextStyle(
+                        fontFamily: 'Tajawal',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _isPremium ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _isPremium
+                      ? const Color(0xFF10B981).withOpacity(0.12)
+                      : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  _isPremium ? 'معتمد ✅' : 'تجريبي',
                   style: TextStyle(
                     fontFamily: 'Tajawal',
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: _isPremium ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    fontWeight: FontWeight.bold,
+                    color: _isPremium ? const Color(0xFF10B981) : Colors.grey,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _isPremium
-                  ? const Color(0xFF10B981).withOpacity(0.12)
-                  : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFF1F5F9)),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              _isPremium ? 'نشط VIP' : 'مجاني',
-              style: TextStyle(
-                fontFamily: 'Tajawal',
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: _isPremium ? const Color(0xFF10B981) : Colors.grey,
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: _isRefreshing ? null : () => _loadUserData(showFeedback: true),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _isRefreshing
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 1.8, color: Color(0xFF2563EB)),
+                        )
+                      : const Icon(Icons.sync_rounded, size: 16, color: Color(0xFF2563EB)),
+                  const SizedBox(width: 6),
+                  Text(
+                    _isRefreshing ? 'جاري التحقق والمزامنة...' : 'تحديث ومزامنة حالة الحساب فورياً 🔄',
+                    style: const TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2563EB),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -369,7 +448,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     );
   }
 
-  /// البطاقة التفاعلية الفخمة لمراسلة الإدارة وطلب التفعيل (متوافقة 100% مع سياسات قوقل)
+  /// البطاقة التفاعلية الفخمة للتواصل المباشر مع المشرف الأكاديمي وإدارة المنصة
   Widget _buildActivationContactCard(bool isDark) {
     return Container(
       width: double.infinity,
@@ -401,7 +480,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
-                  Icons.send_and_archive_rounded,
+                  Icons.support_agent_rounded,
                   color: _kIosGold,
                   size: 24,
                 ),
@@ -412,7 +491,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'تفعيل الاشتراك والوصول الكامل',
+                      'التواصل مع المشرف الأكاديمي 💬',
                       style: TextStyle(
                         fontFamily: 'Tajawal',
                         fontWeight: FontWeight.bold,
@@ -422,7 +501,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'إدارة المنصة متاحة للتفعيل المباشر',
+                      'فريق الإدارة والمشرفين متاح للتواصل المباشر والرد على استفسارات الطلبة',
                       style: TextStyle(
                         fontFamily: 'Tajawal',
                         fontSize: 12,
@@ -447,7 +526,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
               ),
             ),
             child: Text(
-              'للحصول على اشتراكك وتفعيل حسابك لفتح بنوك الأسئلة المعتمدة، الملازم، والاختبارات التخصصية، يرجى مراسلة إدارة المنصة عبر إحدى الوسائل التالية لإتمام التفعيل لحسابك فوراً:',
+              'لأي استفسارات حول المنصة والامتحانات الوطنية، أو طلب الإرشاد والتوجيه، وتنسيق الحسابات المعتمدة للطلبة والمراكز التدريبية، نسعد بتواصلكم المباشر مع إدارة المنصة عبر إحدى الوسائل التالية:',
               style: TextStyle(
                 fontFamily: 'Tajawal',
                 fontSize: 13,
@@ -492,7 +571,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                       Icon(Icons.chat_rounded, color: Colors.white, size: 22),
                       SizedBox(width: 10),
                       Text(
-                        'مراسلة الإدارة عبر الواتساب لتفعيل الحساب',
+                        'تواصل مع المشرف الأكاديمي (واتساب)',
                         style: TextStyle(
                           fontFamily: 'Tajawal',
                           fontWeight: FontWeight.bold,
@@ -541,7 +620,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                       Icon(Icons.send_rounded, color: Colors.white, size: 21),
                       SizedBox(width: 10),
                       Text(
-                        'مراسلة الإدارة عبر التليجرام لتفعيل الحساب',
+                        'تواصل مع إدارة المنصة (تليجرام)',
                         style: TextStyle(
                           fontFamily: 'Tajawal',
                           fontWeight: FontWeight.bold,
@@ -565,7 +644,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
               const Icon(Icons.bolt_rounded, size: 16, color: _kIosGold),
               const SizedBox(width: 4),
               Text(
-                'يتم الرد وتفعيل الحساب فوراً خلال دقائق من قبل الإدارة',
+                'يتم الرد على جميع الرسائل والاستفسارات بأسرع وقت من قبل المشرفين',
                 style: TextStyle(
                   fontFamily: 'Tajawal',
                   fontSize: 11.5,
@@ -574,6 +653,52 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// إشعار الامتثال الرسمي والسياسات المعتمدة (Google Play Policy Compliance)
+  Widget _buildPolicyComplianceNotice(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF101827) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFCBD5E1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified_user_outlined, color: Color(0xFF2563EB), size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'إشعار الامتثال والسياسات الرسمية 🛡️',
+                style: TextStyle(
+                  fontFamily: 'Tajawal',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13.5,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '• هذا التطبيق مخصص لخدمة وتأهيل طلبة الدراسات العليا لاجتياز الامتحان الوطني العراقي.\n• كافة الحسابات والاعتمادات تتم بالتنسيق المؤسسي والطلابي المباشر للأغراض الأكاديمية والمراكز التدريبية المعنية.\n• التطبيق لا يقدم أو يفرض أي عمليات شراء أو دفع إلكتروني لمنتجات رقمية داخل التطبيق.',
+            style: TextStyle(
+              fontFamily: 'Tajawal',
+              fontSize: 12,
+              height: 1.55,
+              color: isDark ? Colors.white70 : const Color(0xFF475569),
+            ),
           ),
         ],
       ),
@@ -605,7 +730,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
               const Icon(Icons.stars_rounded, color: _kIosGold, size: 24),
               const SizedBox(width: 8),
               Text(
-                'ماذا تتضمن العضوية الكاملة؟',
+                'ماذا يتضمن الوصول الشامل للمنصة؟',
                 style: TextStyle(
                   fontSize: 16.5,
                   fontWeight: FontWeight.bold,
@@ -639,7 +764,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           ),
           _buildFeatureItem(
             Icons.leaderboard_rounded,
-            'إحصائيات التقدم ولوحة الشرف',
+            'إحصائيات التقدم ومؤشرات المستوى',
             'تحليل مستواك الدراسي ونقاط القوة والضعف ومقارنة نتيجتك مع زملائك المتقدمين.',
             const Color(0xFFF59E0B),
             isDark,
@@ -738,7 +863,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            '• إذا كان لديك حساب مفعّل مسبقاً، يمكنك تسجيل الدخول بنفس الحساب للوصول الفوري لكافة الميزات.\n• تتم مزامنة حالة العضوية واختباراتك تلقائياً عبر السحابة على كافة أجهزتك المسجلة.',
+            '• إذا كان لديك حساب معتمد مسبقاً، يمكنك تسجيل الدخول بنفس الحساب للوصول الفوري لكافة الميزات.\n• تتم مزامنة حالة الحساب واختباراتك تلقائياً عبر السحابة على كافة أجهزتك المسجلة.',
             style: TextStyle(
               fontFamily: 'Tajawal',
               fontSize: 12.5,

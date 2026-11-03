@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'home_screen.dart';
 import 'subscription_screen.dart';
 import 'about_national_exam_screen.dart';
@@ -59,10 +58,10 @@ class _StudentMainShellState extends State<StudentMainShell> {
   }
 
   List<Widget> _getScreens() {
-    final isIosReview = defaultTargetPlatform == TargetPlatform.iOS && ConfigService().isIosReviewMode;
+    final isReview = ConfigService().isReviewMode;
     return [
       const StudentHomeScreen(),
-      isIosReview ? const AboutNationalExamScreen() : const SubscriptionScreen(),
+      isReview ? const AboutNationalExamScreen() : const SubscriptionScreen(),
       const ExamsScheduleScreen(),
       const StudyMaterialsScreen(),
       _user?.role == UserRole.admin ? AdminDashboard() : ProfileScreen(),

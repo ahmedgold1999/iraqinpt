@@ -1,6 +1,5 @@
 // lib/models/app_models.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import '../services/config_service.dart';
 
 enum UserRole { student, admin }
@@ -30,9 +29,9 @@ class UserModel {
     this.avatarId = 'boy_1',
   }) : _rawPremium = isPremium;
 
-  /// 🍏 النسخة المميزة: يتم تفعيلها تلقائياً على iOS أثناء وضع مراجعة أبل
+  /// النسخة المميزة: يتم تفعيلها تلقائياً أثناء وضع المراجعة (لقوقل بلاي وأبل ستور)
   bool get isPremium {
-    if (ConfigService().isIosReviewMode && defaultTargetPlatform == TargetPlatform.iOS) {
+    if (ConfigService().isReviewMode) {
       return true;
     }
     return _rawPremium;

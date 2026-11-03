@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,6 +54,9 @@ class ConfigService {
         if (data.containsKey('ios_review_mode')) {
           _config['ios_review_mode'] = data['ios_review_mode'] == true;
         }
+        if (data.containsKey('android_review_mode')) {
+          _config['android_review_mode'] = data['android_review_mode'] == true;
+        }
         if (data.containsKey('is_maintenance_on')) {
           _config['is_maintenance_on'] = data['is_maintenance_on'] == true;
         }
@@ -91,7 +95,21 @@ class ConfigService {
   }
 
   bool get isMaintenanceOn => _config['is_maintenance_on'] ?? false;
-  bool get isIosReviewMode => _config['ios_review_mode'] ?? true;
+  bool get isIosReviewMode => _config['ios_review_mode'] ?? false;
+
+  void setIosReviewModeLocal(bool value) {
+    _config['ios_review_mode'] = value;
+  }
+
+  /// وضع المراجعة الذكي الشامل (خاص بأجهزة الآيفون فقط بناءً على طلب الإدارة)
+  bool get isReviewMode {
+    if (kIsWeb) return false;
+    // ملغى ومحذوف تماماً للأندرويد: الأندرويد يعمل بالوضع الطبيعي دائماً
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return isIosReviewMode;
+    }
+    return false;
+  }
   String get examEndDate => _config['exam_end_date'] ?? '2026-06-15';
   
   String get admissionsPdfUrl {

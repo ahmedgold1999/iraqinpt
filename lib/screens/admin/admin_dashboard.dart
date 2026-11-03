@@ -78,6 +78,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
   TextEditingController _versionController = TextEditingController();
   TextEditingController _updateUrlController = TextEditingController();
   TextEditingController _changeLogController = TextEditingController();
+
+  // إعدادات أندرويد المنفصلة
+  TextEditingController _androidVersionController = TextEditingController();
+  TextEditingController _androidUpdateUrlController = TextEditingController();
+  bool _androidForceUpdate = false;
+
+  // إعدادات آيفون المنفصلة
+  TextEditingController _iosVersionController = TextEditingController();
+  TextEditingController _iosUpdateUrlController = TextEditingController();
+  bool _iosForceUpdate = false;
+  // وضع مراجعة أبل ستور (خاص بالآيفون فقط)
+  bool _iosReviewMode = false;
+
+  // منصة الصيانة المستهدفة
+  String _maintenancePlatform = 'all'; // 'all', 'android', 'ios'
   TextEditingController _price1mController = TextEditingController(text: '10,000');
   TextEditingController _price2mController = TextEditingController(text: '15,000');
   TextEditingController _price3mController = TextEditingController(text: '20,000');
@@ -117,6 +132,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _ensureUpdateControllers() {
+    _androidVersionController ??= TextEditingController();
+    _androidUpdateUrlController ??= TextEditingController();
+    _iosVersionController ??= TextEditingController();
+    _iosUpdateUrlController ??= TextEditingController();
     _versionController ??= TextEditingController();
     _updateUrlController ??= TextEditingController();
     _changeLogController ??= TextEditingController();
@@ -548,9 +567,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _changeLogController.text = (data['change_log'] ?? data['notes'] ?? '').toString();
         _isForceUpdate = data['is_force_update'] ?? data['forceUpdate'] ?? false;
         _isMaintenanceOn = data['is_maintenance_on'] ?? false;
+        _maintenancePlatform = (data['maintenance_platform'] ?? 'all').toString();
         _targetAndroid = data['target_android'] ?? true;
         _targetIos = data['target_ios'] ?? true;
         _targetWeb = data['target_web'] ?? true;
+
+        // تحميل بيانات أندرويد المستقلة
+        _androidVersionController.text = (data['android_latest_version'] ?? data['latest_version'] ?? '').toString();
+        _androidUpdateUrlController.text = (data['android_update_url'] ?? data['update_url'] ?? '').toString();
+        _androidForceUpdate = data['android_force_update'] ?? data['is_force_update'] ?? false;
+
+        // تحميل بيانات آيفون المستقلة
+        _iosVersionController.text = (data['ios_latest_version'] ?? data['latest_version'] ?? '').toString();
+        _iosUpdateUrlController.text = (data['ios_update_url'] ?? data['update_url'] ?? '').toString();
+        _iosForceUpdate = data['ios_force_update'] ?? data['is_force_update'] ?? false;
+        _iosReviewMode = data['ios_review_mode'] ?? false;
         _price1mController.text = (data['price_1m'] ?? '10,000').toString();
         _price2mController.text = (data['price_2m'] ?? '15,000').toString();
         _price3mController.text = (data['price_3m'] ?? '20,000').toString();
@@ -597,16 +628,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     setState(() => _isSavingUpdateConfig = true);
     try {
+      final androidVer = _androidVersionController.text.trim();
+      final androidUrl = _androidUpdateUrlController.text.trim();
+      final iosVer = _iosVersionController.text.trim();
+      final iosUrl = _iosUpdateUrlController.text.trim();
+
       final updateData = {
-        'latest_version': _versionController.text.trim(),
-        'version': _versionController.text.trim(),
-        'update_url': _updateUrlController.text.trim(),
-        'url': _updateUrlController.text.trim(),
-        'is_force_update': _isForceUpdate,
-        'forceUpdate': _isForceUpdate,
-        'is_maintenance_on': _isMaintenanceOn,
+        // أندرويد
+        'android_latest_version': androidVer,
+        'android_update_url': androidUrl,
+        'android_force_update': _androidForceUpdate,
         'target_android': _targetAndroid,
+
+        // آيفون
+        'ios_latest_version': iosVer,
+        'ios_update_url': iosUrl,
+        'ios_force_update': _iosForceUpdate,
         'target_ios': _targetIos,
+        'ios_review_mode': _iosReviewMode,
+
+        // الصيانة
+        'is_maintenance_on': _isMaintenanceOn,
+        'maintenance_platform': _maintenancePlatform,
+
+        // الحقول العامة للتوافقية
+        'latest_version': androidVer.isNotEmpty ? androidVer : (_versionController.text.trim().isNotEmpty ? _versionController.text.trim() : iosVer),
+        'version': androidVer.isNotEmpty ? androidVer : (_versionController.text.trim().isNotEmpty ? _versionController.text.trim() : iosVer),
+        'update_url': androidUrl.isNotEmpty ? androidUrl : (_updateUrlController.text.trim().isNotEmpty ? _updateUrlController.text.trim() : iosUrl),
+        'url': androidUrl.isNotEmpty ? androidUrl : (_updateUrlController.text.trim().isNotEmpty ? _updateUrlController.text.trim() : iosUrl),
+        'is_force_update': _androidForceUpdate || _iosForceUpdate || _isForceUpdate,
+        'forceUpdate': _androidForceUpdate || _iosForceUpdate || _isForceUpdate,
         'target_web': _targetWeb,
         'change_log': _changeLogController.text.trim(),
         'price_1m': _price1mController.text.trim().isNotEmpty ? _price1mController.text.trim() : '10,000',
@@ -627,6 +678,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
       // تحديث الحالة محلياً وفورياً
       ConfigService().setMaintenanceLocal(_isMaintenanceOn);
+      ConfigService().setIosReviewModeLocal(_iosReviewMode);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2876,7 +2928,446 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
           const SizedBox(height: 16),
 
-          // Main Settings Card
+          // ================= بطاقة تحديثات أندرويد 🤖 =================
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF131C31) : const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF10B981).withOpacity(isDark ? 0.35 : 0.6),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.android_rounded, color: Color(0xFF10B981), size: 24),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'إعدادات تحديث أندرويد 🤖 (Google Play / APK)',
+                            style: GoogleFonts.notoKufiArabic(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF065F46),
+                            ),
+                          ),
+                          Text(
+                            'التحكم في إصدار ورابط وإجبارية التحديث لأجهزة الأندرويد',
+                            style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: isDark ? Colors.grey : const Color(0xFF047857)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _targetAndroid,
+                      activeColor: const Color(0xFF10B981),
+                      onChanged: (v) => setState(() => _targetAndroid = v),
+                    ),
+                  ],
+                ),
+                const Divider(height: 20),
+                TextField(
+                  controller: _androidVersionController,
+                  keyboardType: TextInputType.text,
+                  decoration: InputDecoration(
+                    labelText: 'رقم إصدار الأندرويد المطلوب (مثال: 2.1.1)',
+                    hintText: '2.1.1',
+                    prefixIcon: const Icon(Icons.tag_rounded, size: 20, color: Color(0xFF10B981)),
+                    filled: true,
+                    fillColor: isDark ? Colors.white.withOpacity(0.03) : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _androidUpdateUrlController,
+                  keyboardType: TextInputType.url,
+                  decoration: InputDecoration(
+                    labelText: 'رابط التوجيه (Google Play أو رابط تحميل APK)',
+                    hintText: 'https://play.google.com/store/apps/details?id=...',
+                    prefixIcon: const Icon(Icons.link_rounded, size: 20, color: Color(0xFF10B981)),
+                    filled: true,
+                    fillColor: isDark ? Colors.white.withOpacity(0.03) : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('تحديث إجباري للأندرويد ⚠️', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13)),
+                  subtitle: const Text('يمنع مستخدم الأندرويد من المتابعة دون التحديث للإصدار المحدد', style: TextStyle(fontSize: 11, fontFamily: 'Tajawal', color: Colors.grey)),
+                  value: _androidForceUpdate,
+                  activeColor: const Color(0xFF10B981),
+                  onChanged: (v) => setState(() => _androidForceUpdate = v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ================= بطاقة تحديثات آيفون 🍎 =================
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF131C31) : const Color(0xFFF0F9FF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF0284C7).withOpacity(isDark ? 0.35 : 0.6),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.apple_rounded, color: Color(0xFF0284C7), size: 24),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'إعدادات تحديث آيفون 🍎 (App Store)',
+                            style: GoogleFonts.notoKufiArabic(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : const Color(0xFF0369A1),
+                            ),
+                          ),
+                          Text(
+                            'التحكم في إصدار ورابط وإجبارية التحديث لأجهزة الآيفون',
+                            style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: isDark ? Colors.grey : const Color(0xFF0284C7)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _targetIos,
+                      activeColor: const Color(0xFF0284C7),
+                      onChanged: (v) => setState(() => _targetIos = v),
+                    ),
+                  ],
+                ),
+                const Divider(height: 20),
+                TextField(
+                  controller: _iosVersionController,
+                  keyboardType: TextInputType.text,
+                  decoration: InputDecoration(
+                    labelText: 'رقم إصدار الآيفون المطلوب (مثال: 2.1.0)',
+                    hintText: '2.1.0',
+                    prefixIcon: const Icon(Icons.tag_rounded, size: 20, color: Color(0xFF0284C7)),
+                    filled: true,
+                    fillColor: isDark ? Colors.white.withOpacity(0.03) : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _iosUpdateUrlController,
+                  keyboardType: TextInputType.url,
+                  decoration: InputDecoration(
+                    labelText: 'رابط التوجيه (متجر App Store)',
+                    hintText: 'https://apps.apple.com/app/...',
+                    prefixIcon: const Icon(Icons.link_rounded, size: 20, color: Color(0xFF0284C7)),
+                    filled: true,
+                    fillColor: isDark ? Colors.white.withOpacity(0.03) : Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('تحديث إجباري للآيفون ⚠️', style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13)),
+                  subtitle: const Text('يمنع مستخدم الآيفون من المتابعة دون التحديث للإصدار المحدد', style: TextStyle(fontSize: 11, fontFamily: 'Tajawal', color: Colors.grey)),
+                  value: _iosForceUpdate,
+                  activeColor: const Color(0xFF0284C7),
+                  onChanged: (v) => setState(() => _iosForceUpdate = v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ================= بطاقة وضع مراجعة أبل ستور 🍎 (خاص بالآيفون فقط) =================
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF131C31) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _iosReviewMode
+                    ? const Color(0xFF0284C7)
+                    : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0)),
+                width: _iosReviewMode ? 1.6 : 1.0,
+              ),
+              boxShadow: [
+                if (_iosReviewMode)
+                  BoxShadow(
+                    color: const Color(0xFF0284C7).withOpacity(0.14),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _iosReviewMode
+                            ? const Color(0xFF0284C7).withOpacity(0.18)
+                            : Colors.grey.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.verified_user_rounded,
+                        color: _iosReviewMode ? const Color(0xFF0284C7) : Colors.grey,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'وضع مراجعة أبل ستور 🍎 (خاص بالآيفون فقط)',
+                                style: TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13.5,
+                                  color: _iosReviewMode
+                                      ? const Color(0xFF0284C7)
+                                      : (isDark ? Colors.white : Colors.black87),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'إخفاء شاشة الاشتراكات واستبدالها بشاشة (دليل الامتحان) وفتح المحتوى لمراجعي Apple',
+                            style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _iosReviewMode,
+                      activeColor: const Color(0xFF0284C7),
+                      onChanged: (v) async {
+                        setState(() => _iosReviewMode = v);
+                        ConfigService().setIosReviewModeLocal(v);
+                        try {
+                          await _db.collection('system_settings').doc('maintenance_and_updates').set({
+                            'ios_review_mode': v,
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          }, SetOptions(merge: true));
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  v
+                                      ? 'تم تفعيل وضع مراجعة Apple للآيفون بنجاح! 🍎'
+                                      : 'تم إيقاف وضع مراجعة Apple وعودة شاشة الاشتراكات للآيفون! ✨',
+                                  style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                                ),
+                                backgroundColor: v ? const Color(0xFF0284C7) : const Color(0xFF10B981),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          debugPrint('Error toggling ios_review_mode: $e');
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _iosReviewMode
+                        ? const Color(0xFF0284C7).withOpacity(0.08)
+                        : (isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFF8FAFC)),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _iosReviewMode
+                          ? const Color(0xFF0284C7).withOpacity(0.2)
+                          : (isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _iosReviewMode ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                        size: 15,
+                        color: _iosReviewMode ? const Color(0xFF0284C7) : Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _iosReviewMode
+                              ? 'الوضع مفعل حالياً: أجهزة الآيفون تشاهد دليل الامتحان بدلاً من شاشة الاشتراكات، بينما الأندرويد يعمل بالوضع الطبيعي.'
+                              : 'الوضع معطل حالياً: تظهر شاشة الاشتراكات والأسعار والتواصل الطبيعية للجميع (آيفون وأندرويد). قم بتفعيله فقط عند إرسال تحديث لمتجر Apple.',
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _iosReviewMode ? const Color(0xFF0284C7) : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ================= بطاقة وضع الصيانة الشامل واستهداف المنصة 🛠️ =================
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF131C31) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _isMaintenanceOn ? Colors.orange : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0)),
+                width: _isMaintenanceOn ? 1.5 : 1.0,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _isMaintenanceOn ? Colors.orange.withOpacity(0.2) : Colors.grey.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.build_rounded, color: _isMaintenanceOn ? Colors.orange : Colors.grey, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'وضع الصيانة واستهداف المنصة 🛠️',
+                            style: TextStyle(
+                              fontFamily: 'Tajawal',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: _isMaintenanceOn ? Colors.orange : (isDark ? Colors.white : Colors.black87),
+                            ),
+                          ),
+                          Text(
+                            'إيقاف التطبيق مؤقتاً وعرض شاشة الصيانة للمنصة المحددة أدناه',
+                            style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _isMaintenanceOn,
+                      activeColor: Colors.orange,
+                      onChanged: (v) => setState(() => _isMaintenanceOn = v),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'اختيار منصة الصيانة المستهدفة:',
+                  style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black87),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('كليهما (الجميع)', style: TextStyle(fontFamily: 'Tajawal', fontSize: 11.5)),
+                        selected: _maintenancePlatform == 'all',
+                        selectedColor: Colors.orange.withOpacity(0.2),
+                        labelStyle: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontWeight: _maintenancePlatform == 'all' ? FontWeight.bold : FontWeight.normal,
+                          color: _maintenancePlatform == 'all' ? Colors.deepOrange : (isDark ? Colors.white70 : Colors.black87),
+                        ),
+                        onSelected: (v) {
+                          if (v) setState(() => _maintenancePlatform = 'all');
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('🤖 أندرويد فقط', style: TextStyle(fontFamily: 'Tajawal', fontSize: 11.5)),
+                        selected: _maintenancePlatform == 'android',
+                        selectedColor: const Color(0xFF10B981).withOpacity(0.2),
+                        labelStyle: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontWeight: _maintenancePlatform == 'android' ? FontWeight.bold : FontWeight.normal,
+                          color: _maintenancePlatform == 'android' ? const Color(0xFF059669) : (isDark ? Colors.white70 : Colors.black87),
+                        ),
+                        onSelected: (v) {
+                          if (v) setState(() => _maintenancePlatform = 'android');
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('🍎 آيفون فقط', style: TextStyle(fontFamily: 'Tajawal', fontSize: 11.5)),
+                        selected: _maintenancePlatform == 'ios',
+                        selectedColor: const Color(0xFF0284C7).withOpacity(0.2),
+                        labelStyle: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontWeight: _maintenancePlatform == 'ios' ? FontWeight.bold : FontWeight.normal,
+                          color: _maintenancePlatform == 'ios' ? const Color(0xFF0284C7) : (isDark ? Colors.white70 : Colors.black87),
+                        ),
+                        onSelected: (v) {
+                          if (v) setState(() => _maintenancePlatform = 'ios');
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Main Settings Card for other settings (Change Log)
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -2891,54 +3382,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'بيانات الإصدار الجديد',
-                  style: GoogleFonts.notoKufiArabic(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Version field
-                TextField(
-                  controller: _versionController,
-                  keyboardType: TextInputType.text,
-                  decoration: InputDecoration(
-                    labelText: 'رقم الإصدار الأحدث (مثال: 1.0.1 أو 1.1.0)',
-                    hintText: '1.0.1',
-                    prefixIcon: const Icon(Icons.tag_rounded, size: 20),
-                    filled: true,
-                    fillColor: isDark
-                        ? Colors.white.withOpacity(0.03)
-                        : const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Update URL
-                TextField(
-                  controller: _updateUrlController,
-                  keyboardType: TextInputType.url,
-                  decoration: InputDecoration(
-                    labelText: 'رابط التحديث / تحميل التطبيق (URL)',
-                    hintText: 'https://...',
-                    prefixIcon: const Icon(Icons.link_rounded, size: 20),
-                    filled: true,
-                    fillColor: isDark
-                        ? Colors.white.withOpacity(0.03)
-                        : const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
                 // Change Log
                 TextField(
                   controller: _changeLogController,
@@ -2954,200 +3397,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Platform Targeting Selection Section
-                Text(
-                  '🎯 المنصات المستهدفة بالتحديث والإشعار:',
-                  style: GoogleFonts.notoKufiArabic(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'اختر المنصات التي سيصلها إشعار التحديث الجديد أو القفل الإجباري (المنصات المعطلة لن يظهر لمستخدميها أي إشعار نهائياً):',
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 11.5,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildPlatformToggleCard(
-                        title: 'أندرويد',
-                        subtitle: 'Android',
-                        icon: Icons.android_rounded,
-                        activeColor: const Color(0xFF10B981),
-                        isSelected: _targetAndroid,
-                        onTap: () => setState(() => _targetAndroid = !(_targetAndroid)),
-                        isDark: isDark,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildPlatformToggleCard(
-                        title: 'آيفون',
-                        subtitle: 'iOS / Apple',
-                        icon: Icons.apple_rounded,
-                        activeColor: const Color(0xFF0284C7),
-                        isSelected: _targetIos,
-                        onTap: () => setState(() => _targetIos = !(_targetIos)),
-                        isDark: isDark,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildPlatformToggleCard(
-                        title: 'الويب',
-                        subtitle: 'Web Browser',
-                        icon: Icons.language_rounded,
-                        activeColor: const Color(0xFF8B5CF6),
-                        isSelected: _targetWeb,
-                        onTap: () => setState(() => _targetWeb = !(_targetWeb)),
-                        isDark: isDark,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-
-                // Force Update Switch
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _isForceUpdate
-                        ? Colors.red.withOpacity(0.1)
-                        : (isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFF8FAFC)),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _isForceUpdate
-                          ? Colors.red.withOpacity(0.3)
-                          : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0)),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: _isForceUpdate
-                              ? Colors.red.withOpacity(0.2)
-                              : Colors.grey.withOpacity(0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.lock_rounded,
-                          color: _isForceUpdate ? Colors.red : Colors.grey,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'تفعيل التحديث الإجباري ⚠️',
-                              style: TextStyle(
-                                fontFamily: 'Tajawal',
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
-                                color: _isForceUpdate
-                                    ? Colors.red
-                                    : (isDark ? Colors.white : Colors.black87),
-                              ),
-                            ),
-                            Text(
-                              'يقفل التطبيق تماماً ويمنع الطلاب من الدخول حتى يقوموا بالتحديث',
-                              style: TextStyle(
-                                fontFamily: 'Tajawal',
-                                fontSize: 11.5,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch.adaptive(
-                        value: _isForceUpdate,
-                        activeColor: Colors.red,
-                        onChanged: (v) => setState(() => _isForceUpdate = v),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Maintenance Switch
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _isMaintenanceOn
-                        ? Colors.orange.withOpacity(0.1)
-                        : (isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFF8FAFC)),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _isMaintenanceOn
-                          ? Colors.orange.withOpacity(0.3)
-                          : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0)),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: _isMaintenanceOn
-                              ? Colors.orange.withOpacity(0.2)
-                              : Colors.grey.withOpacity(0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.build_rounded,
-                          color: _isMaintenanceOn ? Colors.orange : Colors.grey,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'وضع الصيانة الشامل 🛠️',
-                              style: TextStyle(
-                                fontFamily: 'Tajawal',
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13.5,
-                                color: _isMaintenanceOn
-                                    ? Colors.orange
-                                    : (isDark ? Colors.white : Colors.black87),
-                              ),
-                            ),
-                            Text(
-                              'إيقاف التطبيق مؤقتاً لجميع الطلاب لعرض رسالة الصيانة',
-                              style: TextStyle(
-                                fontFamily: 'Tajawal',
-                                fontSize: 11.5,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch.adaptive(
-                        value: _isMaintenanceOn,
-                        activeColor: Colors.orange,
-                        onChanged: (v) => setState(() => _isMaintenanceOn = v),
-                      ),
-                    ],
                   ),
                 ),
                 const SizedBox(height: 20),

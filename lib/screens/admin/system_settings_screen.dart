@@ -1,3 +1,4 @@
+import '../../services/config_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -27,6 +28,9 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   final _iosStoreUrlController = TextEditingController();
   bool _iosForceUpdate = false;
   bool _targetIos = true;
+
+  // إعدادات وضع المراجعة للمتاجر
+  bool _iosReviewMode = false;
 
   // إعدادات وضع الصيانة واستهداف المنصة
   bool _maintenanceMode = false;
@@ -66,12 +70,14 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
         final data = doc.data()!;
         _versionController.text = data['latest_version'] ?? '';
         _storeUrlController.text = data['update_url'] ?? '';
-        _forceUpdate = data['is_force_update'] ?? false;
         _maintenanceMode = data['is_maintenance_on'] ?? false;
         _maintenancePlatform = data['maintenance_platform'] ?? 'all';
         _targetAndroid = data['target_android'] ?? true;
         _targetIos = data['target_ios'] ?? true;
         _targetWeb = data['target_web'] ?? true;
+
+        // أوضاع المراجعة للمتاجر
+        _iosReviewMode = data['ios_review_mode'] ?? false;
 
         // تحميل بيانات أندرويد المستقلة
         _androidVersionController.text = data['android_latest_version'] ?? data['latest_version'] ?? '';
@@ -104,6 +110,23 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ في التحميل: $e')));
+    }
+  }
+
+  Future<void> _saveReviewModeSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      await _db.collection('system_settings').doc('maintenance_and_updates').set({
+        'ios_review_mode': _iosReviewMode,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      ConfigService().setIosReviewModeLocal(_iosReviewMode);
+      await ConfigService().fetchConfig();
+      setState(() => _isLoading = false);
+      _showSuccess('تم حفظ وتحديث وضع مراجعة أبل ستور بنجاح 🍎');
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showError('خطأ في الحفظ: $e');
     }
   }
 
@@ -270,6 +293,74 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildSectionTitle('وضع مراجعة متجر أبل ستور 🍎 (خاص بالآيفون)', Icons.security_rounded),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _iosReviewMode
+                          ? const Color(0xFF0284C7)
+                          : const Color(0xFFE5E5EA),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0284C7).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.verified_user_rounded, color: Color(0xFF0284C7), size: 22),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'تأمين مراجعة أبل ستور 🍎 (iOS Review)',
+                                  style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                                ),
+                                Text(
+                                  'إخفاء شاشة الاشتراكات واستبدالها بشاشة دليل الامتحان لأجهزة الآيفون أثناء مراجعة Apple',
+                                  style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('وضع مراجعة أبل ستور 🍎 (iOS Review Mode)', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13.5)),
+                        subtitle: const Text('لتخطي متطلبات Apple In-App Purchases وموافقة مراجعي أبل فوراً على الآيفون فقط. الأندرويد لا يتأثر ويعمل طبيعياً.', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 11.5, fontFamily: 'Tajawal')),
+                        value: _iosReviewMode,
+                        activeColor: const Color(0xFF0284C7),
+                        onChanged: (v) => setState(() => _iosReviewMode = v),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMiniSaveButton(_saveReviewModeSettings),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
                 _buildSectionTitle('وضع الصيانة واستهداف المنصة', Icons.engineering_rounded),
                 Container(
                   padding: const EdgeInsets.all(18),

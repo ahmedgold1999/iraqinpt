@@ -10,6 +10,8 @@ import 'quiz_screen.dart';
 import 'smart_vault_screen.dart';
 import 'notifications_screen.dart';
 import 'subscription_screen.dart';
+import 'about_national_exam_screen.dart';
+import '../../services/config_service.dart';
 import 'subject_exams_screen.dart';
 import '../../services/specialized_exam_service.dart';
 import '../../services/auth_service.dart';
@@ -212,7 +214,7 @@ class StudentHomeScreen extends StatelessWidget {
     final bool isPremium = user.isPremium;
     final title = isPremium ? 'النسخة المميزة الكاملة' : 'اشتراك محدود';
     final subtitle =
-    isPremium ? 'استمتع بجميع المميزات' : 'اشترك لفتح بقية المواد';
+    isPremium ? 'استمتع بجميع المميزات' : 'الاطلاع على خدمات واعتماد الحساب';
 
     String statusText = isPremium ? 'مُفعّل' : 'اضغط على زر تفعيل في الاسفل';
     if (isPremium && user.expiryDate != null) {
@@ -599,6 +601,13 @@ class StudentHomeScreen extends StatelessWidget {
   }
 
   void _navigateToSubscriptionWithSlide(BuildContext context) {
+    if (ConfigService().isReviewMode) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AboutNationalExamScreen()),
+      );
+      return;
+    }
     Navigator.push(
       context,
       PageRouteBuilder(
@@ -619,11 +628,16 @@ class StudentHomeScreen extends StatelessWidget {
     String? title,
     String? subtitle,
   }) {
+    if (ConfigService().isReviewMode) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AboutNationalExamScreen()),
+      );
+      return;
+    }
     final isIos = defaultTargetPlatform == TargetPlatform.iOS;
-    final dialogTitle = title ?? (isIos ? 'عضوية الحساب المميز 👑' : 'فتح الباقة الملكية VIP 👑');
-    final dialogSubtitle = subtitle ?? (isIos
-        ? 'الوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي والملازم واجتياز الامتحان بتفوق!'
-        : 'اشترك الآن للوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي واجتياز الامتحان الوطني بتفوق!');
+    final dialogTitle = title ?? 'الاعتماد الأكاديمي والخدمات 🎓';
+    final dialogSubtitle = subtitle ?? 'الوصول الكامل إلى بنوك الأسئلة والأستاذ الذكي والملازم واجتياز الامتحان بتفوق!';
 
     showDialog(
       context: context,
@@ -750,7 +764,7 @@ class StudentHomeScreen extends StatelessWidget {
                               const Icon(Icons.workspace_premium_rounded, size: 18),
                               const SizedBox(width: 6),
                               Text(
-                                isIos ? 'تفاصيل العضوية 👑' : 'الترقية والاشتراك 👑',
+                                'تفاصيل العضوية والاعتماد 🎓',
                                 style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w900, fontSize: 14),
                               ),
                             ],
@@ -806,7 +820,7 @@ class StudentHomeScreen extends StatelessWidget {
       _showLuxurySubscriptionDialog(
         context,
         title: 'لقد استهلكت تجربتك المجانية ✨',
-        subtitle: 'نأمل أن تكون التجربة قد نالت إعجابك! للاستمرار في إجراء الاختبارات والوصول إلى كافة المواد والميزات، اشترك الآن في باقة VIP.',
+        subtitle: 'نأمل أن تكون التجربة قد نالت إعجابك! للاستمرار في إجراء الاختبارات والوصول إلى كافة المواد والميزات، تفضل بالاطلاع على تفاصيل الاعتماد والتواصل مع المشرف الأكاديمي.',
       );
       return;
     }
@@ -982,7 +996,7 @@ class StudentHomeScreen extends StatelessWidget {
     _showLuxurySubscriptionDialog(
       context,
       title: 'باقة VIP الملكية مطلوبة 👑',
-      subtitle: 'هذه المادة والامتحان الكامل مخصص لمشتركي باقة VIP. اشترك الآن وافتح كافة المواد والميزات فوراً!',
+      subtitle: 'هذه المادة والامتحانات التخصصية مخصصة للحسابات المعتمدة. تفضل بالاطلاع على التفاصيل والتواصل مع المشرف الأكاديمي.',
     );
   }
 
