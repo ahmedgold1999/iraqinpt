@@ -76,6 +76,7 @@ flutter:
     - assets/icons/newyear.png
     - assets/icons/ramdan.png
     - assets/icons/iraq.png
+    - assets/icons/appwithoutbackground.png
     - assets/audio/
 
   # الخطوط المخصصة
