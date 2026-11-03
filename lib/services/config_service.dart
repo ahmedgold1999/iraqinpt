@@ -56,6 +56,9 @@ class ConfigService {
         if (data.containsKey('is_maintenance_on')) {
           _config['is_maintenance_on'] = data['is_maintenance_on'] == true;
         }
+        if (data.containsKey('maintenance_platform')) {
+          _config['maintenance_platform'] = data['maintenance_platform'].toString();
+        }
         if (data.containsKey('price_1m') && data['price_1m'] != null) {
           _config['price_1m'] = data['price_1m'].toString();
         }

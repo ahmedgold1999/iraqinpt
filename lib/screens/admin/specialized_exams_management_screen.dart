@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/specialized_exam_model.dart';
 import '../../services/specialized_exam_service.dart';
 
@@ -15,6 +15,313 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
   final SpecializedExamService _examService = SpecializedExamService();
   String _selectedFilterSubject = 'all'; // 'all', 'arabic', 'computer', 'english'
   bool _isSyncing = false;
+  bool _isBatchChecking = false;
+
+  /// فحص شامل لجميع روابط الاختبارات وتحديث عداد الوقت والأسئلة تلقائياً بمعدل 40 ثانية لكل سؤال
+  Future<void> _runComprehensiveAuditAndFix() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.auto_fix_high_rounded, color: Color(0xFF2563EB)),
+            SizedBox(width: 8),
+            Text('فحص شامل وضبط التوقيت', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'سيقوم النظام الآن بفحص جميع روابط ملفات الـ JSON في السحابة و GitHub لكافة الاختبارات التخصصية، وحساب عدد الأسئلة بدقة، وضبط وقت كل اختبار تلقائياً بمعدل (40 ثانية لكل سؤال) وتصحيح أي خطأ.\n\nهل تريد البدء الآن؟',
+          style: TextStyle(fontFamily: 'Tajawal', fontSize: 13.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء', style: TextStyle(fontFamily: 'Tajawal')),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('بدء الفحص الشامل 🚀', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isBatchChecking = true);
+
+    int total = 0;
+    int current = 0;
+    String currentTitle = '';
+    StateSetter? setProgressState;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateModal) {
+          setProgressState = setStateModal;
+          final double progress = total > 0 ? (current / total).clamp(0.0, 1.0) : 0.0;
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(22.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.manage_search_rounded, size: 48, color: Color(0xFF2563EB)),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'جاري الفحص الشامل وتحديث التوقيت...',
+                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 15),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  LinearProgressIndicator(
+                    value: total > 0 ? progress : null,
+                    color: const Color(0xFF2563EB),
+                    backgroundColor: const Color(0xFFE2E8F0),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    total > 0 ? 'تم فحص $current من إجمالي $total اختبار' : 'جاري جلب قائمة الاختبارات...',
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12.5, color: Colors.grey),
+                  ),
+                  if (currentTitle.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      currentTitle,
+                      style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12, fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    int updatedCount = 0;
+    int successCount = 0;
+    int failedCount = 0;
+    List<Map<String, String>> failedExams = [];
+
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('specialized_exams').get();
+      final docs = snapshot.docs;
+      total = docs.length;
+      if (setProgressState != null) setProgressState!(() {});
+
+      for (int i = 0; i < docs.length; i++) {
+        final doc = docs[i];
+        final data = doc.data();
+        final examTitle = data['title'] ?? 'بدون عنوان';
+        final jsonUrl = (data['jsonUrl'] ?? '').toString().trim();
+        final existingCount = (data['questionsCount'] as num?)?.toInt() ?? 0;
+        final existingDuration = (data['durationMinutes'] as num?)?.toInt() ?? 0;
+
+        current = i + 1;
+        currentTitle = examTitle;
+        if (setProgressState != null) setProgressState!(() {});
+
+        if (jsonUrl.isEmpty) {
+          failedCount++;
+          failedExams.add({'title': examTitle, 'error': 'الرابط فارغ'});
+          continue;
+        }
+
+        final res = await SpecializedExamService.validateAndPreviewJson(jsonUrl);
+        if (res['success'] == true) {
+          successCount++;
+          final count = res['count'] as int;
+          // حساب الوقت بالدقائق استناداً لقاعدة 40 ثانية لكل سؤال
+          final calculatedMinutes = count > 0 ? (count * 40 / 60).ceil() : existingDuration;
+
+          // إذا كان الوقت الحالي خطأ أو عدد الأسئلة مختلف يتم التعديل في فايربيس فوراً
+          if (calculatedMinutes != existingDuration || count != existingCount) {
+            await doc.reference.update({
+              'questionsCount': count,
+              'durationMinutes': calculatedMinutes,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+            updatedCount++;
+          }
+        } else {
+          failedCount++;
+          failedExams.add({'title': examTitle, 'error': res['error']?.toString() ?? 'فشل الاتصال'});
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in comprehensive audit: $e');
+    } finally {
+      if (mounted) {
+        Navigator.pop(context); // إغلاق حوار التقدم
+        setState(() => _isBatchChecking = false);
+
+        // إظهار تقرير النتائج
+        _showAuditReportDialog(
+          total: total,
+          updated: updatedCount,
+          success: successCount,
+          failed: failedCount,
+          failedList: failedExams,
+        );
+      }
+    }
+  }
+
+  void _showAuditReportDialog({
+    required int total,
+    required int updated,
+    required int success,
+    required int failed,
+    required List<Map<String, String>> failedList,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF22C55E).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 24),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'تقرير الفحص الشامل وضبط الوقت',
+              style: GoogleFonts.notoKufiArabic(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildReportStatTile(
+                  icon: Icons.all_inbox_rounded,
+                  color: const Color(0xFF2563EB),
+                  title: 'إجمالي الاختبارات التي تم فحصها',
+                  value: '$total اختبار',
+                ),
+                const SizedBox(height: 8),
+                _buildReportStatTile(
+                  icon: Icons.timer_rounded,
+                  color: const Color(0xFFF59E0B),
+                  title: 'اختبارات تم تصحيح وضبط توقيتها',
+                  value: '$updated اختبار (بمعدل 40ث/سؤال)',
+                ),
+                const SizedBox(height: 8),
+                _buildReportStatTile(
+                  icon: Icons.check_circle_outline_rounded,
+                  color: const Color(0xFF22C55E),
+                  title: 'روابط سليمة ومطابقة',
+                  value: '$success اختبار',
+                ),
+                if (failed > 0) ...[
+                  const SizedBox(height: 8),
+                  _buildReportStatTile(
+                    icon: Icons.error_outline_rounded,
+                    color: Colors.redAccent,
+                    title: 'روابط بها أخطاء أو تعذر جلبها',
+                    value: '$failed اختبار',
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'قائمة الاختبارات التي بها أخطاء في الروابط:',
+                    style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                  ),
+                  const SizedBox(height: 6),
+                  ...failedList.map((f) => Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('• ${f['title']}', style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12)),
+                        Text('${f['error']}', style: const TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey)),
+                      ],
+                    ),
+                  )),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('حسناً، تم الفحص بنجاح ✨', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportStatTile({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(fontFamily: 'Tajawal', fontSize: 12.5),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12.5, color: color),
+          ),
+        ],
+      ),
+    );
+  }
 
   final Map<String, Map<String, dynamic>> _subjectMeta = {
     'computer': {
@@ -693,47 +1000,84 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
       ),
       body: Column(
         children: [
-          // شريط الفلاتر وزر الإضافة
+          // شريط المواد والأزرار أسفله
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF131C31) : Colors.white,
               border: Border(bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0))),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    child: Row(
-                      children: [
-                        _buildFilterPill('all', 'جميع المواد'),
-                        const SizedBox(width: 6),
-                        _buildFilterPill('computer', '💻 الحاسوب'),
-                        const SizedBox(width: 6),
-                        _buildFilterPill('arabic', '📖 العربي'),
-                        const SizedBox(width: 6),
-                        _buildFilterPill('english', '🇬🇧 الإنكليزي'),
-                      ],
-                    ),
+                // المواد
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      _buildFilterPill('all', 'جميع المواد'),
+                      const SizedBox(width: 6),
+                      _buildFilterPill('computer', '💻 الحاسوب'),
+                      const SizedBox(width: 6),
+                      _buildFilterPill('arabic', '📖 العربي'),
+                      const SizedBox(width: 6),
+                      _buildFilterPill('english', '🇬🇧 الإنكليزي'),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF22C55E),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  onPressed: () => _showAddEditExamDialog(),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text(
-                    'إضافة اختبار ➕',
-                    style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
+                const SizedBox(height: 12),
+
+                // أزرار العمليات أسفل المواد
+                Row(
+                  children: [
+                    // زر إضافة اختبار
+                    Expanded(
+                      flex: 5,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        onPressed: () => _showAddEditExamDialog(),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+                        label: const Text(
+                          'إضافة اختبار ➕',
+                          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // زر فحص الروابط وتحديث الوقت الشامل
+                    Expanded(
+                      flex: 6,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        onPressed: _isBatchChecking ? null : _runComprehensiveAuditAndFix,
+                        icon: _isBatchChecking
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.auto_fix_high_rounded, size: 18),
+                        label: Text(
+                          _isBatchChecking ? 'جاري الفحص...' : 'فحص الروابط وضبط الوقت ⏱️',
+                          style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 12.5),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -907,13 +1251,7 @@ class _SpecializedExamsManagementScreenState extends State<SpecializedExamsManag
                 ),
               ],
             ),
-            if (exam.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                exam.description,
-                style: TextStyle(fontFamily: 'Tajawal', fontSize: 12.5, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
-              ),
-            ],
+// تم إخفاء الوصف من كارد العرض للإدارة للتركيز على باقي البيانات
             const SizedBox(height: 10),
             Row(
               children: [

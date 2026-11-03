@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -45,10 +46,22 @@ class _MaintenanceScreenState extends State<MaintenanceScreen>
           .get();
 
       final bool isMaintenance = doc.data()?['is_maintenance_on'] == true;
+      final String maintenancePlatform = (doc.data()?['maintenance_platform'] ?? 'all').toString();
+
+      bool appliesToPlatform = false;
+      if (maintenancePlatform == 'all') {
+        appliesToPlatform = true;
+      } else if (maintenancePlatform == 'android' && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        appliesToPlatform = true;
+      } else if (maintenancePlatform == 'ios' && !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        appliesToPlatform = true;
+      }
+
+      final bool isStillInMaintenance = isMaintenance && appliesToPlatform;
 
       if (!mounted) return;
 
-      if (!isMaintenance) {
+      if (!isStillInMaintenance) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text(

@@ -16,12 +16,24 @@ class AppUpdateService {
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!context.mounted) return;
 
-    // 1. فحص الصيانة المباشرة
+    // 1. فحص الصيانة المباشرة واستهداف المنصة (أندرويد / آيفون / كليهما)
     try {
       final docSettings = await _db.collection('system_settings').doc('maintenance_and_updates').get();
       if (docSettings.exists && docSettings.data() != null) {
-        final isMaintenance = docSettings.data()!['is_maintenance_on'] == true;
-        if (isMaintenance) {
+        final data = docSettings.data()!;
+        final isMaintenance = data['is_maintenance_on'] == true;
+        final maintenancePlatform = (data['maintenance_platform'] ?? 'all').toString();
+
+        bool appliesToPlatform = false;
+        if (maintenancePlatform == 'all') {
+          appliesToPlatform = true;
+        } else if (maintenancePlatform == 'android' && !kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+          appliesToPlatform = true;
+        } else if (maintenancePlatform == 'ios' && !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          appliesToPlatform = true;
+        }
+
+        if (isMaintenance && appliesToPlatform) {
           final user = FirebaseAuth.instance.currentUser;
           bool isAdmin = false;
           if (user != null) {
@@ -59,25 +71,27 @@ class AppUpdateService {
       bool targetIos = true;
       bool targetWeb = true;
 
-      // 1. القراءة من system_settings/maintenance_and_updates
+      // 1. القراءة من system_settings/maintenance_and_updates مع عزل كامل بين أندرويد وآيفون
       final docSettings = await _db.collection('system_settings').doc('maintenance_and_updates').get();
       if (docSettings.exists && docSettings.data() != null) {
         final data = docSettings.data()!;
-        latestVersion = (data['latest_version'] ?? data['version'] ?? '1.0.0').toString().trim();
-        updateUrl = (data['update_url'] ?? data['url'] ?? '').toString().trim();
-        isForceUpdate = data['is_force_update'] ?? data['forceUpdate'] ?? false;
         changeLog = (data['change_log'] ?? data['notes'] ?? '').toString().trim();
-        targetAndroid = data['target_android'] ?? true;
-        targetIos = data['target_ios'] ?? true;
         targetWeb = data['target_web'] ?? true;
 
-        // دعم روابط مخصصة لكل منصة
-        if (kIsWeb && (data['web_update_url'] ?? '').toString().trim().isNotEmpty) {
-          updateUrl = data['web_update_url'].toString().trim();
-        } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && (data['android_update_url'] ?? '').toString().trim().isNotEmpty) {
-          updateUrl = data['android_update_url'].toString().trim();
-        } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS && (data['ios_update_url'] ?? '').toString().trim().isNotEmpty) {
-          updateUrl = data['ios_update_url'].toString().trim();
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+          latestVersion = (data['android_latest_version'] ?? data['latest_version'] ?? '1.0.0').toString().trim();
+          updateUrl = (data['android_update_url'] ?? data['update_url'] ?? '').toString().trim();
+          isForceUpdate = data['android_force_update'] ?? data['android_is_force_update'] ?? data['is_force_update'] ?? false;
+          targetAndroid = data['target_android'] ?? true;
+        } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          latestVersion = (data['ios_latest_version'] ?? data['latest_version'] ?? '1.0.0').toString().trim();
+          updateUrl = (data['ios_update_url'] ?? data['update_url'] ?? '').toString().trim();
+          isForceUpdate = data['ios_force_update'] ?? data['ios_is_force_update'] ?? data['is_force_update'] ?? false;
+          targetIos = data['target_ios'] ?? true;
+        } else {
+          latestVersion = (data['latest_version'] ?? data['version'] ?? '1.0.0').toString().trim();
+          updateUrl = (data['web_update_url'] ?? data['update_url'] ?? data['url'] ?? '').toString().trim();
+          isForceUpdate = data['is_force_update'] ?? data['forceUpdate'] ?? false;
         }
       } else {
         // 2. Fallback إلى app_config/version

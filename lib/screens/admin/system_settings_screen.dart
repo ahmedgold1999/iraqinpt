@@ -16,6 +16,22 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   final _versionController = TextEditingController();
   final _storeUrlController = TextEditingController();
   
+  // إعدادات أندرويد المنفصلة
+  final _androidVersionController = TextEditingController();
+  final _androidStoreUrlController = TextEditingController();
+  bool _androidForceUpdate = false;
+  bool _targetAndroid = true;
+
+  // إعدادات آيفون المنفصلة
+  final _iosVersionController = TextEditingController();
+  final _iosStoreUrlController = TextEditingController();
+  bool _iosForceUpdate = false;
+  bool _targetIos = true;
+
+  // إعدادات وضع الصيانة واستهداف المنصة
+  bool _maintenanceMode = false;
+  String _maintenancePlatform = 'all'; // 'all', 'android', 'ios'
+
   final _price1mController = TextEditingController();
   final _price2mController = TextEditingController();
   final _price3mController = TextEditingController();
@@ -25,10 +41,6 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   final _admissionsUrlController = TextEditingController();
   final _geminiApiKeyController = TextEditingController();
 
-  bool _forceUpdate = false;
-  bool _maintenanceMode = false;
-  bool _targetAndroid = true;
-  bool _targetIos = true;
   bool _targetWeb = true;
   bool _isLoading = true;
   String _currentAppVersion = '';
@@ -56,9 +68,20 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
         _storeUrlController.text = data['update_url'] ?? '';
         _forceUpdate = data['is_force_update'] ?? false;
         _maintenanceMode = data['is_maintenance_on'] ?? false;
+        _maintenancePlatform = data['maintenance_platform'] ?? 'all';
         _targetAndroid = data['target_android'] ?? true;
         _targetIos = data['target_ios'] ?? true;
         _targetWeb = data['target_web'] ?? true;
+
+        // تحميل بيانات أندرويد المستقلة
+        _androidVersionController.text = data['android_latest_version'] ?? data['latest_version'] ?? '';
+        _androidStoreUrlController.text = data['android_update_url'] ?? data['update_url'] ?? '';
+        _androidForceUpdate = data['android_force_update'] ?? data['android_is_force_update'] ?? data['is_force_update'] ?? false;
+
+        // تحميل بيانات آيفون المستقلة
+        _iosVersionController.text = data['ios_latest_version'] ?? data['latest_version'] ?? '';
+        _iosStoreUrlController.text = data['ios_update_url'] ?? data['update_url'] ?? '';
+        _iosForceUpdate = data['ios_force_update'] ?? data['ios_is_force_update'] ?? data['is_force_update'] ?? false;
         
         _price1mController.text = (data['price_1m'] ?? '10,000').toString();
         _price2mController.text = (data['price_2m'] ?? '15,000').toString();
@@ -89,10 +112,11 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
     try {
       await _db.collection('system_settings').doc('maintenance_and_updates').set({
         'is_maintenance_on': _maintenanceMode,
+        'maintenance_platform': _maintenancePlatform, // 'all', 'android', 'ios'
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       setState(() => _isLoading = false);
-      _showSuccess('تم تحديث وضع الصيانة بنجاح');
+      _showSuccess('تم تحديث وضع الصيانة واستهداف المنصة بنجاح ✨');
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('خطأ في الحفظ: $e');
@@ -100,24 +124,35 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
   }
 
   Future<void> _saveUpdateSettings() async {
-    if (_versionController.text.isEmpty || _storeUrlController.text.isEmpty) {
-      _showError('يرجى ملء جميع حقول التحديث');
-      return;
-    }
-
     setState(() => _isLoading = true);
     try {
+      final androidVer = _androidVersionController.text.trim();
+      final androidUrl = _androidStoreUrlController.text.trim();
+      final iosVer = _iosVersionController.text.trim();
+      final iosUrl = _iosStoreUrlController.text.trim();
+
       await _db.collection('system_settings').doc('maintenance_and_updates').set({
-        'latest_version': _versionController.text.trim(),
-        'update_url': _storeUrlController.text.trim(),
-        'is_force_update': _forceUpdate,
+        // بيانات أندرويد المستقلة
+        'android_latest_version': androidVer,
+        'android_update_url': androidUrl,
+        'android_force_update': _androidForceUpdate,
         'target_android': _targetAndroid,
+
+        // بيانات آيفون المستقلة
+        'ios_latest_version': iosVer,
+        'ios_update_url': iosUrl,
+        'ios_force_update': _iosForceUpdate,
         'target_ios': _targetIos,
+
+        // حقول متوافقة عالمياً
+        'latest_version': androidVer.isNotEmpty ? androidVer : iosVer,
+        'update_url': androidUrl.isNotEmpty ? androidUrl : iosUrl,
+        'is_force_update': _androidForceUpdate || _iosForceUpdate,
         'target_web': _targetWeb,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       setState(() => _isLoading = false);
-      _showSuccess('تم تحديث بيانات الإصدار بنجاح');
+      _showSuccess('تم تحديث إعدادات إصدارات الأندرويد والآيفون بنجاح ✨');
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('خطأ في الحفظ: $e');
@@ -235,7 +270,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSectionTitle('وضع الصيانة', Icons.engineering_rounded),
+                _buildSectionTitle('وضع الصيانة واستهداف المنصة', Icons.engineering_rounded),
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
@@ -251,15 +286,74 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                     ],
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
                         title: const Text('تفعيل وضع الصيانة', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 15)),
-                        subtitle: const Text('عند التفعيل سيتم إغلاق التطبيق مؤقتاً وإظهار شاشة الصيانة', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontFamily: 'Tajawal')),
+                        subtitle: const Text('عند التفعيل سيتم إغلاق التطبيق مؤقتاً وعرض شاشة الصيانة للمنصة المحددة', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontFamily: 'Tajawal')),
                         value: _maintenanceMode,
                         activeColor: const Color(0xFFEF4444),
                         onChanged: (v) => setState(() => _maintenanceMode = v),
                       ),
                       const SizedBox(height: 12),
+                      const Text(
+                        'اختيار منصة الصيانة المستهدفة:',
+                        style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Text('كليهما (الجميع)', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
+                              selected: _maintenancePlatform == 'all',
+                              selectedColor: const Color(0xFFEF4444).withOpacity(0.18),
+                              labelStyle: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontWeight: _maintenancePlatform == 'all' ? FontWeight.bold : FontWeight.normal,
+                                color: _maintenancePlatform == 'all' ? const Color(0xFFDC2626) : const Color(0xFF4B5563),
+                              ),
+                              onSelected: (v) {
+                                if (v) setState(() => _maintenancePlatform = 'all');
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Text('🤖 أندرويد فقط', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
+                              selected: _maintenancePlatform == 'android',
+                              selectedColor: const Color(0xFF10B981).withOpacity(0.18),
+                              labelStyle: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontWeight: _maintenancePlatform == 'android' ? FontWeight.bold : FontWeight.normal,
+                                color: _maintenancePlatform == 'android' ? const Color(0xFF059669) : const Color(0xFF4B5563),
+                              ),
+                              onSelected: (v) {
+                                if (v) setState(() => _maintenancePlatform = 'android');
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: ChoiceChip(
+                              label: const Text('🍎 آيفون فقط', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
+                              selected: _maintenancePlatform == 'ios',
+                              selectedColor: const Color(0xFF0284C7).withOpacity(0.18),
+                              labelStyle: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontWeight: _maintenancePlatform == 'ios' ? FontWeight.bold : FontWeight.normal,
+                                color: _maintenancePlatform == 'ios' ? const Color(0xFF0284C7) : const Color(0xFF4B5563),
+                              ),
+                              onSelected: (v) {
+                                if (v) setState(() => _maintenancePlatform = 'ios');
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
                       _buildMiniSaveButton(_saveMaintenanceSettings),
                     ],
                   ),
@@ -267,7 +361,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                 
                 const SizedBox(height: 24),
                 
-                _buildSectionTitle('إدارات وتحديث التطبيق', Icons.system_update_rounded),
+                _buildSectionTitle('إدارات وتحديث التطبيق (أندرويد وآيفون)', Icons.system_update_rounded),
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
@@ -285,64 +379,130 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('إصدار التطبيق الحالي: $_currentAppVersion', style: const TextStyle(color: Color(0xFF2563EB), fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
+                      Text('إصدار هذا الجهاز حالياً: $_currentAppVersion', style: const TextStyle(color: Color(0xFF2563EB), fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
                       const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _versionController,
-                        style: const TextStyle(color: Color(0xFF1C1C1E), fontFamily: 'Tajawal'),
-                        decoration: _inputDecoration('رقم أحدث إصدار (مثلاً 1.1.5)', Icons.vignette_rounded),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _storeUrlController,
-                        style: const TextStyle(color: Color(0xFF1C1C1E), fontFamily: 'Tajawal'),
-                        decoration: _inputDecoration('رابط التحديث على المتجر', Icons.link_rounded),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text('المنصات المستهدفة بالتحديث:', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilterChip(
-                              label: const Text('🤖 أندرويد', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
-                              selected: _targetAndroid,
-                              selectedColor: const Color(0xFF10B981).withOpacity(0.2),
-                              checkmarkColor: const Color(0xFF10B981),
-                              onSelected: (v) => setState(() => _targetAndroid = v),
+
+                      // ================= بطاقة تحديثات أندرويد 🤖 =================
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF86EFAC)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.android_rounded, color: Color(0xFF10B981), size: 22),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'إعدادات أندرويد (Google Play)',
+                                  style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF065F46)),
+                                ),
+                                const Spacer(),
+                                Switch.adaptive(
+                                  value: _targetAndroid,
+                                  activeColor: const Color(0xFF10B981),
+                                  onChanged: (v) => setState(() => _targetAndroid = v),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: FilterChip(
-                              label: const Text('🍎 آيفون', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
-                              selected: _targetIos,
-                              selectedColor: const Color(0xFF0284C7).withOpacity(0.2),
-                              checkmarkColor: const Color(0xFF0284C7),
-                              onSelected: (v) => setState(() => _targetIos = v),
+                            const Divider(height: 16),
+                            TextFormField(
+                              controller: _androidVersionController,
+                              style: const TextStyle(color: Color(0xFF1C1C1E), fontFamily: 'Tajawal'),
+                              decoration: _inputDecoration('رقم إصدار الأندرويد المطلوب (مثلاً 2.1.1)', Icons.vignette_rounded),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: FilterChip(
-                              label: const Text('🌐 الويب', style: TextStyle(fontFamily: 'Tajawal', fontSize: 12)),
-                              selected: _targetWeb,
-                              selectedColor: const Color(0xFF8B5CF6).withOpacity(0.2),
-                              checkmarkColor: const Color(0xFF8B5CF6),
-                              onSelected: (v) => setState(() => _targetWeb = v),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              controller: _androidStoreUrlController,
+                              style: const TextStyle(color: Color(0xFF1C1C1E), fontFamily: 'Tajawal'),
+                              decoration: _inputDecoration('رابط التوجيه (متجر Google Play أو APK)', Icons.link_rounded),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 10),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('تحديث إجباري للأندرويد', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13.5)),
+                              subtitle: const Text('يمنع مستخدم الأندرويد من المتابعة دون التحديث', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 11.5, fontFamily: 'Tajawal')),
+                              value: _androidForceUpdate,
+                              activeColor: const Color(0xFF10B981),
+                              onChanged: (v) => setState(() => _androidForceUpdate = v),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      SwitchListTile(
-                        title: const Text('تحديث إجباري', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 15)),
-                        subtitle: const Text('يمنع الطالب من الاستمرار دون تحديث التطبيق على المنصات المختارة', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 12, fontFamily: 'Tajawal')),
-                        value: _forceUpdate,
-                        activeColor: const Color(0xFF0F172A),
-                        onChanged: (v) => setState(() => _forceUpdate = v),
+
+                      const SizedBox(height: 18),
+
+                      // ================= بطاقة تحديثات آيفون 🍎 =================
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F9FF),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFBAE6FD)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0284C7).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.apple_rounded, color: Color(0xFF0284C7), size: 22),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'إعدادات آيفون (App Store)',
+                                  style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0369A1)),
+                                ),
+                                const Spacer(),
+                                Switch.adaptive(
+                                  value: _targetIos,
+                                  activeColor: const Color(0xFF0284C7),
+                                  onChanged: (v) => setState(() => _targetIos = v),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 16),
+                            TextFormField(
+                              controller: _iosVersionController,
+                              style: const TextStyle(color: Color(0xFF1C1C1E), fontFamily: 'Tajawal'),
+                              decoration: _inputDecoration('رقم إصدار الآيفون المطلوب (مثلاً 2.1.0)', Icons.vignette_rounded),
+                            ),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              controller: _iosStoreUrlController,
+                              style: const TextStyle(color: Color(0xFF1C1C1E), fontFamily: 'Tajawal'),
+                              decoration: _inputDecoration('رابط التوجيه (متجر App Store)', Icons.link_rounded),
+                            ),
+                            const SizedBox(height: 10),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('تحديث إجباري للآيفون', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13.5)),
+                              subtitle: const Text('يمنع مستخدم الآيفون من المتابعة دون التحديث', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 11.5, fontFamily: 'Tajawal')),
+                              value: _iosForceUpdate,
+                              activeColor: const Color(0xFF0284C7),
+                              onChanged: (v) => setState(() => _iosForceUpdate = v),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 12),
+
+                      const SizedBox(height: 16),
                       _buildMiniSaveButton(_saveUpdateSettings),
                     ],
                   ),
