@@ -267,6 +267,8 @@ class SpecializedExamService {
       }
 
       final snapshot = await _examsRef.where('isActive', isEqualTo: true).get();
+      // ✅ حفظ توقيت آخر مزامنة فوراً لمنع استنزاف قراءات الفايربيس حتى لو تعثر أو تأخر تحميل ملفات الأسئلة
+      await prefs.setString('last_specialized_exams_sync', DateTime.now().toIso8601String());
 
       // تجميع الاختبارات حسب المادة وتخزين قائمتها محلياً
       final Map<String, List<Map<String, dynamic>>> grouped = {};
