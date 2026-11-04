@@ -14,6 +14,7 @@ import 'screens/student/speed_quiz_screen.dart';
 import 'screens/student/question_search_screen.dart';
 import 'screens/student/true_false_quiz_screen.dart';
 import 'screens/student/about_national_exam_screen.dart';
+import 'services/config_service.dart';
 import 'screens/student/qualification_score_screen.dart';
 import 'screens/student/ai_tutor_screen.dart';
 import 'screens/admin/leaderboard_management_screen.dart';
@@ -133,6 +134,9 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const StudyMaterialsScreen());
 
       case subscription:
+        if (ConfigService().isReviewMode) {
+          return MaterialPageRoute(builder: (_) => const AboutNationalExamScreen());
+        }
         return MaterialPageRoute(builder: (_) => const SubscriptionScreen());
 
       case deleteAccount:

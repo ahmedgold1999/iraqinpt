@@ -211,6 +211,9 @@ class StudentHomeScreen extends StatelessWidget {
   }
 
   Widget _buildPremiumBanner(BuildContext context, UserModel user) {
+    if (ConfigService().isReviewMode) {
+      return const SizedBox.shrink();
+    }
     final bool isPremium = user.isPremium;
     final title = isPremium ? 'النسخة المميزة الكاملة' : 'اشتراك محدود';
     final subtitle =
@@ -402,6 +405,10 @@ class StudentHomeScreen extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () {
+                    if (ConfigService().isReviewMode && isLocked) {
+                      _showRestrictedAccessDialog(context, subject['name'] as String);
+                      return;
+                    }
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -464,7 +471,7 @@ class StudentHomeScreen extends StatelessWidget {
                                           Icon(Icons.lock_rounded, size: 13, color: Colors.redAccent.shade200),
                                           const SizedBox(width: 4),
                                           Text(
-                                            'مطلوب اشتراك 🔒',
+                                            ConfigService().isReviewMode ? 'مخصصة 🔒' : 'مطلوب اشتراك 🔒',
                                             style: TextStyle(
                                               fontFamily: 'Tajawal',
                                               fontSize: 12,
@@ -480,7 +487,7 @@ class StudentHomeScreen extends StatelessWidget {
                                           Icon(Icons.stars_rounded, size: 14, color: Color(0xFF22C55E)),
                                           SizedBox(width: 4),
                                           Text(
-                                            'اضغط للبدء ✨',
+                                            'اضغط لبدء الاختبار ✨',
                                             style: TextStyle(
                                               fontFamily: 'Tajawal',
                                               fontSize: 12,
@@ -586,6 +593,16 @@ class StudentHomeScreen extends StatelessWidget {
   }
 
   String _getSubjectStatus(String subjectKey, bool isLocked) {
+    if (ConfigService().isReviewMode) {
+      if (subjectKey == 'arabic') {
+        return isLocked
+            ? 'الامتحان العام والتخصصي • تجربة نموذج'
+            : 'الامتحان العام والتخصصي • متاح للبدء';
+      }
+      return isLocked
+          ? 'الامتحان العام والتخصصي • مخصص'
+          : 'الامتحان العام والتخصصي • متاح للبدء';
+    }
     if (subjectKey == 'arabic') {
       return isLocked
           ? 'الامتحان العام والتخصصي • تجربة مجانية'
@@ -629,10 +646,7 @@ class StudentHomeScreen extends StatelessWidget {
     String? subtitle,
   }) {
     if (ConfigService().isReviewMode) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const AboutNationalExamScreen()),
-      );
+      _showRestrictedAccessDialog(context, '');
       return;
     }
     final isIos = defaultTargetPlatform == TargetPlatform.iOS;
@@ -910,13 +924,15 @@ class StudentHomeScreen extends StatelessWidget {
                               w: FontWeight.w600, c: Colors.white70, h: 1.5),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'للوصول إلى 100 سؤال كامل، يرجى الاشتراك في النسخة المميزة',
-                          style: _t(13,
-                              w: FontWeight.w500, c: Colors.white54, h: 1.4),
-                          textAlign: TextAlign.center,
-                        ),
+                        if (!ConfigService().isReviewMode) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'للوصول إلى 100 سؤال كامل، يرجى الاشتراك في النسخة المميزة',
+                            style: _t(13,
+                                w: FontWeight.w500, c: Colors.white54, h: 1.4),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         // ⚠️ تنبيه: التجربة مرة واحدة فقط
                         Container(
@@ -993,6 +1009,10 @@ class StudentHomeScreen extends StatelessWidget {
 
 
   void _showNonPremiumDialog(BuildContext context) {
+    if (ConfigService().isReviewMode) {
+      _showRestrictedAccessDialog(context, '');
+      return;
+    }
     _showLuxurySubscriptionDialog(
       context,
       title: 'باقة VIP الملكية مطلوبة 👑',
@@ -1265,30 +1285,28 @@ class StudentHomeScreen extends StatelessWidget {
   }
 
 
-  void _showActivationDialog(BuildContext context) {
-    final controller = TextEditingController();
-
+  void _showRestrictedAccessDialog(BuildContext context, String subjectName) {
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         backgroundColor: Colors.transparent,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(24),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Container(
-              padding: const EdgeInsets.all(26),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFF0B1220).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                color: const Color(0xFF0F172A).withOpacity(0.95),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.45),
-                    blurRadius: 40,
-                    offset: const Offset(0, 16),
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
@@ -1296,101 +1314,56 @@ class StudentHomeScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFFFACC15),
-                          Color(0xFFFB7185),
-                          Color(0xFFEF4444)
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _gold.withOpacity(0.25),
-                          blurRadius: 18,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
+                      color: const Color(0xFF2563EB).withOpacity(0.18),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.4)),
                     ),
-                    child: const Icon(Icons.workspace_premium_rounded,
-                        color: Colors.white, size: 34),
+                    child: const Icon(Icons.school_rounded, color: Color(0xFF60A5FA), size: 36),
                   ),
                   const SizedBox(height: 16),
-                  Text('عضوية الحساب المميز 👑',
-                      style: _t(20, w: FontWeight.w900, c: _gold, ls: 0.6)),
+                  const Text(
+                    'تنبيه دراسي 📚',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                   const SizedBox(height: 12),
-                  Text(
-                    'للحصول على اشتراكك وتفعيل حسابك للوصول الكامل لكافة المواد والامتحانات، يرجى مراسلة إدارة المنصة لإتمام التفعيل فوراً:',
-                    style: _t(13.5, w: FontWeight.w600, c: Colors.white70, h: 1.5),
+                  const Text(
+                    'هذه المادة فقط للطلاب المخصصين لها',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF94A3B8),
+                      height: 1.5,
+                    ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF16A34A),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
-                            elevation: 0,
-                          ),
-                          onPressed: () async {
-                            await launchUrl(
-                                Uri.parse('https://wa.me/9647824255360?text=${Uri.encodeComponent('مرحباً، أود تفعيل اشتراكي في تطبيق دليل الامتحان الوطني')}'),
-                                mode: LaunchMode.externalApplication);
-                          },
-                          icon: const Icon(Icons.chat_rounded,
-                              color: Colors.white, size: 20),
-                          label: Text('واتساب الإدارة',
-                              style: _t(13.5,
-                                  w: FontWeight.w900, c: Colors.white)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
-                            elevation: 0,
-                          ),
-                          onPressed: () async {
-                            await launchUrl(Uri.parse('https://t.me/XG0LDX?text=${Uri.encodeComponent('مرحباً، أود تفعيل اشتراكي في تطبيق دليل الامتحان الوطني')}'),
-                                mode: LaunchMode.externalApplication);
-                          },
-                          icon: const Icon(Icons.send_rounded,
-                              color: Colors.white, size: 20),
-                          label: Text('تليجرام الإدارة',
-                              style: _t(13.5,
-                                  w: FontWeight.w900, c: Colors.white)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 22),
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        side: BorderSide(
-                            color: Colors.white.withOpacity(0.18),
-                            width: 1.2),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
                       ),
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('إغلاق',
-                          style: _t(13,
-                              w: FontWeight.w800, c: Colors.white70)),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text(
+                        'حسناً',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1400,6 +1373,14 @@ class StudentHomeScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _showActivationDialog(BuildContext context) {
+    if (ConfigService().isReviewMode) {
+      _showRestrictedAccessDialog(context, '');
+      return;
+    }
+    _navigateToSubscriptionWithSlide(context);
   }
 
   Widget _buildPreviousExamsCard(BuildContext context) {
@@ -1545,7 +1526,7 @@ class StudentHomeScreen extends StatelessWidget {
                         children: [
                           const Flexible(
                             child: Text(
-                              'الأستاذ الذكي المساعد (AI) 🤖',
+                              'الأستاذ الذكي (AI) 🤖',
                               style: TextStyle(
                                 fontFamily: 'Tajawal',
                                 fontSize: 15.5,
@@ -1555,13 +1536,6 @@ class StudentHomeScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFACC15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 4),

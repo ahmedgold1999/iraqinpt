@@ -6,6 +6,7 @@ import '../../services/gemini_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/app_models.dart';
 import '../../routes.dart';
+import '../../services/config_service.dart';
 import 'subscription_screen.dart';
 
 class AiTutorScreen extends StatefulWidget {

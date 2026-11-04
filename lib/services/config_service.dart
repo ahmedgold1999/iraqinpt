@@ -96,20 +96,28 @@ class ConfigService {
 
   bool get isMaintenanceOn => _config['is_maintenance_on'] ?? false;
   bool get isIosReviewMode => _config['ios_review_mode'] ?? false;
+  bool get isAndroidReviewMode => _config['android_review_mode'] ?? false;
 
   void setIosReviewModeLocal(bool value) {
     _config['ios_review_mode'] = value;
   }
 
-  /// وضع المراجعة الذكي الشامل (خاص بأجهزة الآيفون فقط بناءً على طلب الإدارة)
+  void setAndroidReviewModeLocal(bool value) {
+    _config['android_review_mode'] = value;
+  }
+
+  /// وضع المراجعة الذكي الشامل (يدعم الآيفون والأندرويد للتحكم السحابي الكامل أثناء المراجعة)
   bool get isReviewMode {
     if (kIsWeb) return false;
-    // ملغى ومحذوف تماماً للأندرويد: الأندرويد يعمل بالوضع الطبيعي دائماً
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return isIosReviewMode;
     }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return isAndroidReviewMode;
+    }
     return false;
   }
+  
   String get examEndDate => _config['exam_end_date'] ?? '2026-06-15';
   
   String get admissionsPdfUrl {

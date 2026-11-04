@@ -10,6 +10,7 @@ import '../../models/specialized_exam_model.dart';
 import '../../services/question_service.dart';
 import '../../services/specialized_exam_service.dart';
 import '../../services/subscription_service.dart';
+import '../../services/config_service.dart';
 import 'quiz_screen.dart';
 import 'subscription_screen.dart';
 
@@ -62,6 +63,10 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
   }
 
   void _navigateToSubscription() {
+    if (ConfigService().isReviewMode) {
+      _showRestrictedAccessDialog();
+      return;
+    }
     Navigator.push(
       context,
       PageRouteBuilder(
@@ -78,7 +83,101 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
     );
   }
 
+  void _showRestrictedAccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.transparent,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A).withOpacity(0.95),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB).withOpacity(0.18),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.4)),
+                    ),
+                    child: const Icon(Icons.school_rounded, color: Color(0xFF60A5FA), size: 36),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'تنبيه دراسي 📚',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'هذه المادة فقط للطلاب المخصصين لها',
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF94A3B8),
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text(
+                        'حسناً',
+                        style: TextStyle(
+                          fontFamily: 'Tajawal',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showLuxurySubscriptionPrompt({String? title, String? message}) {
+    if (ConfigService().isReviewMode) {
+      _showRestrictedAccessDialog();
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1073,7 +1172,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
               }
             },
           ),
-          if (!isPremium)
+          if (!isPremium && !ConfigService().isReviewMode)
             Padding(
               padding: const EdgeInsets.only(left: 12),
               child: ActionChip(
@@ -1383,14 +1482,14 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(color: Colors.white.withOpacity(0.25)),
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.lock_rounded, size: 12, color: Color(0xFFFDE047)),
-                                SizedBox(width: 4),
+                                const Icon(Icons.lock_rounded, size: 12, color: Color(0xFFFDE047)),
+                                const SizedBox(width: 4),
                                 Text(
-                                  'VIP',
-                                  style: TextStyle(
+                                  ConfigService().isReviewMode ? 'مخصص' : 'VIP',
+                                  style: const TextStyle(
                                     fontFamily: 'Tajawal',
                                     fontSize: 10.5,
                                     fontWeight: FontWeight.bold,
