@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_windowmanager/flutter_windowmanager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'dart:convert';
 import 'dart:ui' as ui;
 import '../../routes.dart';
 import '../../services/auth_service.dart';
@@ -56,6 +57,30 @@ class StudyMaterial {
           : (data['pageCount'] != null ? int.tryParse(data['pageCount'].toString()) : null),
     );
   }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'description': description,
+    'pdfUrl': pdfUrl,
+    'category': category,
+    'createdAt': createdAt.toIso8601String(),
+    'fileSize': fileSize,
+    'pageCount': pageCount,
+  };
+
+  factory StudyMaterial.fromMap(Map<String, dynamic> data) => StudyMaterial(
+    id: data['id'] ?? '',
+    name: data['name'] ?? '',
+    description: data['description'] ?? '',
+    pdfUrl: data['pdfUrl'] ?? '',
+    category: data['category'] ?? 'computer',
+    createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+    fileSize: data['fileSize'],
+    pageCount: data['pageCount'] is int
+        ? data['pageCount']
+        : (data['pageCount'] != null ? int.tryParse(data['pageCount'].toString()) : null),
+  );
 }
 
 class GoogleFormItem {
@@ -86,6 +111,24 @@ class GoogleFormItem {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'name': name,
+    'description': description,
+    'formUrl': formUrl,
+    'category': category,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory GoogleFormItem.fromMap(Map<String, dynamic> data) => GoogleFormItem(
+    id: data['id'] ?? '',
+    name: data['name'] ?? '',
+    description: data['description'] ?? '',
+    formUrl: data['formUrl'] ?? '',
+    category: data['category'] ?? 'computer',
+    createdAt: DateTime.tryParse(data['createdAt']?.toString() ?? '') ?? DateTime.now(),
+  );
 }
 
 // ==================== نافذة الاشتراك المطلوب ====================
@@ -2909,22 +2952,63 @@ class _StudyMaterialsScreenState extends State<StudyMaterialsScreen>
     }
   }
 
-  Future<void> _loadDataFromFirebase() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadDataFromFirebase({bool forceRefresh = false}) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedMaterialsRaw = prefs.getString('cached_study_materials');
+      final cachedFormsRaw = prefs.getString('cached_google_forms');
+      final lastSyncMs = prefs.getInt('last_study_materials_sync') ?? 0;
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final isCacheValid = (nowMs - lastSyncMs) < (24 * 60 * 60 * 1000);
+
+      // تحميل فوري من الكاش المحلي بدون أي قراءة من فايربيس (0ms, 0 reads)
+      if (cachedMaterialsRaw != null && cachedFormsRaw != null) {
+        try {
+          final List<dynamic> materialsList = jsonDecode(cachedMaterialsRaw);
+          final List<dynamic> formsList = jsonDecode(cachedFormsRaw);
+
+          if (mounted) {
+            setState(() {
+              _allMaterials = materialsList.map((m) => StudyMaterial.fromMap(m as Map<String, dynamic>)).toList();
+              _allForms = formsList.map((f) => GoogleFormItem.fromMap(f as Map<String, dynamic>)).toList();
+              _isLoading = false;
+            });
+          }
+
+          // إذا كانت البيانات مخزنة ولم يمضِ عليها 24 ساعة، نتوقف هنا لحفظ قراءات الفايربيس
+          if (!forceRefresh && isCacheValid) {
+            return;
+          }
+        } catch (e) {
+          debugPrint('Error reading cached materials: $e');
+        }
+      }
+
+      if (_allMaterials.isEmpty && _allForms.isEmpty) {
+        setState(() => _isLoading = true);
+      }
+
       final firestore = FirebaseFirestore.instance;
       final results = await Future.wait([
         firestore.collection('study_materials').orderBy('createdAt', descending: true).get(),
         firestore.collection('google_forms').orderBy('createdAt', descending: true).get(),
       ]);
 
+      final loadedMaterials = results[0].docs.map((doc) => StudyMaterial.fromFirestore(doc)).toList();
+      final loadedForms = results[1].docs.map((doc) => GoogleFormItem.fromFirestore(doc)).toList();
+
       if (mounted) {
         setState(() {
-          _allMaterials = results[0].docs.map((doc) => StudyMaterial.fromFirestore(doc)).toList();
-          _allForms = results[1].docs.map((doc) => GoogleFormItem.fromFirestore(doc)).toList();
+          _allMaterials = loadedMaterials;
+          _allForms = loadedForms;
           _isLoading = false;
         });
       }
+
+      // حفظ في الكاش المحلي وتحديث وقت المزامنة
+      await prefs.setString('cached_study_materials', jsonEncode(loadedMaterials.map((m) => m.toMap()).toList()));
+      await prefs.setString('cached_google_forms', jsonEncode(loadedForms.map((f) => f.toMap()).toList()));
+      await prefs.setInt('last_study_materials_sync', nowMs);
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -3157,7 +3241,7 @@ class _StudyMaterialsScreenState extends State<StudyMaterialsScreen>
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
             tooltip: 'تحديث البيانات',
-            onPressed: _loadDataFromFirebase,
+            onPressed: () => _loadDataFromFirebase(forceRefresh: true),
           ),
         ],
       ),
@@ -3340,7 +3424,7 @@ class _StudyMaterialsScreenState extends State<StudyMaterialsScreen>
                       child: totalCount == 0
                           ? _buildEmptyState(isDark)
                           : RefreshIndicator(
-                              onRefresh: _loadDataFromFirebase,
+                              onRefresh: () => _loadDataFromFirebase(forceRefresh: true),
                               color: const Color(0xFF2563EB),
                               child: ListView(
                                 physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),

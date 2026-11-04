@@ -253,6 +253,19 @@ class SpecializedExamService {
   Future<void> syncAllExamsOffline({bool forceUpdate = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // ✅ فحص الكاش الزمني الذكي: إذا تمت المزامنة خلال آخر 24 ساعة ولم يطلب تحديث إجباري، تخطي فوراً (0 قراءات فايربيس)
+      if (!forceUpdate) {
+        final lastSyncStr = prefs.getString('last_specialized_exams_sync');
+        if (lastSyncStr != null) {
+          final lastSync = DateTime.tryParse(lastSyncStr);
+          if (lastSync != null && DateTime.now().difference(lastSync).inHours < 24) {
+            // الكاش المحلي حديث، نتخطى طلب فايربيس تماماً
+            return;
+          }
+        }
+      }
+
       final snapshot = await _examsRef.where('isActive', isEqualTo: true).get();
 
       // تجميع الاختبارات حسب المادة وتخزين قائمتها محلياً

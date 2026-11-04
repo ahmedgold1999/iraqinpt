@@ -5,17 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'quiz_screen.dart';
-import 'smart_vault_screen.dart';
-import 'notifications_screen.dart';
 import 'subscription_screen.dart';
 import 'about_national_exam_screen.dart';
 import '../../services/config_service.dart';
 import 'subject_exams_screen.dart';
-import '../../services/specialized_exam_service.dart';
 import '../../services/auth_service.dart';
-import '../../services/notification_service.dart';
 import '../../services/subscription_service.dart';
 import '../../services/announcement_service.dart';
 import '../../models/app_models.dart';
@@ -72,71 +67,6 @@ class StudentHomeScreen extends StatelessWidget {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
     } catch (_) {}
-  }
-
-  Widget _buildNotificationBell(BuildContext context, bool isDark) {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    return Padding(
-      padding: const EdgeInsets.only(left: 12),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFF1F5F9),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFE2E8F0),
-              ),
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.notifications_active_rounded,
-                size: 22,
-                color: isDark ? const Color(0xFFFACC15) : const Color(0xFF2563EB),
-              ),
-              tooltip: 'الإشعارات والمنبه اليومي',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const NotificationsScreen()),
-                );
-              },
-            ),
-          ),
-          if (userId != null)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: StreamBuilder<int>(
-                stream: NotificationService.getUnreadCount(userId),
-                builder: (context, snapshot) {
-                  final count = snapshot.data ?? 0;
-                  if (count == 0) return const SizedBox.shrink();
-                  return Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFEF4444),
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                    child: Text(
-                      count > 9 ? '9+' : '$count',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Tajawal',
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    );
   }
 
   Widget _buildAnnouncementBanner(BuildContext context) {
