@@ -147,9 +147,9 @@ class StudentHomeScreen extends StatelessWidget {
     final bool isPremium = user.isPremium;
     final title = isPremium ? 'النسخة المميزة الكاملة' : 'اشتراك محدود';
     final subtitle =
-    isPremium ? 'استمتع بجميع المميزات' : 'الاطلاع على خدمات واعتماد الحساب';
+    isPremium ? 'استمتع بجميع المميزات' : 'انت غير مشترك للاشتراك بالتطبيق';
 
-    String statusText = isPremium ? 'مُفعّل' : 'اضغط على زر تفعيل في الاسفل';
+    String statusText = isPremium ? 'مُفعّل' : 'اضغط على زر العضوية في الاسفل';
     if (isPremium && user.expiryDate != null) {
       final days = user.expiryDate!.difference(DateTime.now()).inDays;
       if (days > 365) {

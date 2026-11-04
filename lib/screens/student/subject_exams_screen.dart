@@ -360,24 +360,7 @@ class _SubjectExamsScreenState extends State<SubjectExamsScreen> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          side: BorderSide(color: isDark ? Colors.white24 : Colors.grey.shade300),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _navigateToSubscription();
-                        },
-                        icon: const Icon(Icons.vpn_key_rounded, size: 16),
-                        label: const Text(
-                          'تفعيل بكود اشتراك 🔑',
-                          style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                      ),
-                    ),
+
                     const SizedBox(width: 10),
                     Expanded(
                       child: TextButton(
