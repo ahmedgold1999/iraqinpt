@@ -31,6 +31,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
   // إعدادات وضع المراجعة للمتاجر
   bool _iosReviewMode = false;
+  bool _androidReviewMode = false;
 
   // إعدادات وضع الصيانة واستهداف المنصة
   bool _maintenanceMode = false;
@@ -78,6 +79,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
 
         // أوضاع المراجعة للمتاجر
         _iosReviewMode = data['ios_review_mode'] ?? false;
+        _androidReviewMode = data['android_review_mode'] ?? false;
 
         // تحميل بيانات أندرويد المستقلة
         _androidVersionController.text = data['android_latest_version'] ?? data['latest_version'] ?? '';
@@ -118,12 +120,14 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
     try {
       await _db.collection('system_settings').doc('maintenance_and_updates').set({
         'ios_review_mode': _iosReviewMode,
+        'android_review_mode': _androidReviewMode,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       ConfigService().setIosReviewModeLocal(_iosReviewMode);
+      ConfigService().setAndroidReviewModeLocal(_androidReviewMode);
       await ConfigService().fetchConfig();
       setState(() => _isLoading = false);
-      _showSuccess('تم حفظ وتحديث وضع مراجعة أبل ستور بنجاح 🍎');
+      _showSuccess('تم حفظ وتحديث أوضاع المراجعة للمتاجر بنجاح ✨');
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('خطأ في الحفظ: $e');
@@ -345,6 +349,15 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
                         ],
                       ),
                       const Divider(height: 20),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('وضع مراجعة قوقل بلاي 🤖 (Google Play Review)', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13.5)),
+                        subtitle: const Text('لتخطي متطلبات Google Play Billing وإخفاء أزرار الاشتراكات وشاشات الدفع أثناء فحص متجر قوقل بلاي على أجهزة الأندرويد.', style: TextStyle(color: Color(0xFF8E8E93), fontSize: 11.5, fontFamily: 'Tajawal')),
+                        value: _androidReviewMode,
+                        activeColor: const Color(0xFF10B981),
+                        onChanged: (v) => setState(() => _androidReviewMode = v),
+                      ),
+                      const Divider(height: 16),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         title: const Text('وضع مراجعة أبل ستور 🍎 (iOS Review Mode)', style: TextStyle(color: Color(0xFF1C1C1E), fontWeight: FontWeight.bold, fontFamily: 'Tajawal', fontSize: 13.5)),
