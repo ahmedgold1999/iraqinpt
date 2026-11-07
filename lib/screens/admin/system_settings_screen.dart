@@ -84,10 +84,10 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
         _androidStoreUrlController.text = data['android_update_url'] ?? data['update_url'] ?? '';
         _androidForceUpdate = data['android_force_update'] ?? data['android_is_force_update'] ?? data['is_force_update'] ?? false;
 
-        // تحميل بيانات آيفون المستقلة
-        _iosVersionController.text = data['ios_latest_version'] ?? data['latest_version'] ?? '';
-        _iosStoreUrlController.text = data['ios_update_url'] ?? data['update_url'] ?? '';
-        _iosForceUpdate = data['ios_force_update'] ?? data['ios_is_force_update'] ?? data['is_force_update'] ?? false;
+        // تحميل بيانات آيفون المستقلة (عزل كامل عن بيانات الأندرويد)
+        _iosVersionController.text = data['ios_latest_version'] ?? '';
+        _iosStoreUrlController.text = data['ios_update_url'] ?? '';
+        _iosForceUpdate = data['ios_force_update'] ?? data['ios_is_force_update'] ?? false;
         
         _price1mController.text = (data['price_1m'] ?? '10,000').toString();
         _price2mController.text = (data['price_2m'] ?? '15,000').toString();
@@ -117,6 +117,10 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
     setState(() => _isLoading = true);
     try {
       await _db.collection('system_settings').doc('maintenance_and_updates').set({
+        'ios_review_mode': _iosReviewMode,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await _db.collection('app_config').doc('version').set({
         'ios_review_mode': _iosReviewMode,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -154,7 +158,7 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
       final iosVer = _iosVersionController.text.trim();
       final iosUrl = _iosStoreUrlController.text.trim();
 
-      await _db.collection('system_settings').doc('maintenance_and_updates').set({
+      final updatePayload = {
         // بيانات أندرويد المستقلة
         'android_latest_version': androidVer,
         'android_update_url': androidUrl,
@@ -167,13 +171,19 @@ class _SystemSettingsScreenState extends State<SystemSettingsScreen> {
         'ios_force_update': _iosForceUpdate,
         'target_ios': _targetIos,
 
-        // حقول متوافقة عالمياً
+        // حقول التوافقية القديمة
         'latest_version': androidVer.isNotEmpty ? androidVer : iosVer,
         'update_url': androidUrl.isNotEmpty ? androidUrl : iosUrl,
         'is_force_update': _androidForceUpdate || _iosForceUpdate,
+        'forceUpdate': _androidForceUpdate || _iosForceUpdate,
         'target_web': _targetWeb,
+        'version': androidVer.isNotEmpty ? androidVer : iosVer,
+        'url': androidUrl.isNotEmpty ? androidUrl : iosUrl,
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+
+      await _db.collection('system_settings').doc('maintenance_and_updates').set(updatePayload, SetOptions(merge: true));
+      await _db.collection('app_config').doc('version').set(updatePayload, SetOptions(merge: true));
       setState(() => _isLoading = false);
       _showSuccess('تم تحديث إعدادات إصدارات الأندرويد والآيفون بنجاح ✨');
     } catch (e) {

@@ -20,6 +20,7 @@ import '../../services/dynamic_app_icon_service.dart';
 import '../../routes.dart';
 import 'leaderboard_management_screen.dart';
 import 'specialized_exams_management_screen.dart';
+import '../student/about_national_exam_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -577,10 +578,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _androidUpdateUrlController.text = (data['android_update_url'] ?? data['update_url'] ?? '').toString();
         _androidForceUpdate = data['android_force_update'] ?? data['is_force_update'] ?? false;
 
-        // تحميل بيانات آيفون المستقلة
-        _iosVersionController.text = (data['ios_latest_version'] ?? data['latest_version'] ?? '').toString();
-        _iosUpdateUrlController.text = (data['ios_update_url'] ?? data['update_url'] ?? '').toString();
-        _iosForceUpdate = data['ios_force_update'] ?? data['is_force_update'] ?? false;
+        // تحميل بيانات آيفون المستقلة (عزل كامل دون أي اعتماد على بيانات الأندرويد)
+        _iosVersionController.text = (data['ios_latest_version'] ?? '').toString();
+        _iosUpdateUrlController.text = (data['ios_update_url'] ?? '').toString();
+        _iosForceUpdate = data['ios_force_update'] ?? false;
         _iosReviewMode = data['ios_review_mode'] ?? false;
         _price1mController.text = (data['price_1m'] ?? '10,000').toString();
         _price2mController.text = (data['price_2m'] ?? '15,000').toString();
@@ -608,6 +609,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
           _targetAndroid = data['target_android'] ?? true;
           _targetIos = data['target_ios'] ?? true;
           _targetWeb = data['target_web'] ?? true;
+
+          _androidVersionController.text = (data['android_latest_version'] ?? data['version'] ?? '').toString();
+          _androidUpdateUrlController.text = (data['android_update_url'] ?? data['url'] ?? '').toString();
+          _androidForceUpdate = data['android_force_update'] ?? data['forceUpdate'] ?? false;
+
+          _iosVersionController.text = (data['ios_latest_version'] ?? '').toString();
+          _iosUpdateUrlController.text = (data['ios_update_url'] ?? '').toString();
+          _iosForceUpdate = data['ios_force_update'] ?? false;
         }
       }
     } catch (e) {
@@ -619,19 +628,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _saveUpdateConfig() async {
     _ensureUpdateControllers();
-    if (_versionController.text.trim().isEmpty) {
+    final androidVer = _androidVersionController.text.trim();
+    final androidUrl = _androidUpdateUrlController.text.trim();
+    final iosVer = _iosVersionController.text.trim();
+    final iosUrl = _iosUpdateUrlController.text.trim();
+
+    if (androidVer.isEmpty && iosVer.isEmpty && _versionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('يرجى كتابة رقم الإصدار')),
+        const SnackBar(content: Text('يرجى كتابة رقم الإصدار للأندرويد أو الآيفون')),
       );
       return;
     }
 
+    if (_versionController.text.trim().isEmpty) {
+      _versionController.text = androidVer.isNotEmpty ? androidVer : iosVer;
+    }
+    if (_updateUrlController.text.trim().isEmpty) {
+      _updateUrlController.text = androidUrl.isNotEmpty ? androidUrl : iosUrl;
+    }
+
     setState(() => _isSavingUpdateConfig = true);
     try {
-      final androidVer = _androidVersionController.text.trim();
-      final androidUrl = _androidUpdateUrlController.text.trim();
-      final iosVer = _iosVersionController.text.trim();
-      final iosUrl = _iosUpdateUrlController.text.trim();
 
       final updateData = {
         // أندرويد
@@ -3189,6 +3206,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             'ios_review_mode': v,
                             'updatedAt': FieldValue.serverTimestamp(),
                           }, SetOptions(merge: true));
+                          await _db.collection('app_config').doc('version').set({
+                            'ios_review_mode': v,
+                          }, SetOptions(merge: true));
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -3235,7 +3255,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       Expanded(
                         child: Text(
                           _iosReviewMode
-                              ? 'الوضع مفعل حالياً: أجهزة الآيفون تشاهد دليل الامتحان بدلاً من شاشة الاشتراكات، بينما الأندرويد يعمل بالوضع الطبيعي.'
+                              ? 'الوضع مفعل حالياً في السحابة: أجهزة الآيفون تشاهد دليل الامتحان بدلاً من شاشة الاشتراكات. الأندرويد يعمل طبيعياً كالمعتاد.'
                               : 'الوضع معطل حالياً: تظهر شاشة الاشتراكات والأسعار والتواصل الطبيعية للجميع (آيفون وأندرويد). قم بتفعيله فقط عند إرسال تحديث لمتجر Apple.',
                           style: TextStyle(
                             fontFamily: 'Tajawal',
@@ -3247,6 +3267,103 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 10),
+                // أزرار المعاينة والتجربة المباشرة للأدمن
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AboutNationalExamScreen()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.35)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.visibility_rounded, size: 15, color: Color(0xFF0284C7)),
+                            SizedBox(width: 6),
+                            Text(
+                              'معاينة شاشة دليل الامتحان (التي يراها المراجع) 👁️',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                                color: Color(0xFF0284C7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        final current = ConfigService().isForcePreviewMode;
+                        ConfigService().setForcePreviewMode(!current);
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              !current
+                                  ? 'تم تفعيل المعاينة الحية على هذا الجهاز! تفقد التبويب السفلي (العضوية أصبحت الدليل) 🧪'
+                                  : 'تم إيقاف المعاينة الحية وعودة الواجهة الطبيعية لهذا الجهاز! ✨',
+                              style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                            ),
+                            backgroundColor: !current ? const Color(0xFF0284C7) : const Color(0xFF10B981),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: ConfigService().isForcePreviewMode
+                              ? const Color(0xFF10B981).withOpacity(0.2)
+                              : (isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: ConfigService().isForcePreviewMode
+                                ? const Color(0xFF10B981)
+                                : (isDark ? Colors.white12 : const Color(0xFFCBD5E1)),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              ConfigService().isForcePreviewMode ? Icons.check_circle_rounded : Icons.science_rounded,
+                              size: 15,
+                              color: ConfigService().isForcePreviewMode ? const Color(0xFF10B981) : (isDark ? Colors.white70 : Colors.black87),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              ConfigService().isForcePreviewMode
+                                  ? 'إيقاف المعاينة الحية على هذا الجهاز ⏹️'
+                                  : 'تجربة حية على هذا الجهاز (حتى لو أندرويد) 🧪',
+                              style: TextStyle(
+                                fontFamily: 'Tajawal',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11.5,
+                                color: ConfigService().isForcePreviewMode ? const Color(0xFF10B981) : (isDark ? Colors.white70 : Colors.black87),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -3611,11 +3728,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         currentVersion: _currentInstalledVersion.isNotEmpty
                             ? _currentInstalledVersion
                             : '1.0.0',
-                        latestVersion: _versionController.text.trim().isNotEmpty
-                            ? _versionController.text.trim()
-                            : '1.1.0',
-                        updateUrl: _updateUrlController.text.trim(),
-                        isForceUpdate: _isForceUpdate,
+                        latestVersion: _androidVersionController.text.trim().isNotEmpty
+                            ? _androidVersionController.text.trim()
+                            : (_iosVersionController.text.trim().isNotEmpty
+                                ? _iosVersionController.text.trim()
+                                : (_versionController.text.trim().isNotEmpty ? _versionController.text.trim() : '1.1.0')),
+                        updateUrl: _androidUpdateUrlController.text.trim().isNotEmpty
+                            ? _androidUpdateUrlController.text.trim()
+                            : (_iosUpdateUrlController.text.trim().isNotEmpty
+                                ? _iosUpdateUrlController.text.trim()
+                                : _updateUrlController.text.trim()),
+                        isForceUpdate: _androidForceUpdate || _iosForceUpdate || _isForceUpdate,
                         changeLog: _changeLogController.text.trim().isNotEmpty
                             ? _changeLogController.text.trim()
                             : 'ميزات وتحديثات استثنائية جديدة!',

@@ -1,30 +1,79 @@
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ConfigService {
+class ConfigService with ChangeNotifier {
   static final ConfigService _instance = ConfigService._internal();
   factory ConfigService() => _instance;
   ConfigService._internal();
 
-  // رابط الإعدادات على GitHub (يوفر قراءات Firestore)
+  // رابط الإعدادات على GitHub (Fallback احتياطي فقط)
   static const String _configUrl = 'https://raw.githubusercontent.com/ahmedgold1999/inptquestions/refs/heads/main/app_config.json';
   
   Map<String, dynamic> _config = {};
   bool _isInitialized = false;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _firestoreSubscription;
+
+  // خيار اختياري للمدير لمعاينة وتجربة وضع المراجعة حياً على أي جهاز (حتى لو أندرويد)
+  bool _forcePreviewMode = false;
+  bool get isForcePreviewMode => _forcePreviewMode;
+  void setForcePreviewMode(bool val) {
+    _forcePreviewMode = val;
+    notifyListeners();
+  }
 
   Future<void> initialize() async {
     if (_isInitialized) return;
     await fetchConfig();
+    _listenToSettings();
     _isInitialized = true;
+  }
+
+  void _listenToSettings() {
+    _firestoreSubscription?.cancel();
+    _firestoreSubscription = FirebaseFirestore.instance
+        .collection('system_settings')
+        .doc('maintenance_and_updates')
+        .snapshots()
+        .listen((snap) async {
+      if (snap.exists && snap.data() != null) {
+        final data = snap.data()!;
+        bool changed = false;
+        if (data.containsKey('ios_review_mode')) {
+          final val = data['ios_review_mode'] == true;
+          if (_config['ios_review_mode'] != val) {
+            _config['ios_review_mode'] = val;
+            changed = true;
+          }
+        }
+        if (data.containsKey('is_maintenance_on')) {
+          final val = data['is_maintenance_on'] == true;
+          if (_config['is_maintenance_on'] != val) {
+            _config['is_maintenance_on'] = val;
+            changed = true;
+          }
+        }
+        if (data.containsKey('maintenance_platform')) {
+          _config['maintenance_platform'] = data['maintenance_platform'].toString();
+        }
+        if (changed) {
+          notifyListeners();
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('app_config_cache', json.encode(_config));
+          } catch (_) {}
+        }
+      }
+    }, onError: (e) => debugPrint('ConfigService listener error: $e'));
   }
 
   Future<void> fetchConfig() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // 1. Fallback to cache first
+    // 1. استرجاع الكاش المحلي فورياً كـ Fallback مؤقت
     final cached = prefs.getString('app_config_cache');
     if (cached != null) {
       try {
@@ -32,30 +81,17 @@ class ConfigService {
       } catch (_) {}
     }
 
-    // 2. Fetch from GitHub
+    // 2. ✅ الأولوية القصوى والمباشرة: فايربيس (المصدر المباشر والحقيقي)
     try {
-      final response = await http.get(Uri.parse(_configUrl)).timeout(const Duration(seconds: 4));
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        if (decoded is Map<String, dynamic>) {
-          _config.addAll(decoded);
-        }
-        await prefs.setString('app_config_cache', json.encode(_config));
-      }
-    } catch (e) {
-      print('⚠️ Config fetch error: $e');
-    }
-
-    // 3. ✅ فحص حالة الصيانة والأسعار المباشرة من فايربيس
-    try {
-      final doc = await FirebaseFirestore.instance.collection('system_settings').doc('maintenance_and_updates').get();
+      final doc = await FirebaseFirestore.instance
+          .collection('system_settings')
+          .doc('maintenance_and_updates')
+          .get(const GetOptions(source: Source.serverAndCache))
+          .timeout(const Duration(seconds: 4));
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         if (data.containsKey('ios_review_mode')) {
           _config['ios_review_mode'] = data['ios_review_mode'] == true;
-        }
-        if (data.containsKey('android_review_mode')) {
-          _config['android_review_mode'] = data['android_review_mode'] == true;
         }
         if (data.containsKey('is_maintenance_on')) {
           _config['is_maintenance_on'] = data['is_maintenance_on'] == true;
@@ -86,23 +122,52 @@ class ConfigService {
         await prefs.setString('app_config_cache', json.encode(_config));
       }
     } catch (e) {
-      print('⚠️ Firestore maintenance & prices check error: $e');
+      debugPrint('⚠️ Firestore config fetch error: $e');
+    }
+
+    // 3. احتياطي إضافي من GitHub في حال تعذر فايربيس فقط
+    if (!_config.containsKey('ios_review_mode')) {
+      try {
+        final response = await http.get(Uri.parse(_configUrl)).timeout(const Duration(seconds: 3));
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            _config.addAll(decoded);
+          }
+          await prefs.setString('app_config_cache', json.encode(_config));
+        }
+      } catch (e) {
+        debugPrint('⚠️ Config fetch error: $e');
+      }
     }
   }
 
-  void setMaintenanceLocal(bool value) {
+  void setMaintenanceLocal(bool value) async {
     _config['is_maintenance_on'] = value;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config_cache', json.encode(_config));
+    } catch (_) {}
   }
 
   bool get isMaintenanceOn => _config['is_maintenance_on'] ?? false;
+  
+  /// الافتراضي الصارم هو false (وضع طبيعي) لتجنب ظهور الدليل بالخطأ
   bool get isIosReviewMode => _config['ios_review_mode'] ?? false;
 
-  void setIosReviewModeLocal(bool value) {
+  void setIosReviewModeLocal(bool value) async {
     _config['ios_review_mode'] = value;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config_cache', json.encode(_config));
+    } catch (_) {}
   }
 
   /// وضع المراجعة الذكي الشامل (خاص بأجهزة الآيفون فقط بناءً على طلب الإدارة)
   bool get isReviewMode {
+    if (_forcePreviewMode) return true;
     if (kIsWeb) return false;
     // ملغى ومحذوف تماماً للأندرويد: الأندرويد يعمل بالوضع الطبيعي دائماً
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -110,6 +175,7 @@ class ConfigService {
     }
     return false;
   }
+
   String get examEndDate => _config['exam_end_date'] ?? '2026-06-15';
   
   String get admissionsPdfUrl {
@@ -131,4 +197,10 @@ class ConfigService {
   }
 
   Map<String, dynamic> get allConfig => _config;
+
+  @override
+  void dispose() {
+    _firestoreSubscription?.cancel();
+    super.dispose();
+  }
 }

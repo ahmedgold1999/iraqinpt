@@ -283,6 +283,8 @@ class _AppIntroSplashScreenState extends State<AppIntroSplashScreen>
         }
       }
 
+      // التأكد من جلب وتحديث الإعدادات لحظياً أثناء عرض السبلاش سكرين
+      await ConfigService().fetchConfig().catchError((_) => null);
       final bool isMaintenance = ConfigService().isMaintenanceOn;
 
       bool hasSeenOnboarding = true;

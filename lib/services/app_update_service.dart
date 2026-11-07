@@ -79,14 +79,17 @@ class AppUpdateService {
         targetWeb = data['target_web'] ?? true;
 
         if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-          latestVersion = (data['android_latest_version'] ?? data['latest_version'] ?? '1.0.0').toString().trim();
+          final androidVer = (data['android_latest_version'] ?? data['latest_version'] ?? '').toString().trim();
+          latestVersion = androidVer.isNotEmpty ? androidVer : '1.0.0';
           updateUrl = (data['android_update_url'] ?? data['update_url'] ?? '').toString().trim();
           isForceUpdate = data['android_force_update'] ?? data['android_is_force_update'] ?? data['is_force_update'] ?? false;
           targetAndroid = data['target_android'] ?? true;
         } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-          latestVersion = (data['ios_latest_version'] ?? data['latest_version'] ?? '1.0.0').toString().trim();
-          updateUrl = (data['ios_update_url'] ?? data['update_url'] ?? '').toString().trim();
-          isForceUpdate = data['ios_force_update'] ?? data['ios_is_force_update'] ?? data['is_force_update'] ?? false;
+          // 🍏 عزل تام للآيفون: يقرأ حقول الآيفون فقط ولا يعتمد إطلاقاً على latest_version الخاص بالأندرويد
+          final iosVer = (data['ios_latest_version'] ?? '').toString().trim();
+          latestVersion = iosVer;
+          updateUrl = (data['ios_update_url'] ?? '').toString().trim();
+          isForceUpdate = data['ios_force_update'] ?? data['ios_is_force_update'] ?? false;
           targetIos = data['target_ios'] ?? true;
         } else {
           latestVersion = (data['latest_version'] ?? data['version'] ?? '1.0.0').toString().trim();
@@ -94,17 +97,30 @@ class AppUpdateService {
           isForceUpdate = data['is_force_update'] ?? data['forceUpdate'] ?? false;
         }
       } else {
-        // 2. Fallback إلى app_config/version
+        // 2. Fallback إلى app_config/version مع عزل تام للمنصة أيضاً
         final docConfig = await _db.collection('app_config').doc('version').get();
         if (docConfig.exists && docConfig.data() != null) {
           final data = docConfig.data()!;
-          latestVersion = (data['version'] ?? '1.0.0').toString().trim();
-          updateUrl = (data['url'] ?? '').toString().trim();
-          isForceUpdate = data['forceUpdate'] ?? false;
           changeLog = (data['change_log'] ?? '').toString().trim();
           targetAndroid = data['target_android'] ?? true;
           targetIos = data['target_ios'] ?? true;
           targetWeb = data['target_web'] ?? true;
+
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+            final androidVer = (data['android_latest_version'] ?? data['version'] ?? data['latest_version'] ?? '').toString().trim();
+            latestVersion = androidVer.isNotEmpty ? androidVer : '1.0.0';
+            updateUrl = (data['android_update_url'] ?? data['url'] ?? data['update_url'] ?? '').toString().trim();
+            isForceUpdate = data['android_force_update'] ?? data['forceUpdate'] ?? data['is_force_update'] ?? false;
+          } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+            final iosVer = (data['ios_latest_version'] ?? '').toString().trim();
+            latestVersion = iosVer;
+            updateUrl = (data['ios_update_url'] ?? '').toString().trim();
+            isForceUpdate = data['ios_force_update'] ?? false;
+          } else {
+            latestVersion = (data['version'] ?? data['latest_version'] ?? '1.0.0').toString().trim();
+            updateUrl = (data['url'] ?? data['update_url'] ?? '').toString().trim();
+            isForceUpdate = data['forceUpdate'] ?? data['is_force_update'] ?? false;
+          }
         }
       }
 
@@ -139,6 +155,12 @@ class AppUpdateService {
 
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version.trim();
+
+      // إذا كان إصدار المنصة الحالية غير محدد (مثلاً لم يحدد الأدمن إصداراً للآيفون بعد)،
+      // نعتبره مساوياً للإصدار الحالي المثبت كي لا يظهر للمستخدم أي إشعار تحديث بالخطأ
+      if (latestVersion.isEmpty) {
+        latestVersion = currentVersion;
+      }
 
       if (isVersionLower(currentVersion, latestVersion)) {
         if (!context.mounted) return;

@@ -40,7 +40,7 @@ void main() async {
     await Future.wait([
       NotificationService.initialize().catchError((_) => null),
       DailyReminderService.initialize().catchError((_) => null),
-      ConfigService().initialize().timeout(const Duration(seconds: 3)).catchError((_) => null),
+      ConfigService().initialize().timeout(const Duration(seconds: 6)).catchError((_) => null),
       SoundEffectsService().init().catchError((_) => null),
     ]);
     

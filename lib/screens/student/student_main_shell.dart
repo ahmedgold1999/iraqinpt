@@ -32,11 +32,22 @@ class _StudentMainShellState extends State<StudentMainShell> {
   void initState() {
     super.initState();
     _loadUserData();
+    ConfigService().addListener(_onConfigChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppUpdateService.checkUpdateOnStartup(context);
       DailyReminderService.checkAndDispatchTodayNotification();
       SpecializedExamService().syncAllExamsOffline();
     });
+  }
+
+  void _onConfigChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    ConfigService().removeListener(_onConfigChanged);
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
