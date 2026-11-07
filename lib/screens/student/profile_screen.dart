@@ -12,6 +12,7 @@ import '../../models/app_models.dart';
 import '../../utils/avatar_helper.dart';
 import '../../widgets/luxury_loading.dart';
 import '../../routes.dart';
+import '../../services/config_service.dart';
 import '../../services/sound_effects_service.dart';
 import 'home_screen.dart';
 
@@ -479,7 +480,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final categories = [
       {'id': 'question', 'label': 'سؤال أو استفسار عام ❓'},
       {'id': 'technical_issue', 'label': 'مشكلة تقنية أو خطأ بالتطبيق 🛠️'},
-      {'id': 'subscription', 'label': 'استفسار حول الاشتراك والترقية 💳'},
+      if (!ConfigService().isReviewMode)
+        {'id': 'subscription', 'label': 'استفسار حول الاشتراك والترقية 💳'},
       {'id': 'suggestion', 'label': 'اقتراح لتطوير التطبيق 💡'},
       {'id': 'materials', 'label': 'ملاحظة حول الملازم أو الأسئلة 📄'},
       {'id': 'other', 'label': 'أخرى 💬'},
@@ -821,9 +823,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                       ),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    child: const Text(
-                                      'VIP 👑',
-                                      style: TextStyle(
+                                    child: Text(
+                                      ConfigService().isReviewMode ? 'معتمد 🎓' : 'VIP 👑',
+                                      style: const TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                         color: Color(0xFF0F172A),
@@ -1155,6 +1157,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   // ================= بطاقة الاشتراك الفاخرة وتفاصيل الانتهاء =================
   Widget _buildSubscriptionCard(UserModel user, bool isDark) {
+    if (ConfigService().isReviewMode) {
+      return const SizedBox.shrink();
+    }
     final isPremium = user.isPremium;
     final expiryDate = user.expiryDate;
     final isExpired = user.isSubscriptionExpired;

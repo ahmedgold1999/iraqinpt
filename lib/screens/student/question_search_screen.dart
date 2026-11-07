@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/question_model.dart';
 import '../../services/question_service.dart';
 import '../../services/tts_service.dart';
+import '../../services/config_service.dart';
 import 'subscription_screen.dart';
 
 class QuestionSearchScreen extends StatefulWidget {
@@ -59,6 +60,20 @@ class _QuestionSearchScreenState extends State<QuestionSearchScreen> {
 
       if (!isPremium) {
         if (!mounted) return;
+        if (ConfigService().isReviewMode) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'هذه المادة فقط للطلاب المخصصين لها',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: Color(0xFF0F172A),
+              duration: Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(

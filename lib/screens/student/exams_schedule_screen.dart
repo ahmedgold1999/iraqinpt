@@ -97,6 +97,19 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
   }
 
   void _showPremiumRequiredDialog() {
+    if (ConfigService().isReviewMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'هذه الأداة فقط للطلاب المخصصين لها',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Color(0xFF0F172A),
+        ),
+      );
+      return;
+    }
     AppDialogs.showConfirmDialog(
       context: context,
       title: 'عضوية مميزة مطلوبة',
@@ -248,7 +261,7 @@ class _ExamsScheduleScreenState extends State<ExamsScheduleScreen> {
     String route = AppRoutes.studentHome;
     switch (index) {
       case 0: route = AppRoutes.studentHome; break;
-      case 1: route = AppRoutes.subscription; break;
+      case 1: route = ConfigService().isReviewMode ? AppRoutes.aboutExam : AppRoutes.subscription; break;
       case 2: route = AppRoutes.examsSchedule; break;
       case 3: route = AppRoutes.studyMaterials; break;
       case 4: route = AppRoutes.profile; break;

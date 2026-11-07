@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../services/leaderboard_service.dart';
 import '../../utils/avatar_helper.dart';
 import '../../routes.dart';
+import '../../services/config_service.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -184,7 +185,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
 
           // شريط تشجيعي سفلي جذاب للانضمام لـ VIP
-          Container(
+          if (!ConfigService().isReviewMode)
+            Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -365,9 +367,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           ),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text(
-                          'VIP 👑',
-                          style: TextStyle(
+                        child: Text(
+                          ConfigService().isReviewMode ? 'معتمد 🎓' : 'VIP 👑',
+                          style: const TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0F172A),

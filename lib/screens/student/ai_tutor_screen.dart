@@ -6,6 +6,7 @@ import '../../services/gemini_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/app_models.dart';
 import '../../routes.dart';
+import '../../services/config_service.dart';
 import 'subscription_screen.dart';
 
 class AiTutorScreen extends StatefulWidget {
@@ -249,6 +250,23 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
   }
 
   void _showQuotaExceededDialog() {
+    if (ConfigService().isReviewMode) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('تنبيه دراسي 📚', textAlign: TextAlign.center, style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+          content: const Text('لقد وصلت للحد اليومي المتاح. هذه الميزة مخصصة للطلاب المخصصين لها.', textAlign: TextAlign.center, style: TextStyle(fontFamily: 'Tajawal')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('حسناً', style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final isIos = defaultTargetPlatform == TargetPlatform.iOS;
 
     showDialog(
@@ -482,8 +500,9 @@ class _AiTutorScreenState extends State<AiTutorScreen> {
       body: Column(
         children: [
           // شريط معلومات الباقة
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          if (!ConfigService().isReviewMode)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: _cardDark,

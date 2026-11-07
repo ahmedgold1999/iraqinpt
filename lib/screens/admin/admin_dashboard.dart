@@ -91,6 +91,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   bool _iosForceUpdate = false;
   // وضع مراجعة أبل ستور (خاص بالآيفون فقط)
   bool _iosReviewMode = false;
+  // وضع مراجعة قوقل بلاي (خاص بالأندرويد)
+  bool _androidReviewMode = false;
 
   // منصة الصيانة المستهدفة
   String _maintenancePlatform = 'all'; // 'all', 'android', 'ios'
@@ -583,6 +585,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _iosUpdateUrlController.text = (data['ios_update_url'] ?? '').toString();
         _iosForceUpdate = data['ios_force_update'] ?? false;
         _iosReviewMode = data['ios_review_mode'] ?? false;
+        _androidReviewMode = data['android_review_mode'] ?? false;
         _price1mController.text = (data['price_1m'] ?? '10,000').toString();
         _price2mController.text = (data['price_2m'] ?? '15,000').toString();
         _price3mController.text = (data['price_3m'] ?? '20,000').toString();
@@ -663,6 +666,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         'ios_force_update': _iosForceUpdate,
         'target_ios': _targetIos,
         'ios_review_mode': _iosReviewMode,
+        'android_review_mode': _androidReviewMode,
 
         // الصيانة
         'is_maintenance_on': _isMaintenanceOn,
@@ -696,6 +700,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       // تحديث الحالة محلياً وفورياً
       ConfigService().setMaintenanceLocal(_isMaintenanceOn);
       ConfigService().setIosReviewModeLocal(_iosReviewMode);
+      ConfigService().setAndroidReviewModeLocal(_androidReviewMode);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -3121,6 +3126,149 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   value: _iosForceUpdate,
                   activeColor: const Color(0xFF0284C7),
                   onChanged: (v) => setState(() => _iosForceUpdate = v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ================= بطاقة وضع مراجعة قوقل بلاي 🤖 (خاص بالأندرويد) =================
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF131C31) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _androidReviewMode
+                    ? const Color(0xFF10B981)
+                    : (isDark ? Colors.white.withOpacity(0.06) : const Color(0xFFE2E8F0)),
+                width: _androidReviewMode ? 1.6 : 1.0,
+              ),
+              boxShadow: [
+                if (_androidReviewMode)
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withOpacity(0.14),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _androidReviewMode
+                            ? const Color(0xFF10B981).withOpacity(0.18)
+                            : Colors.grey.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.verified_user_rounded,
+                        color: _androidReviewMode ? const Color(0xFF10B981) : Colors.grey,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'وضع مراجعة قوقل بلاي 🤖 (Google Play Review)',
+                                style: TextStyle(
+                                  fontFamily: 'Tajawal',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13.5,
+                                  color: _androidReviewMode
+                                      ? const Color(0xFF10B981)
+                                      : (isDark ? Colors.white : Colors.black87),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'إخفاء شاشات الاشتراكات والدفع واستبدالها بـ (الدليل) وتنبيه المواد المخصصة لمراجعي قوقل',
+                            style: TextStyle(fontFamily: 'Tajawal', fontSize: 11, color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _androidReviewMode,
+                      activeColor: const Color(0xFF10B981),
+                      onChanged: (v) async {
+                        setState(() => _androidReviewMode = v);
+                        ConfigService().setAndroidReviewModeLocal(v);
+                        try {
+                          await _db.collection('system_settings').doc('maintenance_and_updates').set({
+                            'android_review_mode': v,
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          }, SetOptions(merge: true));
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  v
+                                      ? 'تم تفعيل وضع مراجعة Google Play للأندرويد بنجاح! 🤖'
+                                      : 'تم إيقاف وضع مراجعة Google Play وعودة الوضع الطبيعي! ✨',
+                                  style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                                ),
+                                backgroundColor: v ? const Color(0xFF10B981) : const Color(0xFF2563EB),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          debugPrint('Error toggling android_review_mode: $e');
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _androidReviewMode
+                        ? const Color(0xFF10B981).withOpacity(0.08)
+                        : (isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFF8FAFC)),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _androidReviewMode
+                          ? const Color(0xFF10B981).withOpacity(0.2)
+                          : (isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _androidReviewMode ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                        size: 15,
+                        color: _androidReviewMode ? const Color(0xFF10B981) : Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _androidReviewMode
+                              ? 'الوضع مفعل حالياً: أجهزة الأندرويد تشاهد دليل الامتحان بدلاً من شاشة الاشتراكات وتنبيه المواد المخصصة لتخطي فحص Google Play بنجاح.'
+                              : 'الوضع معطل حالياً: تظهر شاشة الاشتراكات والخدمات الطبيعية لمستخدمي الأندرويد.',
+                          style: TextStyle(
+                            fontFamily: 'Tajawal',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _androidReviewMode ? const Color(0xFF10B981) : (isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

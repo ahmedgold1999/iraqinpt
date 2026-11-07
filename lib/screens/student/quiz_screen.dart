@@ -17,6 +17,7 @@ import '../../services/mistake_vault_service.dart';
 import '../../services/ai_explainer_service.dart';
 import '../../services/sound_effects_service.dart';
 import '../../services/subscription_service.dart';
+import '../../services/config_service.dart';
 import '../../widgets/luxury_score_certificate.dart';
 import 'package:flutter_windowmanager/flutter_windowmanager.dart';
 
@@ -1789,13 +1790,16 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
           if (mounted) {
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Text(
-                  '⛔ هذه المادة مخصصة للمشتركين فقط. يرجى الاشتراك في باقة VIP.',
-                  style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+                  ConfigService().isReviewMode
+                      ? 'هذه المادة فقط للطلاب المخصصين لها'
+                      : '⛔ هذه المادة مخصصة للمشتركين فقط. يرجى الاشتراك في باقة VIP.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
                 ),
-                backgroundColor: Color(0xFFDC2626),
-                duration: Duration(seconds: 4),
+                backgroundColor: const Color(0xFFDC2626),
+                duration: const Duration(seconds: 4),
               ),
             );
           }
